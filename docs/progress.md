@@ -123,7 +123,7 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 ## Phase 1 — Foundation
 
-Status: **Complete — verified locally** (Supabase connection not yet exercised; see notes)
+Status: **Complete — verified locally and against Supabase**
 
 Tasks:
 
@@ -149,7 +149,8 @@ Implementation notes:
 * Local dev DB is a Docker Postgres (port 5433) in `docker-compose.yml`; it is dev-only. Production/staging use Supabase.
 * Verified end to end: browser path Vite `/api` proxy -> FastAPI -> Postgres returns 200.
 * Frontend production build succeeds.
-* Not yet verified: connecting to a Supabase-hosted database (needs the project's connection string; mind the pooler / asyncpg prepared-statement settings when we do).
+* Verified against the Supabase project (PostgreSQL 17) via the **session pooler** (port 5432): `SELECT 1`, `GET /api/health/db` = 200, and the baseline Alembic migration applied. No application tables exist yet.
+* Supabase project settings chosen: Data API disabled, automatic RLS enabled (the browser never queries tables; only FastAPI does).
 * Not implemented (belongs to later phases): any tables, authentication, rate limiting, CI pipeline.
 
 ---
