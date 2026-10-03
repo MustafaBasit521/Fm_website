@@ -29,3 +29,22 @@ make check      # lint + tests + build
 ```
 
 Secrets go in `.env` files only (git-ignored). Never put secrets in `VITE_*` variables.
+
+## Creating the admin
+
+The system has one admin (business-rules §32). The role is stored in the server-controlled
+`app_metadata`, never in user-editable metadata. After that person has registered normally,
+run this once in the Supabase SQL editor:
+
+```sql
+update auth.users
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role": "admin"}'
+where email = 'admin@example.com';
+```
+
+They must log out and in again so the new token carries the role.
+
+## Tests
+
+Backend database tests need the local Docker Postgres (`make db`); they use a separate
+`crochet_test` database and are skipped if it is unavailable.

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     database_url: str
+    # Supabase project URL, e.g. https://<ref>.supabase.co (public value, not a secret)
+    supabase_url: str
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")
@@ -25,6 +27,19 @@ class Settings(BaseSettings):
         if not v.startswith("postgresql+asyncpg://"):
             raise ValueError("DATABASE_URL must use the postgresql+asyncpg:// scheme")
         return v
+
+    @field_validator("supabase_url")
+    @classmethod
+    def _normalize_supabase_url(cls, v: str) -> str:
+        return v.rstrip("/")
+
+    @property
+    def jwt_issuer(self) -> str:
+        return f"{self.supabase_url}/auth/v1"
+
+    @property
+    def jwks_url(self) -> str:
+        return f"{self.jwt_issuer}/.well-known/jwks.json"
 
     @property
     def is_production(self) -> bool:

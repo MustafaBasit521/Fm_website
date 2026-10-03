@@ -157,18 +157,26 @@ Implementation notes:
 
 ## Phase 2 — Authentication
 
-Status: Not Started
+Status: **Implemented and tested, except the live browser signup/login flow (see notes)**
 
 Tasks:
 
-* Supabase Auth integration
-* customer authentication
-* customer profile
-* authentication dependency
-* admin authorization
-* protected routes
-* customer-only data access
-* admin-only data access
+* [x] Supabase Auth integration (frontend `supabase-js` client; backend verifies JWTs via the project's public JWKS, ES256 only)
+* [x] customer authentication (signup with name, login, logout; email confirmation required by the project)
+* [x] customer profile (`GET/PATCH /api/customers/me`; `customers` table + Alembic migration, matches `database.md` §4)
+* [x] authentication dependency (`get_current_user`: signature, expiry, audience, issuer, required claims; generic 401)
+* [x] admin authorization (`require_admin`: `app_metadata.role == "admin"`; `user_metadata` cannot grant it)
+* [x] protected routes (frontend `ProtectedRoute`; UX only)
+* [x] customer-only data access (identity comes only from the verified token; no `{id}` in customer routes)
+* [x] admin-only data access (`/api/admin/*` router-level dependency; `GET /api/admin/me`)
+
+Implementation notes:
+
+* Tests: backend 30 passing (invalid/expired/forged/wrong-key/wrong-issuer/wrong-audience/HS256 tokens, admin vs customer vs `user_metadata` escalation, lazy customer creation, concurrent first request, validation, isolation); frontend 9 passing. Backend DB tests use a separate `crochet_test` database on the local Docker Postgres and are skipped if it is unavailable; they never touch Supabase.
+* Verified against Supabase: `customers` migration applied (RLS on automatically); real JWKS fetched and parsed; live API returns 401 for missing, garbage and forged tokens.
+* `customers` row is created lazily on the first authenticated `/api/customers/me` call from the token's email/name (`subscribed_to_updates` defaults TRUE per business-rules §7).
+* The first admin is set up manually: see "Creating the admin" in `README.md`.
+* **Not yet verified:** a real browser signup -> email confirmation -> login -> profile round trip against Supabase (needs a real inbox). Also not covered: login rate limiting (Supabase applies its own; app-level limits are Phase 10), account deletion/anonymization (open decision).
 
 ---
 
