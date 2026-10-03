@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Design tokens taken from the UI mockups (Design System.dc.html). */
+@theme {
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+  --color-cream: #fbf8f3;
+  --color-cream-100: #f5efe6;
+  --color-cream-200: #ede3d4;
+  --color-sand: #e6dccd;
+  --color-ink: #2f231c;
+  --color-bark: #5c4436;
+  --color-muted: #7a6656;
+  --color-terracotta: #a64b2a;
+  --color-moss: #5f7550;
+  --color-moss-dark: #3f5233;
+  --color-danger: #b0362f;
+}
+
+body {
+  @apply bg-cream font-sans text-ink antialiased;
+}

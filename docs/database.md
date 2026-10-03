@@ -1,0 +1,793 @@
+# Crochet Shop — Database Design
+
+This document is the **authoritative source for database structure, constraints, enums and foreign-key behavior**.
+
+## 1. Database
+
+Database:
+
+PostgreSQL
+
+Hosted through:
+
+Supabase
+
+ORM:
+
+SQLAlchemy 2.x
+
+Database driver:
+
+asyncpg
+
+Migrations:
+
+Alembic
+
+---
+
+# 2. General Database Principles
+
+Use:
+
+* UUID primary keys where appropriate
+* foreign keys, with explicit `ON DELETE` behavior
+* unique constraints
+* check constraints
+* indexes based on query patterns
+* timestamps
+* transactions for multi-step business operations
+
+Money must be stored as integer minor units/paisa.
+
+Do not use floating-point database columns for monetary values.
+
+---
+
+# 3. Enums
+
+PostgreSQL ENUM types are used consistently for controlled lifecycle/state values.
+
+```text
+order_status
+-----------
+PENDING
+CONFIRMED
+PROCESSING
+SHIPPED
+DELIVERED
+CANCELLED
+```
+
+```text
+payment_status
+-----------
+PENDING
+PAID
+PARTIALLY_REFUNDED
+REFUNDED
+```
+
+```text
+payment_method
+-----------
+COD
+ONLINE
+```
+
+```text
+product_availability
+-----------
+READY_TO_SHIP
+MADE_TO_ORDER
+```
+
+```text
+gallery_image_type
+-----------
+SHOP
+DESIGN
+BEHIND_THE_SCENES
+CUSTOMER_PHOTO
+OTHER
+```
+
+```text
+message_status
+-----------
+NEW
+READ
+REPLIED
+ARCHIVED
+```
+
+```text
+custom_order_status
+-----------
+(values finalized during custom-order implementation)
+```
+
+Do not create enums for genuinely free-form fields (names, descriptions, labels, comments).
+
+---
+
+# 4. Customers
+
+```text
+customers
+-----------
+customer_id UUID PK
+name TEXT NOT NULL
+email TEXT NOT NULL UNIQUE
+phone TEXT
+subscribed_to_updates BOOLEAN NOT NULL DEFAULT TRUE
+created_at TIMESTAMPTZ
+```
+
+`customer_id` corresponds to the user's Supabase Auth ID.
+
+Passwords are not stored in this table.
+
+Supabase Auth manages authentication credentials.
+
+Account creation subscribes the customer to shop updates unless they later unsubscribe.
+
+---
+
+# 5. Addresses
+
+```text
+addresses
+-----------
+address_id UUID PK
+customer_id UUID NOT NULL FK → customers ON DELETE CASCADE
+label TEXT
+house_no TEXT NOT NULL
+street_number TEXT
+city TEXT NOT NULL
+province TEXT
+postal_code TEXT NOT NULL
+country TEXT NOT NULL
+created_at TIMESTAMPTZ
+```
+
+Relationship:
+
+```text
+customers 1 ──── N addresses
+```
+
+A customer may have multiple saved addresses.
+
+Customer deletion cascades to the customer's saved addresses.
+
+---
+
+# 6. Categories
+
+```text
+categories
+-----------
+category_id UUID PK
+name TEXT NOT NULL UNIQUE
+```
+
+Initial categories:
+
+* Flowers
+* Amigurumi
+* House/Home Decor
+* Key Chains
+* Accessories
+* Custom
+
+---
+
+# 7. Products
+
+```text
+products
+-----------
+product_id UUID PK
+category_id UUID NOT NULL FK → categories ON DELETE RESTRICT
+name TEXT NOT NULL
+description TEXT
+price_paisa BIGINT NOT NULL
+availability_type product_availability NOT NULL
+stock_quantity INTEGER NOT NULL
+max_active_units INTEGER NOT NULL
+is_visible BOOLEAN NOT NULL
+is_featured BOOLEAN NOT NULL
+created_at TIMESTAMPTZ
+updated_at TIMESTAMPTZ
+```
+
+Constraints:
+
+```text
+price_paisa >= 0
+stock_quantity >= 0
+max_active_units >= 0
+```
+
+`max_active_units` is made-to-order capacity, measured in units (renamed from `max_active_orders`).
+
+Relationship:
+
+```text
+categories 1 ──── N products
+```
+
+---
+
+# 8. Product Images
+
+```text
+product_images
+-----------
+image_id UUID PK
+product_id UUID NOT NULL FK → products ON DELETE CASCADE
+storage_path TEXT NOT NULL
+alt_text TEXT
+sort_order INTEGER
+created_at TIMESTAMPTZ
+```
+
+Relationship:
+
+```text
+products 1 ──── N product_images
+```
+
+Images are stored in Supabase Storage.
+
+The database stores the storage reference/path and metadata.
+
+Product deletion cascades to product-image metadata. When a product is permanently deleted, the corresponding files in Supabase Storage must also be deleted by the application (the database cascade does not remove Storage files).
+
+---
+
+# 9. Orders
+
+```text
+orders
+-----------
+order_id UUID PK
+
+customer_id UUID NULLABLE FK → customers ON DELETE SET NULL
+
+customer_name TEXT NOT NULL
+customer_email TEXT NOT NULL
+customer_phone TEXT
+
+status order_status NOT NULL
+
+delivery_name TEXT NOT NULL
+delivery_house_no TEXT NOT NULL
+delivery_street_number TEXT
+delivery_city TEXT NOT NULL
+delivery_province TEXT
+delivery_postal_code TEXT NOT NULL
+delivery_country TEXT NOT NULL
+
+subtotal_paisa BIGINT NOT NULL
+delivery_fee_paisa BIGINT NOT NULL DEFAULT 0
+total_amount_paisa BIGINT NOT NULL
+
+payment_deadline_at TIMESTAMPTZ NULL
+
+cancelled_at TIMESTAMPTZ NULL
+cancellation_charge_paisa BIGINT NOT NULL DEFAULT 0
+charge_waived BOOLEAN NOT NULL DEFAULT FALSE
+
+created_at TIMESTAMPTZ
+updated_at TIMESTAMPTZ
+```
+
+Constraints:
+
+```text
+subtotal_paisa >= 0
+delivery_fee_paisa >= 0
+total_amount_paisa = subtotal_paisa + delivery_fee_paisa
+cancellation_charge_paisa >= 0
+```
+
+Field notes:
+
+* `total_amount_paisa` represents subtotal + delivery fee.
+* `payment_deadline_at` is set to 30 minutes after creation for online orders; it is NULL for COD orders.
+* `cancelled_at` is set when the order becomes Cancelled.
+* `cancellation_charge_paisa` is the Processing cancellation charge (50% of the original total including delivery fee), or 0.
+* `charge_waived` records that the admin waived the charge (or that it was waived for an unpaid COD order).
+
+Orders preserve customer and delivery snapshots so historical orders remain meaningful even if customer/product data changes later.
+
+Customer relationship:
+
+```text
+customers 1 ──── N orders
+```
+
+But:
+
+```text
+customer_id = NULL
+```
+
+is valid for guest orders, and for orders whose customer account was deleted.
+
+---
+
+# 10. Order Items
+
+```text
+order_items
+-----------
+order_item_id UUID PK
+
+order_id UUID NOT NULL FK → orders
+
+product_id UUID NULLABLE FK → products ON DELETE SET NULL
+
+product_name_snapshot TEXT NOT NULL
+quantity INTEGER NOT NULL
+unit_price_at_purchase_paisa BIGINT NOT NULL
+```
+
+Constraints:
+
+```text
+quantity > 0
+unit_price_at_purchase_paisa >= 0
+```
+
+Relationship:
+
+```text
+orders 1 ──── N order_items
+products 1 ──── N order_items
+```
+
+`product_id` is nullable because a product may later be permanently deleted.
+
+Historical information is preserved using:
+
+* `product_name_snapshot`
+* `unit_price_at_purchase_paisa`
+
+---
+
+# 11. Payments
+
+```text
+payments
+-----------
+payment_id UUID PK
+order_id UUID NOT NULL FK → orders
+
+method payment_method NOT NULL
+status payment_status NOT NULL
+
+amount_paisa BIGINT NOT NULL
+refunded_amount_paisa BIGINT NOT NULL DEFAULT 0
+provider_reference TEXT UNIQUE
+
+created_at TIMESTAMPTZ
+updated_at TIMESTAMPTZ
+```
+
+Constraints:
+
+```text
+amount_paisa >= 0
+refunded_amount_paisa >= 0
+refunded_amount_paisa <= amount_paisa
+UNIQUE(provider_reference)
+```
+
+`provider_reference` may remain NULL for COD payments. (PostgreSQL allows multiple NULLs under a UNIQUE constraint.)
+
+Relationship:
+
+```text
+orders 1 ──── N payments
+```
+
+The implementation should decide whether multiple payment attempts are represented as multiple payment records or payment-attempt records. This should be finalized before provider-specific implementation.
+
+---
+
+# 12. Wishlist Items
+
+```text
+wishlist_items
+-----------
+customer_id UUID NOT NULL FK → customers ON DELETE CASCADE
+product_id UUID NOT NULL FK → products ON DELETE CASCADE
+created_at TIMESTAMPTZ
+
+UNIQUE(customer_id, product_id)
+```
+
+Relationship:
+
+```text
+customers 1 ──── N wishlist_items
+products 1 ──── N wishlist_items
+```
+
+There is intentionally no separate `wishlists` table.
+
+Each customer effectively has one wishlist represented by their wishlist items.
+
+Wishlist is for registered customers only.
+
+Product deletion cascades to wishlist items.
+
+---
+
+# 13. Reviews
+
+```text
+reviews
+-----------
+review_id UUID PK
+
+customer_id UUID NULLABLE FK → customers ON DELETE SET NULL
+product_id UUID NULLABLE FK → products ON DELETE SET NULL
+order_id UUID NOT NULL FK → orders
+
+product_name_snapshot TEXT NOT NULL
+
+rating INTEGER NOT NULL
+comment TEXT
+created_at TIMESTAMPTZ
+```
+
+Constraints:
+
+```text
+rating BETWEEN 1 AND 5
+UNIQUE(customer_id, product_id)
+```
+
+Deletion behavior:
+
+* `customer_id` and `product_id` are nullable with `ON DELETE SET NULL`, so permanently deleting a customer account or a product does not destroy historical review data.
+* `product_name_snapshot` keeps the review meaningful after its product is deleted.
+
+The backend must verify eligibility: the customer has a **Delivered** order containing that product.
+
+---
+
+# 14. Gallery Images
+
+```text
+gallery_images
+-----------
+gallery_image_id UUID PK
+
+storage_path TEXT NOT NULL
+title TEXT
+description TEXT
+image_type gallery_image_type NOT NULL
+is_visible BOOLEAN NOT NULL
+
+created_at TIMESTAMPTZ
+```
+
+Images are stored in Supabase Storage.
+
+---
+
+# 15. Custom Orders
+
+```text
+custom_orders
+-----------
+custom_order_id UUID PK
+
+customer_id UUID NULLABLE FK → customers ON DELETE SET NULL
+
+name TEXT NOT NULL
+whatsapp_number TEXT NOT NULL
+description TEXT NOT NULL
+
+budget_paisa BIGINT
+required_date DATE
+
+reference_image_path TEXT
+
+status custom_order_status
+
+created_at TIMESTAMPTZ
+updated_at TIMESTAMPTZ
+```
+
+`customer_id` is nullable because guests may submit custom-order requests.
+
+Customer deletion does not destroy the custom-order record (`ON DELETE SET NULL`).
+
+The exact status enum will be finalized during custom-order implementation.
+
+---
+
+# 16. Messages
+
+```text
+messages
+-----------
+message_id UUID PK
+
+name TEXT NOT NULL
+email TEXT
+phone TEXT
+whatsapp_number TEXT
+
+message TEXT NOT NULL
+
+status message_status NOT NULL
+
+created_at TIMESTAMPTZ
+```
+
+---
+
+# 17. Notifications
+
+```text
+notifications
+-----------
+notification_id UUID PK
+
+customer_id UUID NOT NULL FK → customers ON DELETE CASCADE
+
+type
+title TEXT NOT NULL
+message TEXT NOT NULL
+
+status
+
+created_at TIMESTAMPTZ
+```
+
+These records represent in-app notifications.
+
+They are not email delivery logs.
+
+Notifications are non-historical data. When a customer account is deleted, the customer's notifications are deleted with it (`ON DELETE CASCADE`), so notification handling never blocks or conflicts with customer deletion.
+
+Possible notification types include:
+
+```text
+ORDER_PLACED
+ORDER_CONFIRMED
+ORDER_STATUS_CHANGED
+ORDER_SHIPPED
+ORDER_DELIVERED
+PAYMENT_SUCCESS
+PAYMENT_FAILURE
+NEW_PRODUCT
+CUSTOM_ORDER_UPDATE
+```
+
+Notification read/unread behavior should be finalized during implementation.
+
+---
+
+# 18. Business Settings
+
+Initial conceptual structure:
+
+```text
+business_settings
+-----------
+setting_id UUID PK
+
+business_name TEXT
+email TEXT
+phone TEXT
+whatsapp TEXT
+address TEXT
+delivery_information TEXT
+
+delivery_fee_paisa BIGINT
+
+social_links JSONB
+
+updated_at TIMESTAMPTZ
+```
+
+There is initially one active business-settings record.
+
+---
+
+# 19. Important Relationships
+
+High-level relationship map:
+
+```text
+customers
+   │
+   ├── addresses
+   │
+   ├── orders
+   │     └── order_items
+   │             └── products
+   │
+   ├── wishlist_items
+   │             └── products
+   │
+   ├── reviews
+   │
+   ├── notifications
+   │
+   └── custom_orders
+
+
+categories
+   │
+   └── products
+          │
+          └── product_images
+
+
+orders
+   │
+   ├── order_items
+   └── payments
+
+
+products
+   │
+   ├── product_images
+   ├── order_items
+   ├── wishlist_items
+   └── reviews
+```
+
+---
+
+# 20. Historical Data
+
+Historical orders must remain meaningful even if related current entities change.
+
+Order snapshots include:
+
+* customer information
+* delivery address
+* product name
+* purchase price
+
+Do not rely solely on current customer/product records to reconstruct an old order.
+
+---
+
+# 21. Delete Behavior
+
+Deletion behavior must be explicit for every foreign key.
+
+| Foreign key | ON DELETE | Reason |
+|---|---|---|
+| `addresses.customer_id` | CASCADE | Saved addresses are not historical; orders keep their own address snapshot |
+| `orders.customer_id` | SET NULL | Orders are historical business records; snapshots keep them meaningful |
+| `custom_orders.customer_id` | SET NULL | Custom-order records are kept |
+| `reviews.customer_id` | SET NULL | Review data is kept |
+| `wishlist_items.customer_id` | CASCADE | Wishlist is not historical |
+| `notifications.customer_id` | CASCADE | Notifications are not historical |
+| `products.category_id` | RESTRICT | A category cannot be deleted while products reference it |
+| `product_images.product_id` | CASCADE | Storage files must also be deleted by the application |
+| `order_items.product_id` | SET NULL | Snapshots preserve history |
+| `wishlist_items.product_id` | CASCADE | Wishlist is not historical |
+| `reviews.product_id` | SET NULL | Review data is kept; product name snapshot preserves meaning |
+
+### Address deletion
+
+Deleting a saved customer address must not modify historical order delivery addresses because orders contain address snapshots.
+
+---
+
+# 22. Indexing
+
+Indexes should be added based on actual access patterns.
+
+Likely candidates include:
+
+* product category
+* product visibility
+* product availability
+* order customer
+* order status
+* order creation time
+* order payment deadline (for expired-order cleanup)
+* order item order ID
+* order item product ID (for made-to-order capacity checks)
+* payment order ID
+* wishlist customer/product
+* review product
+* notification customer/status
+* message status
+
+Do not add large numbers of indexes without a reason.
+
+---
+
+# 23. Transactions
+
+Transactions are required for operations where multiple database changes must succeed or fail together.
+
+Examples:
+
+* order creation
+* stock reservation
+* made-to-order capacity reservation
+* cancellation and inventory release
+* automatic cancellation of expired unpaid online orders
+* payment/refund state changes where database consistency requires it
+
+The system must prevent:
+
+* negative inventory
+* exceeding made-to-order capacity
+* duplicate reservation
+* inconsistent order/payment states
+* race conditions during reservation and release
+
+---
+
+# 24. Stock and Capacity Logic
+
+Ready-to-ship products:
+
+```text
+available stock = stock_quantity
+```
+
+Reserved quantity is subtracted from `stock_quantity` at order creation and added back when the order is cancelled (including automatic cancellation after an expired online-payment window).
+
+Made-to-order products:
+
+```text
+active capacity usage
+=
+sum of quantities in active Pending/Confirmed/Processing order items
+```
+
+A new order must not cause active capacity usage to exceed:
+
+```text
+max_active_units
+```
+
+Because cancelled orders are not active, cancelling an order releases its made-to-order units from active capacity.
+
+This logic must be protected against concurrent requests.
+
+---
+
+# 25. Database Migrations
+
+All schema changes must be represented through Alembic migrations.
+
+Do not manually modify production database structure without a corresponding migration.
+
+Migration files should be understandable and reviewed before applying them.
+
+---
+
+# 26. Security
+
+Database access must respect the application's authorization model.
+
+Supabase RLS should be used where appropriate.
+
+If FastAPI uses privileged credentials, application-level authorization remains mandatory.
+
+Never expose:
+
+* database credentials
+* Supabase service-role keys
+* payment secrets
+
+to the frontend.
