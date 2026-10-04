@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { Page, ProductSummary } from '../lib/api'
+import { makeAuth } from '../test/auth'
 import WishlistPage from './WishlistPage'
 
 const getWishlist = vi.fn()
@@ -30,12 +30,7 @@ const page = (items: ProductSummary[]): Page<ProductSummary> => ({
   page: 1,
   page_size: 12,
 })
-const renderPage = () =>
-  render(
-    <MemoryRouter>
-      <WishlistPage />
-    </MemoryRouter>,
-  )
+const renderPage = () => render(makeAuth().wrap(<WishlistPage />))
 
 beforeEach(() => {
   getWishlist.mockReset()
@@ -72,4 +67,16 @@ it('keeps the item and shows an error when removal fails', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Remove Rose from wishlist' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not remove')
   expect(screen.getByText('Rose')).toBeInTheDocument()
+})
+
+it('moves a wishlist item to the cart (wishlist -> cart flow)', async () => {
+  getWishlist.mockResolvedValue(
+    page([product('p1', 'Rose'), { ...product('p2', 'Tulip'), is_available: false }]),
+  )
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Add Rose to cart' }))
+  expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toEqual([
+    { product_id: 'p1', quantity: 1 },
+  ])
+  expect(screen.getByRole('button', { name: 'Add Tulip to cart' })).toBeDisabled()
 })

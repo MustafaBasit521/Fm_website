@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { Page, ProductSummary } from '../lib/api'
+import { makeAuth } from '../test/auth'
 import ShopPage from './ShopPage'
 
 const getProducts = vi.fn()
@@ -32,12 +32,7 @@ const page = (items: ProductSummary[], total = items.length): Page<ProductSummar
   page_size: 12,
 })
 
-const renderShop = (path = '/shop') =>
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <ShopPage />
-    </MemoryRouter>,
-  )
+const renderShop = (path = '/shop') => render(makeAuth().wrap(<ShopPage />, path))
 
 beforeEach(() => {
   getProducts.mockReset()

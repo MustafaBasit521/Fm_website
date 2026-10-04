@@ -14,7 +14,7 @@ from sqlalchemy import (
     false,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, query_expression, relationship
 
 from app.core.db import Base
 from app.models.enums import ProductAvailability
@@ -62,6 +62,10 @@ class Product(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    # Units held by active orders. Not a column: load it with
+    # `with_expression(Product.active_units, active_units_expr())` (see services/catalog.py).
+    active_units: Mapped[int | None] = query_expression()
 
     category: Mapped[Category] = relationship(back_populates="products")
     images: Mapped[list["ProductImage"]] = relationship(

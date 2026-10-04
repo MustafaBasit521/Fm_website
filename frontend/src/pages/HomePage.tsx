@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
+import { CartLink } from './CartLink'
 
 export default function HomePage() {
   const { session } = useAuth()
@@ -9,6 +10,7 @@ export default function HomePage() {
       <p className="text-muted">Handmade crochet, made with care in Lahore.</p>
       <nav className="flex gap-4 text-terracotta underline">
         <Link to="/shop">Shop</Link>
+        <CartLink />
         {session ? (
           <Link to="/account">My account</Link>
         ) : (

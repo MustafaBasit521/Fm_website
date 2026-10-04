@@ -3,13 +3,14 @@ from collections.abc import Callable
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, Select, and_, func, literal, or_, select
+from sqlalchemy import ColumnElement, Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_expression
 
 from app.models.catalog import Category, Product, ProductImage
-from app.models.enums import ProductAvailability
+from app.models.enums import ACTIVE_ORDER_STATUSES, ProductAvailability
+from app.models.orders import Order, OrderItem
 from app.schemas.catalog import (
     AdminProduct,
     CategoryRead,
@@ -32,12 +33,15 @@ UrlFor = Callable[[str], str]
 
 
 def active_units_expr() -> ColumnElement[int]:
-    """Units currently consumed by active (Pending/Confirmed/Processing) order items.
-
-    Orders do not exist yet (Phase 5), so nothing consumes capacity. Phase 5 replaces this
-    with the real aggregate; every availability check below goes through this one function.
-    """
-    return literal(0)
+    """Units currently held by active (Pending/Confirmed/Processing) orders, per product."""
+    return (
+        select(func.coalesce(func.sum(OrderItem.quantity), 0))
+        .select_from(OrderItem)
+        .join(Order, Order.order_id == OrderItem.order_id)
+        .where(OrderItem.product_id == Product.product_id, Order.status.in_(ACTIVE_ORDER_STATUSES))
+        .correlate(Product)
+        .scalar_subquery()
+    )
 
 
 def availability_expr() -> ColumnElement[bool]:
@@ -51,10 +55,12 @@ def availability_expr() -> ColumnElement[bool]:
     return or_(ready, made)
 
 
-def is_available(product: Product, active_units: int = 0) -> bool:
+def is_available(product: Product) -> bool:
     if product.availability_type == ProductAvailability.READY_TO_SHIP:
         return product.stock_quantity > 0
-    return product.max_active_units - active_units > 0
+    if product.active_units is None:  # a query forgot with_expression(): fail loudly
+        raise RuntimeError("Product.active_units was not loaded")
+    return product.max_active_units - product.active_units > 0
 
 
 # ---- mapping -------------------------------------------------------------------------------
@@ -157,7 +163,11 @@ async def list_products(
     stmt: Select[tuple[Product]] = (
         select(Product)
         .where(*conditions)
-        .options(selectinload(Product.category), selectinload(Product.images))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.images),
+            with_expression(Product.active_units, active_units_expr()),
+        )
         .order_by(*_SORTS[sort], Product.product_id)  # product_id: stable pagination
         .offset((page - 1) * page_size)
         .limit(page_size)
@@ -172,7 +182,11 @@ async def get_product(
     stmt = (
         select(Product)
         .where(Product.product_id == product_id)
-        .options(selectinload(Product.category), selectinload(Product.images))
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.images),
+            with_expression(Product.active_units, active_units_expr()),
+        )
     )
     if visible_only:
         stmt = stmt.where(Product.is_visible.is_(True))

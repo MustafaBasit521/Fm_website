@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
+import { AddToCartButton } from './AddToCartButton'
+import { CartLink } from './CartLink'
 import { WishlistButton } from './WishlistButton'
 
 export default function ProductPage() {
@@ -32,9 +34,12 @@ export default function ProductPage() {
   const selected = selection.id === id ? selection.index : 0
 
   const back = (
-    <Link to="/shop" className="text-terracotta underline">
-      ← Back to shop
-    </Link>
+    <span className="flex justify-between">
+      <Link to="/shop" className="text-terracotta underline">
+        ← Back to shop
+      </Link>
+      <CartLink />
+    </span>
   )
 
   if (state === 'loading')
@@ -106,6 +111,11 @@ export default function ProductPage() {
                 : 'In stock'
               : 'Currently unavailable'}
           </p>
+          <AddToCartButton
+            productId={product.product_id}
+            productName={product.name}
+            disabled={!product.is_available}
+          />
           <WishlistButton productId={product.product_id} />
           {product.description && <p className="whitespace-pre-line">{product.description}</p>}
         </div>

@@ -5,10 +5,21 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 export class ApiError extends Error {
   readonly status: number
-  constructor(status: number, message: string) {
+  /** The server's `detail` (a string, or an object such as { code, message, ... }). */
+  readonly detail: unknown
+  constructor(status: number, message: string, detail?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.detail = detail
+  }
+
+  /** Machine-readable error code from structured errors, e.g. CHECKOUT_INVALID. */
+  get code(): string | undefined {
+    const d = this.detail
+    return typeof d === 'object' && d !== null && 'code' in d
+      ? String((d as { code: unknown }).code)
+      : undefined
   }
 }
 
@@ -19,7 +30,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (init.body) headers.set('Content-Type', 'application/json')
 
   const res = await fetch(`${BASE_URL}/api${path}`, { ...init, headers })
-  if (!res.ok) throw new ApiError(res.status, `Request failed (${res.status})`)
+  if (!res.ok) {
+    let detail: unknown
+    try {
+      detail = ((await res.json()) as { detail?: unknown }).detail
+    } catch {
+      detail = undefined
+    }
+    throw new ApiError(res.status, `Request failed (${res.status})`, detail)
+  }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T
 }
@@ -137,3 +156,88 @@ export const addToWishlist = (productId: string) =>
   apiPost<{ product_id: string }>('/customers/me/wishlist', { product_id: productId })
 export const removeFromWishlist = (productId: string) =>
   apiDelete(`/customers/me/wishlist/${encodeURIComponent(productId)}`)
+
+// ---- cart, checkout, orders ---------------------------------------------------------------
+
+export type PaymentMethod = 'COD' | 'ONLINE'
+export type LineIssue = 'NOT_FOUND' | 'UNAVAILABLE' | 'EXCEEDS_AVAILABLE'
+
+export interface CartLine {
+  product_id: string
+  quantity: number
+}
+
+export interface QuoteLine {
+  product_id: string
+  quantity: number
+  name: string | null
+  unit_price_paisa: number | null
+  line_total_paisa: number | null
+  image: ProductImage | null
+  issue: LineIssue | null
+  max_quantity: number | null
+}
+
+export interface Quote {
+  lines: QuoteLine[]
+  subtotal_paisa: number
+  delivery_fee_paisa: number
+  total_paisa: number
+  payment_methods: PaymentMethod[]
+  can_checkout: boolean
+}
+
+export const getQuote = (items: CartLine[], signal?: AbortSignal) =>
+  request<Quote>('/checkout/quote', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+    signal,
+  })
+
+export interface CheckoutAddress {
+  label?: null
+  house_no: string
+  street_number: string | null
+  city: string
+  province: string | null
+  postal_code: string
+  country: string
+}
+
+export interface OrderRequest {
+  items: CartLine[]
+  contact: { name: string; email: string; phone: string | null }
+  delivery: { recipient_name?: string | null; address_id?: string; address?: CheckoutAddress }
+  payment_method: PaymentMethod
+  expected_total_paisa?: number
+}
+
+export interface Order {
+  order_id: string
+  status: string
+  payment_method: PaymentMethod
+  payment_status: string
+  payment_deadline_at: string | null
+  customer_name: string
+  customer_email: string
+  customer_phone: string | null
+  delivery_name: string
+  delivery_house_no: string
+  delivery_street_number: string | null
+  delivery_city: string
+  delivery_province: string | null
+  delivery_postal_code: string
+  delivery_country: string
+  items: {
+    product_id: string | null
+    product_name_snapshot: string
+    quantity: number
+    unit_price_at_purchase_paisa: number
+  }[]
+  subtotal_paisa: number
+  delivery_fee_paisa: number
+  total_amount_paisa: number
+  created_at: string
+}
+
+export const createOrder = (data: OrderRequest) => apiPost<Order>('/orders', data)

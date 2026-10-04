@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 import app.models  # noqa: F401  (registers models on Base.metadata)
 from app.core.auth import KeyResolver, get_key_resolver
 from app.core.config import get_settings
-from app.core.db import Base, get_session
+from app.core.db import get_session
 from app.core.storage import SignedUpload, SupabaseStorage, get_storage
 from app.main import create_app
 
@@ -70,24 +70,50 @@ def other_key():
     return _OTHER_KEY
 
 
-@pytest_asyncio.fixture
-async def db_engine():
-    """Dedicated test database on the local Docker Postgres. Skips if unavailable."""
-    try:
-        admin = await asyncpg.connect(
-            "postgresql://crochet:crochet_dev_password@localhost:5433/postgres", timeout=3
-        )
-    except Exception:
-        pytest.skip("local test Postgres not available (run `make db`)")
+_ADMIN_DSN = "postgresql://crochet:crochet_dev_password@localhost:5433/postgres"
+
+
+async def _reset_test_database() -> None:
+    admin = await asyncpg.connect(_ADMIN_DSN, timeout=3)
     try:
         if not await admin.fetchval("SELECT 1 FROM pg_database WHERE datname='crochet_test'"):
             await admin.execute("CREATE DATABASE crochet_test")
     finally:
         await admin.close()
+    conn = await asyncpg.connect(_ADMIN_DSN.replace("/postgres", "/crochet_test"), timeout=3)
+    try:
+        await conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
+    finally:
+        await conn.close()
+
+
+@pytest.fixture(scope="session")
+def migrated_db():
+    """Build the test schema with the REAL Alembic migrations (so migrations, seed data and the
+    SQL expiry function are exercised too). Local Docker Postgres only; skipped if unavailable."""
+    import asyncio
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    try:
+        asyncio.run(_reset_test_database())
+    except Exception:
+        pytest.skip("local test Postgres not available (run `make db`)")
+    backend = Path(__file__).resolve().parent.parent
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend,
+        env={**os.environ},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest_asyncio.fixture
+async def db_engine(migrated_db):
     engine = create_async_engine(os.environ["DATABASE_URL"])
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
 
@@ -129,10 +155,18 @@ async def client(db_engine, storage):
     async with db_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+                "TRUNCATE payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+            )
+        )
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO business_settings (setting_id, business_name, delivery_fee_paisa)"
+                " VALUES (gen_random_uuid(), 'Test Shop', 20000)"
             )
         )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        c.app = app  # tests tweak dependency overrides (e.g. enable online payments)
         yield c
 
 
@@ -175,3 +209,13 @@ def make_product(client, admin_h, category_id):
         return r.json()
 
     return _make
+
+
+@pytest.fixture
+def online_enabled(client):
+    from app.core.config import Settings
+
+    base = get_settings()
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        **{**base.model_dump(), "online_payments_enabled": True}, _env_file=None
+    )

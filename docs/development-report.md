@@ -116,3 +116,36 @@ Status of each phase lives in `progress.md`; business rules and schema live in `
 
 * "Wishlist -> cart" deferred to Phase 5 (cart does not exist yet); see `progress.md`.
 * The production bundle is now ~490 kB (Vite warns above 500 kB). Code splitting is a Phase 10 performance item, not done now.
+
+---
+
+## Phase 5 — Cart and Checkout
+
+**Design (CLAUDE.md §14–15; business-rules §10–13, §24; database.md §9–11, §18, §23–24)**
+
+* The cart lives only in the browser (ids and quantities). The backend never accepts prices: `POST /api/checkout/quote` returns authoritative lines, availability issues, delivery fee and total; `POST /api/orders` recomputes everything again inside the order transaction.
+* Order creation is one transaction: lock the product rows (`FOR UPDATE`, ordered by id so opposite-order carts cannot deadlock), re-evaluate every line, reserve ready-to-ship stock, then insert order, items (name/price snapshots) and a PENDING payment row. Any problem rolls everything back (all-or-nothing). The `stock_quantity >= 0` CHECK is the last backstop.
+* Made-to-order capacity is derived (units in Pending/Confirmed/Processing orders), so there is no counter to keep in sync, and cancelling or shipping an order frees capacity automatically.
+* Lahore is enforced server-side for inline and saved addresses; the city is stored canonically. Saved-address ids are resolved with the owner in the query, so another customer's address is "not found". A guest cannot use a saved address.
+* The order endpoint takes an optional login: a missing token is a guest order, but a token that is sent and is invalid or expired is a 401, never a silent downgrade to a guest order.
+* Expiry (decided with the owner: pg_cron + SQL function): `expire_unpaid_online_orders()` selects overdue unpaid online orders with `FOR UPDATE SKIP LOCKED`, cancels them, and returns ready-to-ship stock. An advisory lock serializes runs. The API calls the same function before reserving stock, so the schedule is an optimization for freeing stock, not a correctness dependency.
+* Online payment is refused until the payment phase (`ONLINE_PAYMENTS_ENABLED=false`).
+
+**Built**
+
+* Backend: `models/orders.py` (orders, order_items, payments), `models/business_settings.py`, enums, migration (tables, seed Rs 200 fee, SQL function, clean downgrade), `schemas/checkout.py`, `services/checkout.py`, `api/checkout.py`, `get_optional_user`, catalog availability now uses real active order units.
+* Frontend: cart store (`lib/cart.ts`, `CartProvider`), `AddToCartButton`, `CartLink`, `CartPage`, `CheckoutPage`, `OrderConfirmationPage`, structured API errors (`ApiError.code`), wishlist -> cart action.
+
+**Verified**
+
+* Backend 163 tests, frontend 57 tests, Ruff/ESLint/Prettier clean, build OK, migration applied on Supabase, live validation responses OK. Tests build the schema from the real migrations.
+
+**Bugs found by tests and fixed**
+
+* Made-to-order oversell race: six concurrent orders passed a capacity of 2 because the active-units subquery used the statement's old snapshot after waiting for the row lock. Fix: lock first, then read active units in a separate statement.
+* Test-only mistakes: tests that created the database with `create_all` missed the SQL function (tests now run the real migrations); an expiry test forgot that placing an order also expires overdue ones.
+
+**Decisions / notes**
+
+* See `progress.md` for the decisions and known gaps (rate limiting, double-submit, payment status after expiry, product type changes, guest order lookup).
+* pg_cron is available on the Supabase project but not enabled; enabling it is a one-time manual step (README).

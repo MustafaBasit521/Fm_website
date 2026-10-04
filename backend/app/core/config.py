@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Storage upload URLs and delete Storage files. Never sent to the browser.
     supabase_service_key: SecretStr | None = None
     product_images_bucket: str = "product-images"
+    # Online payment needs a gateway (chosen/implemented in the payments phase). Until then the
+    # API refuses ONLINE orders so nobody places an order they cannot pay for.
+    online_payments_enabled: bool = False
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")

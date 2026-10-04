@@ -116,3 +116,15 @@ async def require_admin(user: Annotated[AuthUser, Depends(get_current_user)]) ->
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     return user
+
+
+async def get_optional_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    resolver: Annotated[KeyResolver, Depends(get_key_resolver)],
+) -> AuthUser | None:
+    """Guests send no token and get None. A token that IS sent must be valid: an expired token
+    is a 401 (so the client can refresh), never a silent downgrade to a guest order."""
+    if credentials is None:
+        return None
+    return await verify_token(credentials.credentials, settings, resolver)

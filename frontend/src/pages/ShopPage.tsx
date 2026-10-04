@@ -7,6 +7,7 @@ import {
   type Page,
   type ProductSummary,
 } from '../lib/api'
+import { CartLink } from './CartLink'
 import { ProductCard } from './ProductCard'
 
 const PAGE_SIZE = 12
@@ -66,9 +67,12 @@ export default function ShopPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link to="/" className="text-terracotta underline">
-        ← Home
-      </Link>
+      <div className="flex justify-between">
+        <Link to="/" className="text-terracotta underline">
+          ← Home
+        </Link>
+        <CartLink />
+      </div>
       <h1 className="mt-2 font-serif text-4xl">Shop</h1>
 
       <form

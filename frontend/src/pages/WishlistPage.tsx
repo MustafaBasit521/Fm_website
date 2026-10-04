@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getWishlist, removeFromWishlist, type Page, type ProductSummary } from '../lib/api'
+import { AddToCartButton } from './AddToCartButton'
 import { ProductCard } from './ProductCard'
 
 export default function WishlistPage() {
@@ -82,6 +83,12 @@ export default function WishlistPage() {
             {data.items.map((p) => (
               <li key={p.product_id} className="flex flex-col gap-2">
                 <ProductCard product={p} />
+                <AddToCartButton
+                  compact
+                  productId={p.product_id}
+                  productName={p.name}
+                  disabled={!p.is_available}
+                />
                 <button
                   type="button"
                   className="text-left text-danger underline"

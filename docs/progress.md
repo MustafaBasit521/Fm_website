@@ -45,29 +45,30 @@ Updating documentation does **not** mean a decision is implemented or tested.
 |---|---|---|---|---|
 | 30-minute online payment window | Yes | Yes (`orders.payment_deadline_at`) | No | No |
 | Payment retry during the window | Yes | Partly — payment-attempt representation still open | No | No |
-| Automatic cancellation after expiry | Yes | Partly — cleanup mechanism still open | No | No |
-| Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | No | No |
+| Automatic cancellation after expiry | Yes | Yes (decided: pg_cron + SQL function `expire_unpaid_online_orders()`) | Yes (SQL function; scheduling step pending, see Phase 5) | Yes (function) |
+| Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | Partly (reserve at order creation; release on expiry. Release on customer/admin cancellation is Phase 6) | Yes (reservation + expiry release) |
 | Online order Confirmed only after verified payment | Yes | Yes | No | No |
 | COD payment confirmed on delivery by admin | Yes | Yes | No | No |
-| Client-side cart for MVP (no cart tables) | Yes | Yes | No | No |
+| Client-side cart for MVP (no cart tables) | Yes | Yes | Yes | Yes |
 | Guest cancellation/address change via admin/contact flow | Yes | Yes | No | No |
 | Processing cancellation charge = 50% of original total incl. delivery fee | Yes | Yes (`cancellation_charge_paisa`, `charge_waived`) | No | No |
 | Review eligibility requires a Delivered order | Yes | Yes | No | No |
 | One review per customer/product | Yes | Yes (`UNIQUE(customer_id, product_id)`) | No | No |
-| Lahore-only delivery (canonical city value) | Yes | Yes | No | No |
-| Made-to-order capacity measured in active units | Yes | Yes (`max_active_units`) | No | No |
-| Database fields/constraints added (see `database.md`) | Yes | Yes | No | No |
-| PostgreSQL ENUMs for controlled state values | Yes | Yes (`database.md` §3) | No | No |
-| Explicit FK delete behavior | Yes | Yes (`database.md` §21) | No | No |
+| Lahore-only delivery (canonical city value) | Yes | Yes | Yes (at checkout) | Yes |
+| Made-to-order capacity measured in active units | Yes | Yes (`max_active_units`) | Yes | Yes |
+| Database fields/constraints added (see `database.md`) | Yes | Yes | Partly (customers, catalog, addresses, wishlist, orders, order_items, payments, business_settings) | Yes (constraints exercised by tests) |
+| PostgreSQL ENUMs for controlled state values | Yes | Yes (`database.md` §3) | Partly (product_availability, order_status, payment_status, payment_method) | Yes |
+| Explicit FK delete behavior | Yes | Yes (`database.md` §21) | Partly (all tables created so far) | Yes (cascade/restrict/set-null tests) |
 | Signed-URL image upload flow | Yes | Yes (`CLAUDE.md` §10) | No | No |
 
 ---
 
 # Open Decisions (require approval)
 
+Decided: expired unpaid online orders are cleaned up by a PostgreSQL function (`expire_unpaid_online_orders()`) scheduled with Supabase pg_cron (Phase 5).
+
 * How a Processing-stage cancellation is requested (business-rules §15 allows only admin-performed cancellation from Processing onwards)
 * Payment-attempt representation: one payment record updated in place vs one record per attempt (the status list has no "Failed" state)
-* Mechanism for automatic cleanup of expired unpaid online orders
 * Handling of a verified online payment that arrives after the 30-minute window has expired
 * Exact anonymization/retention strategy for customer account deletion
 * How the admin verifies a guest's identity for WhatsApp/contact requests
@@ -233,21 +234,32 @@ Implementation notes:
 
 ## Phase 5 — Cart and Checkout
 
-Status: Not Started
+Status: **Implemented and tested, except enabling pg_cron on Supabase (manual step) and online payment (Phase 7)**
 
 Tasks:
 
-* client-side/browser cart (guest and authenticated; no cart tables)
-* checkout
-* Lahore validation
-* address selection
-* backend price validation
-* delivery fee
-* stock validation
-* made-to-order capacity validation
-* order creation
-* inventory reservation
-* 30-minute online payment window and automatic expiry
+* [x] client-side/browser cart (guest and authenticated; ids + quantities in localStorage; no cart tables; add-to-cart on product page and wishlist; cart page)
+* [x] checkout (`POST /api/checkout/quote`, `POST /api/orders`; guest and registered; confirmation page)
+* [x] Lahore validation (server-side, canonical city `Lahore`; saved addresses are validated at checkout too)
+* [x] address selection (saved address id for registered customers, or inline address)
+* [x] backend price validation (client sends only ids/quantities; optional expected total, mismatch returns 409 `TOTAL_CHANGED`)
+* [x] delivery fee (`business_settings`, seeded Rs 200)
+* [x] stock validation
+* [x] made-to-order capacity validation (units held by Pending/Confirmed/Processing orders)
+* [x] order creation (one transaction: lock products in id order, validate, reserve, create order + items + payment row; guest orders have no customer)
+* [x] inventory reservation (ready-to-ship stock decremented at creation; made-to-order capacity reserved by the active order itself)
+* [~] 30-minute online payment window and automatic expiry — the window, `payment_deadline_at` and the SQL expiry function are implemented and tested; **the pg_cron schedule is not yet enabled on Supabase** (one-time manual SQL, see `README.md`). Customers cannot use online payment until Phase 7 (`ONLINE_PAYMENTS_ENABLED=false`), so the window is exercised only by tests for now.
+
+Implementation notes:
+
+* Tests: backend 163 passing (adds quote and order rules, Lahore-only, address ownership, optional-auth rules, all-or-nothing reservation, snapshots surviving product edits/deletion, expiry function, DB constraints); the test database is now built by the real Alembic migrations. Frontend 57 passing (adds cart store, cart/checkout/confirmation pages, add-to-cart, wishlist -> cart).
+* Concurrency tested: six simultaneous buyers of the last unit -> exactly one order, stock never negative; made-to-order capacity of 2 under six simultaneous orders -> exactly two succeed; opposite-order multi-item carts do not deadlock.
+* A real race was found by these tests and fixed: made-to-order active units must be read in a separate statement after the product row lock is held (READ COMMITTED does not refresh a subquery in the locking statement).
+* Verified against Supabase: migration applied (tables, enums, seeded delivery fee Rs 200, expiry function; dry run returned 0; RLS on); live `quote` and `orders` validation responses behave as designed. No real orders were created there.
+* The expiry function is the only implementation of expiry; the API also calls it just before reserving stock, so correctness does not depend on the cron schedule (the schedule frees stock when nobody is ordering).
+* `payments`: one PENDING row is created with each order. How retries are represented stays an open decision (compatible with either option).
+* Decisions (not in the docs, easy to change): `ONLINE_PAYMENTS_ENABLED` defaults to false so nobody places an order they cannot pay for; quantity cap 99 per line and 50 lines per order (technical limits); FKs from `order_items`/`payments` to `orders` use RESTRICT (orders are never deleted); an optional `expected_total_paisa` protects customers from price changes.
+* Known gaps, deliberately left for later: no rate limiting on order creation (a guest could reserve stock with fake COD orders; Phase 10); no idempotency key against double submits; an expired order's payment row stays PENDING (the payment_status enum has no cancelled/failed state); changing a product's availability type while orders are active is not blocked (Phase 9); guests have no order lookup (Phase 6 decides how); notification/confirmation emails (Phase 8).
 
 ---
 

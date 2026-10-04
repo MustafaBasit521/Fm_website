@@ -4,11 +4,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_expression
 
 from app.core.auth import AuthUser
 from app.models.catalog import Product
 from app.models.customer_data import WishlistItem
+from app.services.catalog import active_units_expr
 from app.services.customers import get_or_create_customer
 
 
@@ -25,7 +26,11 @@ async def list_wishlist(
     )
     total = await session.scalar(select(func.count()).select_from(base.subquery()))
     stmt = (
-        base.options(selectinload(Product.category), selectinload(Product.images))
+        base.options(
+            selectinload(Product.category),
+            selectinload(Product.images),
+            with_expression(Product.active_units, active_units_expr()),
+        )
         .order_by(WishlistItem.created_at.desc(), Product.product_id)
         .offset((page - 1) * page_size)
         .limit(page_size)
