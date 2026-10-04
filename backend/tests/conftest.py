@@ -6,24 +6,24 @@ os.environ["DATABASE_URL"] = (
 )
 os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 
-import time  # noqa: E402
-import uuid  # noqa: E402
+import time
+import uuid
 
-import asyncpg  # noqa: E402
-import jwt  # noqa: E402
-import pytest  # noqa: E402
-import pytest_asyncio  # noqa: E402
-from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
-from httpx import ASGITransport, AsyncClient  # noqa: E402
-from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+import asyncpg
+import jwt
+import pytest
+import pytest_asyncio
+from cryptography.hazmat.primitives.asymmetric import ec
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-import app.models  # noqa: E402, F401
-from app.core.auth import KeyResolver, get_key_resolver  # noqa: E402
-from app.core.config import get_settings  # noqa: E402
-from app.core.db import Base, get_session  # noqa: E402
-from app.core.storage import SignedUpload, SupabaseStorage, get_storage  # noqa: E402
-from app.main import create_app  # noqa: E402
+import app.models  # noqa: F401  (registers models on Base.metadata)
+from app.core.auth import KeyResolver, get_key_resolver
+from app.core.config import get_settings
+from app.core.db import Base, get_session
+from app.core.storage import SignedUpload, SupabaseStorage, get_storage
+from app.main import create_app
 
 ISSUER = "https://test-project.supabase.co/auth/v1"
 _PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
@@ -127,7 +127,11 @@ async def client(db_engine, storage):
     app.dependency_overrides[get_key_resolver] = lambda: _TestResolver()
     app.dependency_overrides[get_storage] = lambda: storage
     async with db_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE product_images, products, categories, customers CASCADE"))
+        await conn.execute(
+            text(
+                "TRUNCATE wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+            )
+        )
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 

@@ -151,7 +151,9 @@ export default function ShopPage() {
             <p className="text-muted">{result.total} products</p>
             <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {result.items.map((p) => (
-                <ProductCard key={p.product_id} product={p} />
+                <li key={p.product_id}>
+                  <ProductCard product={p} />
+                </li>
               ))}
             </ul>
             <nav aria-label="Pagination" className="mt-6 flex items-center gap-4">

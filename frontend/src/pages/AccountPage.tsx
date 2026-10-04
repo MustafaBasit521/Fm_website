@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { ApiError, getMe, updateMe, type Customer } from '../lib/api'
 import { buttonClass, Field, FormError } from './ui'
@@ -61,6 +62,10 @@ export default function AccountPage() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-4">
       <h1 className="font-serif text-4xl">My account</h1>
       <p className="text-muted">{customer.email}</p>
+      <nav className="flex gap-4 text-terracotta underline">
+        <Link to="/account/addresses">Saved addresses</Link>
+        <Link to="/wishlist">Wishlist</Link>
+      </nav>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field
           id="name"

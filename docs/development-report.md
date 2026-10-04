@@ -85,3 +85,34 @@ Status of each phase lives in `progress.md`; business rules and schema live in `
 * Made-to-order capacity placeholder (see `progress.md`): to be replaced in Phase 5.
 * `is_visible` defaults to false for new products (a small decision not stated in the docs; easy to change).
 * Not verified: the real Supabase Storage signed-upload and delete calls (need the bucket and the service key); the mocked-transport tests only prove our request/response handling.
+
+---
+
+## Phase 4 — Customer Features
+
+**Design (CLAUDE.md §6, §13; database.md §5, §12, §21; business-rules §8–11, §25)**
+
+* All routes live under `/api/customers/me/...` and take the owner only from the verified token; there is no customer id in any path or body. Address queries include `customer_id` in the WHERE clause, so another customer's address is simply not found (404).
+* First write creates the `customers` row if needed (`get_or_create_customer`), so saving an address or wishlisting a product as the very first call satisfies the foreign key.
+* Wishlist add uses `INSERT ... ON CONFLICT DO NOTHING RETURNING`, so concurrent double-clicks produce exactly one row (one 201, the rest 409). Remove is idempotent.
+* Hidden products are filtered out of the wishlist view and cannot be added, but existing rows survive so a product the admin re-publishes reappears.
+* Frontend: addresses page (add/edit/two-step delete, blank optional fields sent as null), wishlist page (remove, pagination, loading/empty/error), wishlist button (signed-out visitors see a login link and trigger no API calls; a 409 is treated as success).
+
+**Built**
+
+* Backend: `models/customer_data.py`, migration `create addresses and wishlist`, `schemas/address.py`, `schemas/wishlist.py`, `services/addresses.py`, `services/wishlist.py`, routers `api/addresses.py` and `api/wishlist.py`.
+* Frontend: `AddressesPage`, `WishlistPage`, `WishlistButton`, API client additions (including 204 handling), links from the account page.
+
+**Verified**
+
+* Backend 115 tests, frontend 35 tests, Ruff/ESLint/Prettier clean, production build OK, migration applied on Supabase, FK delete rules and RLS confirmed there, live 401 checks OK.
+
+**Problems found and fixed during the work**
+
+* `ProductCard` rendered an `<li>` while the wishlist page wrapped cards in a `<div>` inside a `<ul>` (invalid list structure for assistive tech); cards are now plain elements and each page wraps them in `<li>`.
+* The product page test needed an auth context once it contained the wishlist button.
+
+**Decisions / notes**
+
+* "Wishlist -> cart" deferred to Phase 5 (cart does not exist yet); see `progress.md`.
+* The production bundle is now ~490 kB (Vite warns above 500 kB). Code splitting is a Phase 10 performance item, not done now.

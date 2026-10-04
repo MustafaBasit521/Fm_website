@@ -1,11 +1,13 @@
 import { Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import AccountPage from './pages/AccountPage'
+import AddressesPage from './pages/AddressesPage'
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ShopPage from './pages/ShopPage'
 import ProductPage from './pages/ProductPage'
 import RegisterPage from './pages/RegisterPage'
+import WishlistPage from './pages/WishlistPage'
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/account/addresses" element={<AddressesPage />} />
+        <Route path="/wishlist" element={<WishlistPage />} />
       </Route>
     </Routes>
   )

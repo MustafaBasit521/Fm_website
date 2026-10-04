@@ -212,14 +212,22 @@ Implementation notes:
 
 ## Phase 4 — Customer Features
 
-Status: Not Started
+Status: **Implemented and tested, except "wishlist -> cart", which is deferred to Phase 5**
 
 Tasks:
 
-* customer profile
-* saved addresses
-* wishlist
-* wishlist → cart flow
+* [x] customer profile (done in Phase 2: `GET/PATCH /api/customers/me`, profile page)
+* [x] saved addresses (`addresses` table + migration per `database.md` §5; `GET/POST /api/customers/me/addresses`, `PATCH/DELETE .../{id}`; addresses page)
+* [x] wishlist (`wishlist_items` table + migration per `database.md` §12; list, ids, add, remove; wishlist page; wishlist button on the product page)
+* [ ] wishlist -> cart flow — **deferred to Phase 5**: the cart is a client-side feature (`business-rules.md` §11) that does not exist yet. The wishlist page is ready for an "Add to cart" action once the cart exists.
+
+Implementation notes:
+
+* Tests: backend 115 passing (adds login checks on every route; one customer can never see another's data; required-field and validation rules; uniqueness, concurrent double-add, hidden products, cascade deletes of customers and products); frontend 35 passing (adds addresses, wishlist, wishlist button).
+* Verified against Supabase: migration applied; both new tables have the documented `ON DELETE CASCADE` foreign keys and RLS enabled; live routes return 401 without a valid token.
+* Decisions (not specified in the docs, easy to change): saved addresses accept any city and Lahore-only is enforced at checkout (Phase 5, `business-rules.md` §10); a technical cap of 20 saved addresses per customer; `wishlist_items` uses a composite primary key `(customer_id, product_id)` to implement the documented uniqueness; hidden products are not shown in the wishlist (their rows are kept) and cannot be added; adding a product that is already saved returns 409.
+* Other customers' addresses return 404, not 403, so their existence is not revealed.
+* Not verified: a real browser run of the new pages against Supabase.
 
 ---
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
+import { WishlistButton } from './WishlistButton'
 
 export default function ProductPage() {
   const { id = '' } = useParams()
@@ -105,6 +106,7 @@ export default function ProductPage() {
                 : 'In stock'
               : 'Currently unavailable'}
           </p>
+          <WishlistButton productId={product.product_id} />
           {product.description && <p className="whitespace-pre-line">{product.description}</p>}
         </div>
       </div>

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, admin_catalog, catalog, customers, health
+from app.api import addresses, admin, admin_catalog, catalog, customers, health, wishlist
 from app.core.config import get_settings
 from app.core.db import dispose_engine
 
@@ -33,6 +33,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(health.router, prefix="/api")
     app.include_router(customers.router, prefix="/api")
+    app.include_router(addresses.router, prefix="/api")
+    app.include_router(wishlist.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(admin_catalog.router, prefix="/api")

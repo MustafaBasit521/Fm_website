@@ -4,7 +4,7 @@ import { formatPrice } from '../lib/money'
 
 export function ProductCard({ product }: { product: ProductSummary }) {
   return (
-    <li className="overflow-hidden rounded-xl border border-sand bg-white">
+    <div className="overflow-hidden rounded-xl border border-sand bg-white">
       <Link
         to={`/shop/${product.product_id}`}
         className="block focus-visible:outline-2 focus-visible:outline-terracotta"
@@ -34,6 +34,6 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           </span>
         </div>
       </Link>
-    </li>
+    </div>
   )
 }

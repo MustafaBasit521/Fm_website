@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ApiError, type ProductDetail } from '../lib/api'
+import { makeAuth } from '../test/auth'
 import ProductPage from './ProductPage'
 
 const getProduct = vi.fn()
@@ -31,14 +32,17 @@ const detail: ProductDetail = {
   images: [img(1), img(2)],
 }
 
-const renderPage = () =>
-  render(
-    <MemoryRouter initialEntries={['/shop/p1']}>
+const renderPage = () => {
+  const { wrap } = makeAuth()
+  return render(
+    wrap(
       <Routes>
         <Route path="/shop/:id" element={<ProductPage />} />
-      </Routes>
-    </MemoryRouter>,
+      </Routes>,
+      '/shop/p1',
+    ),
   )
+}
 
 beforeEach(() => {
   getProduct.mockReset()
@@ -51,6 +55,7 @@ it('shows product details and switches images', async () => {
   expect(screen.getByText('Rs 999')).toBeInTheDocument()
   expect(screen.getByText('Made to order')).toBeInTheDocument()
   expect(screen.getByText('Bright and cheerful')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /Log in to save/ })).toBeInTheDocument()
   expect(screen.getByAltText('Photo 1')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Show image 2' }))
   expect(screen.getByAltText('Photo 2')).toBeInTheDocument()

@@ -1,0 +1,15 @@
+# Single Ruff config for the whole repo. It lives at the root so that every tool that lints
+# the repo (make lint, editors, the git-security-tool pre-commit scan) sees the same settings.
+line-length = 100
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+
+[lint.per-file-ignores]
+"backend/tests/*" = ["E501"]
+# conftest must set environment variables before importing the app.
+"backend/tests/conftest.py" = ["E402"]
+
+[lint.isort]
+known-first-party = ["app"]
