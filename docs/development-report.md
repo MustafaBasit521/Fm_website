@@ -176,3 +176,41 @@ Status of each phase lives in `progress.md`; business rules and schema live in `
 
 * The expiry function was rewritten as a loop over overdue orders calling the shared release function; behaviour is unchanged (all 8 expiry tests pass unchanged).
 * `make check` now takes a little over two minutes because of the database-backed backend suite.
+
+---
+
+## Documentation sync (after Phase 6)
+
+Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in line with Phases 1–6: new-product visibility default, lazy customer creation, address cap and Lahore enforcement points, cart limits and the quote endpoint, seeded delivery fee, expiry mechanism and the disabled-online-payment safeguard, forward-only status changes, the Processing-cancellation decision and rounding rule, single stock-release function, guest order lookup, wishlist behaviour, search implementation; and for the schema: defaults, constraint names, index list, composite wishlist key, RESTRICT foreign keys, seeded settings row, locking/derived-capacity details and a new section for the two database functions.
+
+---
+
+## Phase 7 — Payments
+
+**Design (CLAUDE.md §3, §14–15; business-rules §13, §18, §20–22; database.md §11)**
+
+* Decisions taken with the owner: the gateway is chosen later (so the provider-independent parts are built now, behind a `PaymentProvider` interface and tested with a fake provider); one `payments` row per attempt with a new `FAILED` status; a verified payment arriving after expiry leaves the order Cancelled and refundable in full.
+* The backend never trusts the browser or a webhook body. A webhook only identifies the attempt (after its signature is checked); the provider is then asked for the real status and amount (`verify`), and state changes only from that answer. Wrong amounts are never accepted; provider outages return 503 so the provider retries.
+* Concurrency: every change takes the order row lock first (webhook, customer return, initiate, admin cancel, refund, expiry), so notifications can be duplicated or simultaneous without double effects, and a payment racing an admin cancel always ends consistently (Cancelled + Paid + full refund due, stock released once).
+* Late payment: if the deadline has passed but the expiry job has not run yet, the payment handler cancels the order itself (same outcome as the job); the database clock is used for the comparison.
+* Retry safety: a new attempt starts only after the previous one failed; an apparently open earlier attempt is verified first, so a customer who actually paid is confirmed instead of charged again.
+* Refunds: admin-only, only for cancelled orders, capped at paid − charge − already refunded, in steps if wanted; the provider is called with an idempotency key; on provider failure nothing changes.
+* Settings refuse unsafe payment configuration (fake provider in production, online enabled without a provider, unknown provider).
+
+**Built**
+
+* Backend: migration `payment attempts failed status` (enum value + expiry-function fix), `core/payments/` (`base.py` interface, `fake.py` simulator with HMAC-signed webhooks, `registry.py`), `services/payments.py`, `api/payments.py`, `api/dev_gateway.py` (fake provider only), admin endpoints `confirm-cod-payment` and `refund`, order responses now list payment attempts for the admin.
+* Frontend: `PayNowButton`, `PaymentReturnPage`, `FakeGatewayPage` (dev only, absent from production builds), payment prompts on the confirmation and order pages.
+
+**Verified**
+
+* Backend 241 tests (race tests repeated for stability), frontend 86 tests, Ruff/ESLint/Prettier clean, production build verified free of the simulator, migration applied on Supabase.
+
+**Bugs found by tests and fixed**
+
+* A timezone-aware deadline was bound as a naive timestamp when compared with the database clock; the comparison now happens in SQL against the order row.
+* Phase 6 expiry function: an order with only FAILED attempts could never expire. Fixed in the new migration; covered by a test.
+
+**Open**
+
+* Which real gateway to use; its adapter (signature scheme, refund API, redirect and return flow) and sandbox testing come after that decision.

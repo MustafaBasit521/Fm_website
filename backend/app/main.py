@@ -14,6 +14,7 @@ from app.api import (
     customers,
     health,
     orders,
+    payments,
     wishlist,
 )
 from app.core.config import get_settings
@@ -48,10 +49,15 @@ def create_app() -> FastAPI:
     app.include_router(wishlist.router, prefix="/api")
     app.include_router(checkout.router, prefix="/api")
     app.include_router(orders.router, prefix="/api")
+    app.include_router(payments.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(admin_catalog.router, prefix="/api")
     app.include_router(admin_orders.router, prefix="/api")
+    if settings.payment_provider == "fake":  # dev-only simulator (refused in production)
+        from app.api import dev_gateway
+
+        app.include_router(dev_gateway.router, prefix="/api")
     return app
 
 

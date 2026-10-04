@@ -44,11 +44,11 @@ Updating documentation does **not** mean a decision is implemented or tested.
 | Decision | Decided/Documented | Designed | Implemented | Tested |
 |---|---|---|---|---|
 | 30-minute online payment window | Yes | Yes (`orders.payment_deadline_at`) | No | No |
-| Payment retry during the window | Yes | Partly — payment-attempt representation still open | No | No |
+| Payment retry during the window | Yes | Yes (one payments row per attempt, FAILED status) | Yes (against the fake provider) | Yes |
 | Automatic cancellation after expiry | Yes | Yes (decided: pg_cron + SQL function `expire_unpaid_online_orders()`) | Yes (SQL function; scheduling step pending, see Phase 5) | Yes (function) |
 | Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | Yes (reserve at creation; release on expiry and on cancellation via one SQL function `release_order_stock`) | Yes |
-| Online order Confirmed only after verified payment | Yes | Yes | No | No |
-| COD payment confirmed on delivery by admin | Yes | Yes | No | No |
+| Online order Confirmed only after verified payment | Yes | Yes | Yes (provider-verified only) | Yes |
+| COD payment confirmed on delivery by admin | Yes | Yes | Yes | Yes |
 | Client-side cart for MVP (no cart tables) | Yes | Yes | Yes | Yes |
 | Guest cancellation/address change via admin/contact flow | Yes | Yes | Yes (admin endpoints; guests have no website route) | Yes |
 | Processing cancellation charge = 50% of original total incl. delivery fee | Yes | Yes (`cancellation_charge_paisa`, `charge_waived`) | Yes (admin cancel; floor rounding; waive option; unpaid COD waived) | Yes |
@@ -67,12 +67,19 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 Decided: expired unpaid online orders are cleaned up by a PostgreSQL function (`expire_unpaid_online_orders()`) scheduled with Supabase pg_cron (Phase 5).
 
+Decided (Phase 7): each online payment attempt is its own `payments` row with a new `FAILED` status; a verified payment that arrives after the window closes leaves the order Cancelled and is refundable in full.
+
 Decided (Phase 6): a customer asks to cancel a Processing order by contacting the shop (no request button; the admin cancels). The 50% Processing charge is rounded down to a whole paisa.
 
-* Payment-attempt representation: one payment record updated in place vs one record per attempt (the status list has no "Failed" state)
-* Handling of a verified online payment that arrives after the 30-minute window has expired
+* Which payment gateway to use (CLAUDE.md §3: must be chosen and documented before provider-specific code). Deferred by the owner; Phase 7 is built against a provider interface.
 * Exact anonymization/retention strategy for customer account deletion
 * How the admin verifies a guest's identity for WhatsApp/contact requests
+
+---
+
+# Documentation Sync
+
+After Phase 6, `business-rules.md` and `database.md` were updated to record every decision and implementation detail from Phases 1–6 (CLAUDE.md §24): defaults, indexes, composite wishlist key, RESTRICT foreign keys, the seeded delivery fee, the expiry mechanism, cancellation/charge rules and the two database functions (`database.md` §27). Each phase from now on updates all three documents.
 
 ---
 
@@ -293,20 +300,30 @@ Implementation notes:
 
 ## Phase 7 — Payments
 
-Status: Not Started
+Status: **Implemented and tested against a fake gateway. The real gateway adapter is not built: the provider is still to be chosen (deferred by the owner).**
 
 Tasks:
 
-* COD
-* online payment provider selection
-* payment initiation
-* payment verification
-* payment failure
-* retry payment
-* webhooks/callbacks
-* idempotency
-* refunds
-* partial refunds
+* [x] COD (`POST /api/admin/orders/{id}/confirm-cod-payment`: only after Delivered; COD Pending -> Paid)
+* [ ] online payment provider selection — **open**: no real gateway chosen yet. Everything provider-independent is built behind `PaymentProvider` (`create_checkout`, `verify`, `parse_webhook`, `refund`); a real adapter implements those four calls once a gateway and its sandbox credentials exist.
+* [x] payment initiation (`POST /api/orders/{id}/pay`, public for guests and customers; only inside the 30-minute window; returns the gateway redirect URL)
+* [x] payment verification (state changes only from the provider's own answer; amount must match; the browser and webhook bodies are never trusted)
+* [x] payment failure (attempt marked FAILED; the order is not cancelled; reservation kept)
+* [x] retry payment (a new attempt row after a failed one; an earlier open attempt is settled first, so no double charging)
+* [x] webhooks/callbacks (`POST /api/payments/webhook/{provider}`: signature checked, provider asked for the truth, 503 on provider outage so it retries; customer-return verification via `POST /api/orders/{id}/payment/refresh`)
+* [x] idempotency (duplicate and simultaneous notifications harmless; refunds use idempotency keys)
+* [x] refunds (`POST /api/admin/orders/{id}/refund`: cancelled paid online orders only, never more than owed = paid - charge - refunded; provider failure changes nothing)
+* [x] partial refunds (PARTIALLY_REFUNDED / REFUNDED)
+
+Implementation notes:
+
+* Tests: backend 241 passing (adds 33 payment tests: initiation rules, success/failure/retry, webhook forgery and malformed requests, unknown reference, amount mismatch, provider outage, duplicate/concurrent webhooks, late payment before and after the expiry job, payment racing an admin cancel, refund rules/partial/failed/simultaneous, COD, authorization, unsafe configuration); frontend 86 passing (adds Pay now, payment return page, fake gateway page).
+* The tests found and fixed: a timezone bug comparing the deadline with the database clock; and an earlier Phase 6 flaw where an order with only FAILED attempts could never expire (the expiry function now ignores failed attempts).
+* A development simulator (`PAYMENT_PROVIDER=fake`, refused when `APP_ENV=production`) lets the whole online flow be tried locally: checkout with online payment -> fake gateway page -> return page. The simulator page is not in the production frontend bundle (verified) and its backend endpoint is only registered when the fake provider is configured. See `README.md`.
+* Verified against Supabase: migration applied (`FAILED` status present, expiry function updated, dry run returned 0). Online payment stays switched off there (`ONLINE_PAYMENTS_ENABLED=false`, `PAYMENT_PROVIDER=none`).
+* Decisions (documented in `business-rules.md` §13, §20–22 and `database.md` §3, §11, §27): one payments row per attempt; late payment keeps the order Cancelled and refundable in full; payment initiation is public by order id (guests); an attempt can start only after the previous one failed.
+* Known gaps, left for later: no real gateway (and so no real signature scheme, refund API or sandbox testing); no rate limiting on the public pay/refresh/webhook routes (Phase 10); a duplicate payment from a second, unconfirmed attempt is not specially flagged; admin screens for refunds are Phase 9; customer notification emails are Phase 8.
+* Not verified: the full online flow in a browser (use the fake gateway to try it).
 
 ---
 

@@ -30,6 +30,7 @@ class PaymentStatus(enum.StrEnum):
     PAID = "PAID"
     PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED"
     REFUNDED = "REFUNDED"
+    FAILED = "FAILED"  # a failed online attempt; each attempt has its own payments row
 
 
 class PaymentMethod(enum.StrEnum):

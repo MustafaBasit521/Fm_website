@@ -13,7 +13,7 @@ from app.core.auth import AuthUser
 from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.models.orders import Order, Payment
 from app.schemas.checkout import Delivery, OrderItemRead, OrderRead
-from app.schemas.orders import AdminOrderRead, AdminOrderSummary, OrderSummary
+from app.schemas.orders import AdminOrderRead, AdminOrderSummary, OrderSummary, PaymentRead
 
 # Normal lifecycle (business-rules §14). Cancellation is separate: it is a terminal state.
 NEXT_STATUS: dict[OrderStatus, OrderStatus] = {
@@ -34,9 +34,19 @@ def _problem(status_code: int, code: str, message: str) -> HTTPException:
 # ---- mapping -------------------------------------------------------------------------------
 
 
-def _current_payment(order: Order) -> Payment:
-    # Orders have one payment row today; with retries the latest row is the current one.
+MONEY_HELD = (PaymentStatus.PAID, PaymentStatus.PARTIALLY_REFUNDED, PaymentStatus.REFUNDED)
+
+
+def current_payment(order: Order) -> Payment:
+    """The payment that matters: the one that collected money if any, else the latest attempt
+    (one row per online attempt, so failed tries stay in the history)."""
+    for payment in order.payments:
+        if payment.status in MONEY_HELD:
+            return payment
     return order.payments[-1]
+
+
+_current_payment = current_payment
 
 
 def refund_due(order: Order) -> int:
@@ -82,7 +92,10 @@ def to_read(order: Order) -> OrderRead:
 
 def to_admin_read(order: Order) -> AdminOrderRead:
     return AdminOrderRead(
-        **to_read(order).model_dump(), customer_id=order.customer_id, updated_at=order.updated_at
+        **to_read(order).model_dump(),
+        customer_id=order.customer_id,
+        updated_at=order.updated_at,
+        payments=[PaymentRead.model_validate(p) for p in order.payments],
     )
 
 
@@ -118,11 +131,11 @@ _LOAD = (selectinload(Order.items), selectinload(Order.payments))
 
 
 async def read_order(session: AsyncSession, order_id: uuid.UUID) -> OrderRead:
-    order = await _get(session, order_id, lock=False)
+    order = await load_order(session, order_id, lock=False)
     return to_read(order)
 
 
-async def _get(session: AsyncSession, order_id: uuid.UUID, *, lock: bool) -> Order:
+async def load_order(session: AsyncSession, order_id: uuid.UUID, *, lock: bool) -> Order:
     stmt = (
         select(Order)
         .where(Order.order_id == order_id)
@@ -166,7 +179,7 @@ async def list_customer_orders(
 
 
 async def get_customer_order(session: AsyncSession, user: AuthUser, order_id: uuid.UUID) -> Order:
-    return _own(await _get(session, order_id, lock=False), user)
+    return _own(await load_order(session, order_id, lock=False), user)
 
 
 # ---- cancellation (business-rules §15, §18, §19) -------------------------------------------
@@ -201,10 +214,19 @@ async def cancel_order(
 ) -> Order:
     """Cancel an order. With a customer `user` it must be their own and still Pending/Confirmed;
     with user=None the caller is an authorized admin."""
-    order = await _get(session, order_id, lock=True)
+    order = await load_order(session, order_id, lock=True)
     if user is not None:
         _own(order, user)
     charge, waived = cancellation_terms(order, by_admin=user is None, waive=waive)
+    await apply_cancellation(session, order, charge, waived)
+    await session.commit()
+    return await load_order(session, order_id, lock=False)
+
+
+async def apply_cancellation(
+    session: AsyncSession, order: Order, charge: int, waived: bool
+) -> None:
+    """Cancel a locked order inside the caller's transaction (the caller commits)."""
     order.status = OrderStatus.CANCELLED
     order.cancelled_at = func.now()
     order.cancellation_charge_paisa = charge
@@ -213,8 +235,6 @@ async def cancel_order(
     # Same function the payment-window expiry uses: ready-to-ship stock returns, and
     # made-to-order capacity frees itself because the order is no longer active.
     await session.execute(text("SELECT release_order_stock(:id)"), {"id": order.order_id})
-    await session.commit()
-    return await _get(session, order_id, lock=False)
 
 
 # ---- address change (business-rules §16) ---------------------------------------------------
@@ -229,7 +249,7 @@ async def change_address(
 ) -> Order:
     from app.services.checkout import resolve_delivery  # avoid a circular import
 
-    order = await _get(session, order_id, lock=True)
+    order = await load_order(session, order_id, lock=True)
     if user is not None:
         _own(order, user)
     if order.status not in CUSTOMER_EDITABLE:
@@ -244,7 +264,7 @@ async def change_address(
     for field, value in snapshot.items():
         setattr(order, field, value)
     await session.commit()
-    return await _get(session, order_id, lock=False)
+    return await load_order(session, order_id, lock=False)
 
 
 # ---- admin ---------------------------------------------------------------------------------
@@ -291,12 +311,12 @@ async def list_admin_orders(
 
 
 async def get_admin_order(session: AsyncSession, order_id: uuid.UUID) -> Order:
-    return await _get(session, order_id, lock=False)
+    return await load_order(session, order_id, lock=False)
 
 
 async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: OrderStatus) -> Order:
     """Move an order one step forward in the normal lifecycle (admin only)."""
-    order = await _get(session, order_id, lock=True)
+    order = await load_order(session, order_id, lock=True)
     if target == OrderStatus.CANCELLED:
         raise _problem(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -323,4 +343,4 @@ async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: Ord
         )
     order.status = target
     await session.commit()
-    return await _get(session, order_id, lock=False)
+    return await load_order(session, order_id, lock=False)

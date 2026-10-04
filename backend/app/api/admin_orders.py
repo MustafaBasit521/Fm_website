@@ -6,12 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.core.db import get_session
+from app.core.payments.base import PaymentProvider
+from app.core.payments.registry import get_payment_provider
 from app.models.enums import OrderStatus, PaymentMethod
 from app.schemas.catalog import Page
 from app.schemas.checkout import Delivery
-from app.schemas.orders import AdminCancel, AdminOrderRead, AdminOrderSummary, StatusChange
+from app.schemas.orders import (
+    AdminCancel,
+    AdminOrderRead,
+    AdminOrderSummary,
+    RefundRequest,
+    StatusChange,
+)
 from app.services import catalog as catalog_service
 from app.services import orders as service
+from app.services import payments as payments_service
 
 router = APIRouter(
     prefix="/admin/orders", tags=["admin-orders"], dependencies=[Depends(require_admin)]
@@ -64,3 +73,22 @@ async def change_address(order_id: uuid.UUID, data: Delivery, session: Session):
     """For guests who contacted the shop (business-rules §16): same status rules as customers."""
     order = await service.change_address(session, order_id, data, user=None)
     return service.to_admin_read(order)
+
+
+@router.post("/{order_id}/confirm-cod-payment", response_model=AdminOrderRead)
+async def confirm_cod_payment(order_id: uuid.UUID, session: Session):
+    """The cash was received on delivery: COD payment becomes Paid (business-rules §20)."""
+    await payments_service.confirm_cod_payment(session, order_id)
+    return service.to_admin_read(await service.get_admin_order(session, order_id))
+
+
+@router.post("/{order_id}/refund", response_model=AdminOrderRead)
+async def refund(
+    order_id: uuid.UUID,
+    data: RefundRequest,
+    session: Session,
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    """Refund all or part of what a cancelled, paid online order still owes the customer."""
+    await payments_service.refund_order(session, provider, order_id, data.amount_paisa)
+    return service.to_admin_read(await service.get_admin_order(session, order_id))

@@ -10,6 +10,8 @@ import ShopPage from './pages/ShopPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import OrdersPage from './pages/OrdersPage'
+import FakeGatewayPage from './pages/FakeGatewayPage'
+import PaymentReturnPage from './pages/PaymentReturnPage'
 import ProductPage from './pages/ProductPage'
 import RegisterPage from './pages/RegisterPage'
 import WishlistPage from './pages/WishlistPage'
@@ -23,6 +25,8 @@ export default function App() {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
+      <Route path="/payment/return" element={<PaymentReturnPage />} />
+      {import.meta.env.DEV && <Route path="/dev/fake-gateway" element={<FakeGatewayPage />} />}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route element={<ProtectedRoute />}>

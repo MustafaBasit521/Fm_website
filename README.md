@@ -78,6 +78,24 @@ Until the admin UI exists, change the fee (in paisa; Rs 200 = 20000) with:
 update business_settings set delivery_fee_paisa = 20000;
 ```
 
+## Trying online payment locally (fake gateway)
+
+No real gateway is integrated yet. To try the whole online-payment flow on your machine, add this
+to `backend/.env` and restart `make backend` (never use it in production: the app refuses
+`PAYMENT_PROVIDER=fake` when `APP_ENV=production`):
+
+```
+ONLINE_PAYMENTS_ENABLED=true
+PAYMENT_PROVIDER=fake
+PAYMENT_WEBHOOK_SECRET=any-long-random-text-for-local-use
+FRONTEND_URL=http://localhost:5173
+```
+
+Then check out choosing "Pay online". On the confirmation page click **Pay now**, and on the
+fake gateway page choose **Pay successfully** or **Fail the payment**. After a failure you can
+**Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
+afterwards (the fake gateway keeps its state in memory only).
+
 ## Tests
 
 Backend database tests need the local Docker Postgres (`make db`); they use a separate

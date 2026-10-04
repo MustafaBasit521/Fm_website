@@ -60,3 +60,22 @@ it('handles a missing order gracefully', () => {
   renderPage()
   expect(screen.getByText(/could not find a recent order/)).toBeInTheDocument()
 })
+
+it('asks for payment on an unpaid online order', () => {
+  saveLastOrder({
+    ...order,
+    payment_method: 'ONLINE',
+    payment_status: 'PENDING',
+    payment_deadline_at: '2026-01-01T10:30:00Z',
+  })
+  renderPage()
+  expect(screen.getByText(/complete your payment within 30 minutes/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Pay now' })).toBeInTheDocument()
+  expect(screen.getByText(/waiting for payment/)).toBeInTheDocument()
+})
+
+it('does not show a pay button for cash on delivery', () => {
+  saveLastOrder(order)
+  renderPage()
+  expect(screen.queryByRole('button', { name: 'Pay now' })).not.toBeInTheDocument()
+})

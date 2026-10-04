@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, cancelOrder, changeOrderAddress, getOrder, type Order } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
+import { PayNowButton } from './PayNowButton'
 import { buttonClass, Field, FormError } from './ui'
 
 // Which actions the customer is offered. The server enforces the same rules (business-rules
@@ -129,6 +130,21 @@ export default function OrderDetailPage() {
           ? 'Cash on delivery'
           : paymentStatusLabel(order.payment_status)}
       </p>
+
+      {order.payment_method === 'ONLINE' &&
+        order.payment_status === 'PENDING' &&
+        order.status === 'PENDING' && (
+          <div className="mt-4 flex flex-col gap-2 rounded-xl border border-sand bg-cream-100 p-4">
+            <p>
+              This order is waiting for payment
+              {order.payment_deadline_at
+                ? ` until ${new Date(order.payment_deadline_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                : ''}
+              .
+            </p>
+            <PayNowButton orderId={order.order_id} />
+          </div>
+        )}
 
       {order.status === 'CANCELLED' && (
         <div role="status" className="mt-4 rounded-xl border border-sand bg-cream-100 p-4">

@@ -68,6 +68,8 @@ Admin can:
 
 A hidden product should not be purchasable through the normal storefront.
 
+New products are created hidden; the admin publishes them. The public catalog never returns a hidden product, and a hidden product looks exactly like a product that does not exist.
+
 ---
 
 # 3. Product Deletion
@@ -137,6 +139,8 @@ The application does not store passwords.
 
 The customer's application ID corresponds to the Supabase Auth user ID.
 
+The customer record is created automatically the first time an authenticated user calls the API. Its name and email come from the verified login token, and the customer is subscribed to updates (§7).
+
 ---
 
 # 7. Account Creation
@@ -198,6 +202,8 @@ Example labels:
 * Home
 * Office
 
+Saved addresses may be in any city; the Lahore-only rule (§10) is enforced when an address is used for an order. A customer may keep at most 20 saved addresses (a technical abuse guard, not a business rule).
+
 ---
 
 # 10. Lahore Delivery Restriction
@@ -211,6 +217,8 @@ The restriction must be enforced server-side. The backend must independently val
 Checkout must reject addresses outside Lahore.
 
 Do not introduce a complex geographic delivery-zone system for the MVP.
+
+The rule is applied at checkout and whenever an order's delivery address is changed (by the customer or the admin), for both typed-in and saved addresses. The city is compared ignoring case and extra spaces and is stored as `Lahore`.
 
 ---
 
@@ -236,6 +244,8 @@ Frontend-calculated totals are never authoritative.
 
 A server-side cart may be introduced later only if a concrete requirement appears, such as cross-device persistence or abandoned-cart functionality.
 
+The browser cart holds only product ids and quantities (at most 99 units per line and 50 lines). `POST /api/checkout/quote` returns the authoritative lines, availability problems, delivery fee and total for it. An order request may include the total the customer saw; if the real total differs, the order is not created and the customer reviews the new total.
+
 ---
 
 # 12. Delivery Fee
@@ -247,6 +257,8 @@ Final calculation:
 `subtotal + delivery_fee = total`
 
 The backend determines the authoritative total.
+
+The delivery fee is stored in the single business-settings record, which is seeded with Rs 200 (20000 paisa). Until the admin UI exists, it is changed with SQL.
 
 ---
 
@@ -294,6 +306,10 @@ If the 30-minute window expires without a successful payment:
 
 Expired unpaid online orders must be cleaned up automatically.
 
+Expiry mechanism (decided): the database function `expire_unpaid_online_orders()` cancels expired unpaid online orders and returns their stock; it is scheduled every minute with Supabase pg_cron. The API also runs the same function just before reserving stock for a new order, so correctness does not depend on the schedule. Online payment stays disabled (`ONLINE_PAYMENTS_ENABLED=false`) until a payment gateway is integrated, so no customer places an order they cannot pay for.
+
+Late payment (decided): if a verified payment arrives after the window has closed — whether the expiry job has already cancelled the order or has not run yet — the order stays Cancelled and is never reopened. The payment is recorded as Paid and the full amount is refundable (no cancellation charge).
+
 ## COD orders
 
 COD orders do **not** use the 30-minute online payment window.
@@ -330,6 +346,8 @@ Who changes order status:
 * The system automatically sets an online order to Cancelled when its payment window expires without payment (§13).
 * A registered customer may cancel within the rules in §15.
 
+Status changes by the admin move strictly one step forward (Pending → Confirmed → Processing → Shipped → Delivered). An online order cannot be Confirmed until its payment is Paid. Cancelling uses the separate cancel action, never a status change.
+
 ---
 
 # 15. Customer Cancellation
@@ -342,6 +360,8 @@ A registered customer can cancel their own order through the website only while 
 * Confirmed
 
 From Processing onwards, the customer cannot cancel through the website. A cancellation during Processing is performed by the admin and is subject to the cancellation charge in §18.
+
+Decided: there is no "request cancellation" button. The customer contacts the shop (WhatsApp/contact channel) and the admin cancels the order.
 
 Once Shipped or Delivered, the order cannot be cancelled.
 
@@ -378,6 +398,8 @@ Guest customers do **not** modify addresses through the website.
 
 They must contact the business through the available WhatsApp/contact channel. The admin can process an eligible request after verification, applying the same status rules.
 
+The admin changes a guest's address with the same status rules (Pending/Confirmed only) and the same Lahore-only validation. When no new recipient name is given, the existing one is kept.
+
 ## Snapshot
 
 The order stores a snapshot of the delivery address so historical orders remain accurate even if the customer later changes their saved address.
@@ -404,6 +426,8 @@ If an order is cancelled during Processing:
 
 The admin may waive the charge.
 
+Rounding (decided): the charge is the total multiplied by one half, rounded down to a whole paisa (e.g. 20101 → 10050). The charge and whether it was waived are recorded on the order. The amount still owed back to the customer (paid − charge − already refunded) is shown on the order; actually refunding it belongs to the payments phase.
+
 ## Online payment
 
 `refund = amount already paid − applicable cancellation charge`
@@ -428,6 +452,8 @@ When an order is cancelled — including automatic cancellation after an expired
 * ready-to-ship reserved quantity is released back to stock
 * made-to-order reserved units are released from active capacity
 
+Stock release is implemented once, by the database function `release_order_stock()`, which both cancellation and automatic expiry use. Made-to-order capacity is derived from active orders, so cancelling an order frees it automatically.
+
 ---
 
 # 20. Payments
@@ -443,6 +469,7 @@ Payment status:
 * Paid
 * Partially Refunded
 * Refunded
+* Failed (an online attempt that did not succeed; see below)
 
 Order status and payment status are separate concepts.
 
@@ -456,6 +483,12 @@ Order status and payment status are separate concepts.
 * Payment is Pending until the backend verifies a successful payment with the provider.
 * A failed payment attempt does not cancel the order; the customer may retry within the 30-minute window (§13).
 * On verified success: Payment = Paid, Order = Confirmed.
+
+Each online attempt is its own payment record, so failed tries stay in the history. A new attempt can start only when the previous one has failed; if an earlier attempt may still be open, the backend first asks the provider about it, and the customer must finish it or wait. If that earlier attempt turns out to be paid, the order is confirmed instead of charging twice. A failed attempt never cancels the order; an order whose attempts all failed still expires when its window ends.
+
+Paying is possible for guests as well as registered customers: the unguessable order id identifies the order, and only the provider's verified answer ever changes anything.
+
+COD: when the order is Delivered, the admin confirms the cash was received and the COD payment becomes Paid. This is not possible before delivery.
 
 ---
 
@@ -473,6 +506,8 @@ Payment callbacks/webhooks must be:
 
 Do not mark an order as Paid merely because the frontend reports success.
 
+Implementation: a webhook is authenticated by its signature, but its body is only used to find which attempt it concerns. The backend then asks the provider for the real status and amount (`verify`) and changes state only from that answer. A payment whose amount differs from the order's payment is never accepted. Repeated or simultaneous notifications are harmless (processing is idempotent and serialized by the order lock). If the provider cannot be reached, the webhook fails with a retryable error so the provider tries again. When the customer returns from the gateway, the page asks the backend to verify; it never trusts the browser.
+
 ---
 
 # 22. Payment Refunds
@@ -488,6 +523,8 @@ If admin waives the charge:
 `refund = amount paid`
 
 The refunded amount is recorded on the payment and can never exceed the original payment amount.
+
+Refunds are started by the admin, only for cancelled orders, and never exceed what is still owed (paid − cancellation charge − already refunded). The admin may refund in several steps (partial refunds). The payment becomes Refunded when the whole payment has been returned; if a cancellation charge is kept it stays Partially Refunded. The provider is called with an idempotency key, so a repeated request cannot refund twice, and if the provider fails nothing is changed and the refund can be retried.
 
 Payment state may become:
 
@@ -535,6 +572,8 @@ Guest checkout does not require account creation.
 
 Guests cannot cancel or modify orders through the website; see §15 and §16.
 
+Guests have no website order lookup. The confirmation shown right after checkout is kept only in that browser tab; later requests go through the shop and the admin.
+
 ---
 
 # 25. Wishlist
@@ -544,6 +583,8 @@ Only registered customers may use the wishlist.
 A customer may have multiple wishlist items but cannot add the same product twice.
 
 A wishlist item can be moved to the cart.
+
+Adding a product that is already on the wishlist returns a conflict. Hidden products cannot be added and are not shown in the wishlist (their rows are kept, so they reappear if the admin shows the product again). Moving an item to the cart adds the product to the browser cart.
 
 The wishlist uses a simple customer/product relationship.
 
@@ -592,6 +633,8 @@ Sorting:
 * price high to low
 
 Large result sets should use pagination.
+
+Implemented: case-insensitive matching on product name and description; filters for category, type (ready-to-ship / made-to-order), available-only, featured and price range; sorting by newest, price low to high, price high to low, and name; pagination (at most 50 per page publicly).
 
 ---
 

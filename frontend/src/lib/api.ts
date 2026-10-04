@@ -267,3 +267,29 @@ export const changeOrderAddress = (
 ) => apiPatch<Order>(`/orders/${encodeURIComponent(id)}/address`, delivery)
 
 export const createOrder = (data: OrderRequest) => apiPost<Order>('/orders', data)
+
+// ---- online payment -----------------------------------------------------------------------
+
+export interface PayResponse {
+  payment_id: string
+  redirect_url: string
+}
+
+export interface PaymentStatusResponse {
+  order_status: string
+  payment_status: string
+}
+
+/** Start paying for an online order. The caller sends the browser to `redirect_url`. */
+export const payOrder = (orderId: string) =>
+  apiPost<PayResponse>(`/orders/${encodeURIComponent(orderId)}/pay`, {})
+
+/** The customer came back from the gateway: the server verifies with the provider and answers. */
+export const refreshPayment = (orderId: string) =>
+  apiPost<PaymentStatusResponse>(`/orders/${encodeURIComponent(orderId)}/payment/refresh`, {})
+
+/** Development-only (fake gateway simulator). */
+export const fakeGatewayComplete = (reference: string, outcome: 'paid' | 'failed') =>
+  apiPost<{ received: boolean }>(`/dev/fake-gateway/${encodeURIComponent(reference)}/complete`, {
+    outcome,
+  })

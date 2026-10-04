@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { loadLastOrder } from '../lib/lastOrder'
 import { formatPrice } from '../lib/money'
+import { PayNowButton } from './PayNowButton'
 
 export default function OrderConfirmationPage() {
   const order = loadLastOrder()
@@ -32,6 +33,19 @@ export default function OrderConfirmationPage() {
           : 'Your order is waiting for payment.'}{' '}
         A confirmation will be sent to {order.customer_email}.
       </p>
+
+      {order.payment_method === 'ONLINE' && order.payment_status === 'PENDING' && (
+        <div className="mt-4 flex flex-col gap-2 rounded-xl border border-sand bg-cream-100 p-4">
+          <p>
+            Please complete your payment within 30 minutes
+            {order.payment_deadline_at
+              ? ` (by ${new Date(order.payment_deadline_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})`
+              : ''}
+            , or the order will be cancelled.
+          </p>
+          <PayNowButton orderId={order.order_id} />
+        </div>
+      )}
 
       <h2 className="mt-6 text-xl font-semibold">Items</h2>
       <ul className="mt-2 flex flex-col gap-1">

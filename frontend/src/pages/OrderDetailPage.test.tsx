@@ -160,3 +160,17 @@ it('shows not-found and error states', async () => {
   renderPage()
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this order')
 })
+
+it('offers payment for an unpaid online order and hides it once paid', async () => {
+  api.getOrder.mockResolvedValue(order({ payment_method: 'ONLINE', payment_status: 'PENDING' }))
+  const { unmount } = renderPage()
+  expect(await screen.findByText(/waiting for payment/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Pay now' })).toBeInTheDocument()
+  unmount()
+  api.getOrder.mockResolvedValue(
+    order({ payment_method: 'ONLINE', payment_status: 'PAID', status: 'CONFIRMED' }),
+  )
+  renderPage()
+  expect(await screen.findByText('2 × Sunflower')).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Pay now' })).not.toBeInTheDocument()
+})

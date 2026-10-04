@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     # Online payment needs a gateway (chosen/implemented in the payments phase). Until then the
     # API refuses ONLINE orders so nobody places an order they cannot pay for.
     online_payments_enabled: bool = False
+    # "none" = no gateway configured. "fake" is a development simulator and is refused in
+    # production. A real gateway adapter is added once one is chosen (CLAUDE.md §3).
+    payment_provider: str = "none"
+    # Shared secret used to verify webhook signatures (server-only).
+    payment_webhook_secret: SecretStr | None = None
+    # Where the browser returns after paying (the storefront origin).
+    frontend_url: str = "http://localhost:5173"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")
@@ -39,6 +46,21 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_supabase_url(cls, v: str) -> str:
         return v.rstrip("/")
+
+    @field_validator("frontend_url")
+    @classmethod
+    def _normalize_frontend_url(cls, v: str) -> str:
+        return v.rstrip("/")
+
+    @model_validator(mode="after")
+    def _check_payment_settings(self) -> "Settings":
+        if self.payment_provider not in ("none", "fake"):
+            raise ValueError("PAYMENT_PROVIDER must be 'none' or 'fake' until a gateway is added")
+        if self.payment_provider == "fake" and self.is_production:
+            raise ValueError("The fake payment provider cannot be used in production")
+        if self.online_payments_enabled and self.payment_provider == "none":
+            raise ValueError("ONLINE_PAYMENTS_ENABLED requires a PAYMENT_PROVIDER")
+        return self
 
     @property
     def jwt_issuer(self) -> str:
