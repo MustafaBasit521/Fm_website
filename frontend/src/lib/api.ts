@@ -238,6 +238,32 @@ export interface Order {
   delivery_fee_paisa: number
   total_amount_paisa: number
   created_at: string
+  cancelled_at: string | null
+  cancellation_charge_paisa: number
+  charge_waived: boolean
+  refund_due_paisa: number
 }
+
+export interface OrderSummary {
+  order_id: string
+  status: string
+  payment_method: PaymentMethod
+  payment_status: string
+  total_amount_paisa: number
+  item_count: number
+  payment_deadline_at: string | null
+  created_at: string
+}
+
+export const getOrders = (page: number, signal?: AbortSignal) =>
+  apiGet<Page<OrderSummary>>(`/orders?page=${page}&page_size=10`, signal)
+export const getOrder = (id: string, signal?: AbortSignal) =>
+  apiGet<Order>(`/orders/${encodeURIComponent(id)}`, signal)
+export const cancelOrder = (id: string) =>
+  apiPost<Order>(`/orders/${encodeURIComponent(id)}/cancel`, {})
+export const changeOrderAddress = (
+  id: string,
+  delivery: { recipient_name?: string | null; address: CheckoutAddress },
+) => apiPatch<Order>(`/orders/${encodeURIComponent(id)}/address`, delivery)
 
 export const createOrder = (data: OrderRequest) => apiPost<Order>('/orders', data)

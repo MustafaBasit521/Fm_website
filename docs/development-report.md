@@ -149,3 +149,30 @@ Status of each phase lives in `progress.md`; business rules and schema live in `
 
 * See `progress.md` for the decisions and known gaps (rate limiting, double-submit, payment status after expiry, product type changes, guest order lookup).
 * pg_cron is available on the Supabase project but not enabled; enabling it is a one-time manual step (README).
+
+---
+
+## Phase 6 — Orders
+
+**Design (CLAUDE.md §14; business-rules §14–19, §24; database.md §9, §23)**
+
+* Decisions taken with the owner: a customer asks for a Processing cancellation by contacting the shop (admin performs it; no request flow), and the 50% charge is rounded down (`total * 1 // 2`).
+* All state rules live in `services/orders.py` and are enforced server-side; the UI only decides what to show. Every state-changing operation first locks the order row (`FOR UPDATE`) and only then checks the state, so concurrent cancel / status change / expiry cannot interleave.
+* Stock release is implemented once, in the SQL function `release_order_stock()` (locks the affected products in id order, matching checkout, to avoid deadlocks). The expiry function and the Python cancellation both call it. Made-to-order capacity needs no release because it is derived from active orders.
+* Customer routes reach only the caller's own orders (another customer's or a guest order is a 404). Guest orders have no website route; the admin handles them (cancel / address change) as the docs require.
+* Cancellation terms: Pending/Confirmed -> no charge; Processing (admin only) -> unpaid COD or waived: charge 0 and `charge_waived = true`, otherwise 50% rounded down; Shipped/Delivered/Cancelled -> refused. `refund_due_paisa` is computed (paid amount - charge - already refunded) for cancelled paid orders; money movement itself is Phase 7.
+* Address change reuses checkout's delivery resolution (Lahore-only, saved-address ownership) and keeps the existing recipient name when none is given.
+
+**Built**
+
+* Backend: migration `release order stock function`, `schemas/orders.py`, `services/orders.py`, routers `api/orders.py` and `api/admin_orders.py`; the order response gained cancellation fields.
+* Frontend: `OrdersPage`, `OrderDetailPage` (cancel with confirmation, address change, per-status messages), status labels in words (never colour alone), links from the account page.
+
+**Verified**
+
+* Backend 208 tests, frontend 69 tests, Ruff/ESLint/Prettier clean, build OK, migration applied on Supabase, live auth checks on the new routes.
+
+**Notes**
+
+* The expiry function was rewritten as a loop over overdue orders calling the shared release function; behaviour is unchanged (all 8 expiry tests pass unchanged).
+* `make check` now takes a little over two minutes because of the database-backed backend suite.

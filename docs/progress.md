@@ -46,12 +46,12 @@ Updating documentation does **not** mean a decision is implemented or tested.
 | 30-minute online payment window | Yes | Yes (`orders.payment_deadline_at`) | No | No |
 | Payment retry during the window | Yes | Partly — payment-attempt representation still open | No | No |
 | Automatic cancellation after expiry | Yes | Yes (decided: pg_cron + SQL function `expire_unpaid_online_orders()`) | Yes (SQL function; scheduling step pending, see Phase 5) | Yes (function) |
-| Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | Partly (reserve at order creation; release on expiry. Release on customer/admin cancellation is Phase 6) | Yes (reservation + expiry release) |
+| Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | Yes (reserve at creation; release on expiry and on cancellation via one SQL function `release_order_stock`) | Yes |
 | Online order Confirmed only after verified payment | Yes | Yes | No | No |
 | COD payment confirmed on delivery by admin | Yes | Yes | No | No |
 | Client-side cart for MVP (no cart tables) | Yes | Yes | Yes | Yes |
-| Guest cancellation/address change via admin/contact flow | Yes | Yes | No | No |
-| Processing cancellation charge = 50% of original total incl. delivery fee | Yes | Yes (`cancellation_charge_paisa`, `charge_waived`) | No | No |
+| Guest cancellation/address change via admin/contact flow | Yes | Yes | Yes (admin endpoints; guests have no website route) | Yes |
+| Processing cancellation charge = 50% of original total incl. delivery fee | Yes | Yes (`cancellation_charge_paisa`, `charge_waived`) | Yes (admin cancel; floor rounding; waive option; unpaid COD waived) | Yes |
 | Review eligibility requires a Delivered order | Yes | Yes | No | No |
 | One review per customer/product | Yes | Yes (`UNIQUE(customer_id, product_id)`) | No | No |
 | Lahore-only delivery (canonical city value) | Yes | Yes | Yes (at checkout) | Yes |
@@ -67,12 +67,12 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 Decided: expired unpaid online orders are cleaned up by a PostgreSQL function (`expire_unpaid_online_orders()`) scheduled with Supabase pg_cron (Phase 5).
 
-* How a Processing-stage cancellation is requested (business-rules §15 allows only admin-performed cancellation from Processing onwards)
+Decided (Phase 6): a customer asks to cancel a Processing order by contacting the shop (no request button; the admin cancels). The 50% Processing charge is rounded down to a whole paisa.
+
 * Payment-attempt representation: one payment record updated in place vs one record per attempt (the status list has no "Failed" state)
 * Handling of a verified online payment that arrives after the 30-minute window has expired
 * Exact anonymization/retention strategy for customer account deletion
 * How the admin verifies a guest's identity for WhatsApp/contact requests
-* Rounding rule when 50% of the total is not a whole paisa
 
 ---
 
@@ -265,19 +265,29 @@ Implementation notes:
 
 ## Phase 6 — Orders
 
-Status: Not Started
+Status: **Implemented and tested** (admin order management is the API only; the admin screens are Phase 9. Refund execution is Phase 7.)
 
 Tasks:
 
-* order history
-* order details
-* admin order management
-* order status transitions
-* customer cancellation
-* Processing cancellation charge
-* address-change rules
-* historical snapshots
-* inventory release
+* [x] order history (`GET /api/orders`, paginated, newest first; page `/orders`)
+* [x] order details (`GET /api/orders/{id}`; page `/orders/:id`; own orders only, others return 404)
+* [x] admin order management (`/api/admin/orders`: list with status/payment/search filters and pagination, detail, status change, cancel, address change; admin-only)
+* [x] order status transitions (admin moves one step forward only: Pending -> Confirmed -> Processing -> Shipped -> Delivered; an online order cannot be Confirmed until its payment is Paid; terminal states never move)
+* [x] customer cancellation (registered customers, own orders, Pending/Confirmed only; Processing returns "contact the shop"; Shipped/Delivered/Cancelled refused)
+* [x] Processing cancellation charge (admin cancel: 50% of the total incl. delivery fee, rounded down; unpaid COD charge waived automatically; admin may waive; recorded on the order)
+* [x] address-change rules (registered customer or admin: Pending/Confirmed only; same Lahore-only validation and saved-address ownership checks as checkout; guests go through the admin)
+* [x] historical snapshots (orders keep customer, delivery, product name and price snapshots; verified to survive product edits and deletion)
+* [x] inventory release (`release_order_stock()` SQL function shared by cancellation and the payment-window expiry; ready-to-ship stock returns, made-to-order capacity frees itself)
+
+Implementation notes:
+
+* Tests: backend 208 passing (adds customer history/privacy, every cancellation state, charge maths, concurrent double-cancel returning stock exactly once, cancel-vs-status-change race, address rules, admin authorization on every route, listing filters); frontend 69 passing (adds orders list and order detail pages).
+* Verified against Supabase: migration applied; both functions present; expiry dry run returned 0.
+* The expiry function was refactored to call `release_order_stock()`, so there is one implementation of stock release; its existing tests still pass.
+* Refunds: Phase 6 records the charge and shows `refund_due_paisa` (amount paid - charge - already refunded, for cancelled paid orders). Actual refunds and payment-status changes (Partially Refunded / Refunded) are Phase 7. COD "payment received" confirmation (Payment = Paid when Delivered) is also Phase 7 (COD task).
+* Decisions (not in the docs, easy to change): status changes move strictly one step forward; the status endpoint refuses Cancelled (use the cancel action); admin may cancel from Pending, Confirmed or Processing; `payments[-1]` is treated as the current payment (matters once retries exist).
+* Known gaps, left for later: no notification emails on status changes (Phase 8); guests still cannot look up an order on the website (they contact the shop); the order list has no date filter; stock release uses the product's current availability type, so changing a product's type while orders are active could misplace stock (to be blocked in the admin phase).
+* Not verified: a real browser run of the new order pages against Supabase.
 
 ---
 

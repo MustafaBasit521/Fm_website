@@ -8,6 +8,8 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import ShopPage from './pages/ShopPage'
 import OrderConfirmationPage from './pages/OrderConfirmationPage'
+import OrderDetailPage from './pages/OrderDetailPage'
+import OrdersPage from './pages/OrdersPage'
 import ProductPage from './pages/ProductPage'
 import RegisterPage from './pages/RegisterPage'
 import WishlistPage from './pages/WishlistPage'
@@ -27,6 +29,8 @@ export default function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/account/addresses" element={<AddressesPage />} />
         <Route path="/wishlist" element={<WishlistPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
       </Route>
     </Routes>
   )

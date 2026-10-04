@@ -135,3 +135,9 @@ class OrderRead(BaseModel):
     delivery_fee_paisa: int
     total_amount_paisa: int
     created_at: datetime
+    cancelled_at: datetime | None = None
+    cancellation_charge_paisa: int = 0
+    charge_waived: bool = False
+    # Money still owed back to the customer for a cancelled, paid order. Actual refunds are
+    # processed in the payments phase; this is the amount they will be.
+    refund_due_paisa: int = 0

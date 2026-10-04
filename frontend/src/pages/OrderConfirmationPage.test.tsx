@@ -33,6 +33,10 @@ const order: Order = {
   delivery_fee_paisa: 20000,
   total_amount_paisa: 270100,
   created_at: '2026-01-01T00:00:00Z',
+  cancelled_at: null,
+  cancellation_charge_paisa: 0,
+  charge_waived: false,
+  refund_due_paisa: 0,
 }
 
 const renderPage = () =>

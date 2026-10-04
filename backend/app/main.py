@@ -8,10 +8,12 @@ from app.api import (
     addresses,
     admin,
     admin_catalog,
+    admin_orders,
     catalog,
     checkout,
     customers,
     health,
+    orders,
     wishlist,
 )
 from app.core.config import get_settings
@@ -45,9 +47,11 @@ def create_app() -> FastAPI:
     app.include_router(addresses.router, prefix="/api")
     app.include_router(wishlist.router, prefix="/api")
     app.include_router(checkout.router, prefix="/api")
+    app.include_router(orders.router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(admin_catalog.router, prefix="/api")
+    app.include_router(admin_orders.router, prefix="/api")
     return app
 
 

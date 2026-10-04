@@ -30,11 +30,11 @@ from app.schemas.checkout import (
     CartLine,
     Delivery,
     OrderCreate,
-    OrderItemRead,
     OrderRead,
     Quote,
     QuoteLine,
 )
+from app.services import orders as orders_service
 from app.services.catalog import to_image
 from app.services.customers import get_or_create_customer
 
@@ -191,7 +191,7 @@ def _is_lahore(city: str) -> bool:
     return " ".join(city.split()).casefold() == DELIVERY_CITY.casefold()
 
 
-async def _resolve_delivery(
+async def resolve_delivery(
     session: AsyncSession, user: AuthUser | None, delivery: Delivery, contact_name: str
 ) -> dict[str, Any]:
     if delivery.address_id is not None:
@@ -276,7 +276,7 @@ async def create_order(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "QUANTITY_TOO_LARGE", "Too many units"
         )
 
-    delivery = await _resolve_delivery(session, user, data.delivery, data.contact.name)
+    delivery = await resolve_delivery(session, user, data.delivery, data.contact.name)
 
     # Free stock held by orders whose payment window has passed, then re-check below.
     await expire_unpaid_orders(session)
@@ -360,38 +360,4 @@ async def create_order(
         await session.rollback()
         raise
 
-    return await _read_order(session, order.order_id)
-
-
-async def _read_order(session: AsyncSession, order_id: uuid.UUID) -> OrderRead:
-    order = (
-        await session.scalars(
-            select(Order)
-            .where(Order.order_id == order_id)
-            .options(selectinload(Order.items), selectinload(Order.payments))
-            .execution_options(populate_existing=True)
-        )
-    ).one()
-    payment = order.payments[0]
-    return OrderRead(
-        order_id=order.order_id,
-        status=order.status,
-        payment_method=payment.method,
-        payment_status=payment.status,
-        payment_deadline_at=order.payment_deadline_at,
-        customer_name=order.customer_name,
-        customer_email=order.customer_email,
-        customer_phone=order.customer_phone,
-        delivery_name=order.delivery_name,
-        delivery_house_no=order.delivery_house_no,
-        delivery_street_number=order.delivery_street_number,
-        delivery_city=order.delivery_city,
-        delivery_province=order.delivery_province,
-        delivery_postal_code=order.delivery_postal_code,
-        delivery_country=order.delivery_country,
-        items=[OrderItemRead.model_validate(i) for i in order.items],
-        subtotal_paisa=order.subtotal_paisa,
-        delivery_fee_paisa=order.delivery_fee_paisa,
-        total_amount_paisa=order.total_amount_paisa,
-        created_at=order.created_at,
-    )
+    return await orders_service.read_order(session, order.order_id)
