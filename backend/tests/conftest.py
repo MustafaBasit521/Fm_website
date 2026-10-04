@@ -20,7 +20,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 
 import app.models  # noqa: E402, F401
 from app.core.auth import KeyResolver, get_key_resolver  # noqa: E402
+from app.core.config import get_settings  # noqa: E402
 from app.core.db import Base, get_session  # noqa: E402
+from app.core.storage import SignedUpload, SupabaseStorage, get_storage  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 ISSUER = "https://test-project.supabase.co/auth/v1"
@@ -90,8 +92,30 @@ async def db_engine():
     await engine.dispose()
 
 
+class FakeStorage(SupabaseStorage):
+    """Records calls instead of talking to Supabase."""
+
+    def __init__(self, *, configured: bool = True):
+        super().__init__(get_settings())
+        self._key = "fake-key" if configured else None
+        self.deleted: list[str] = []
+
+    async def create_signed_upload(self, path: str) -> SignedUpload:
+        return SignedUpload(
+            path=path, token="tok", upload_url=f"https://up.example/{path}?token=tok"
+        )
+
+    async def delete(self, paths: list[str]) -> None:
+        self.deleted.extend(paths)
+
+
+@pytest.fixture
+def storage():
+    return FakeStorage()
+
+
 @pytest_asyncio.fixture
-async def client(db_engine):
+async def client(db_engine, storage):
     app = create_app()
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
@@ -101,11 +125,49 @@ async def client(db_engine):
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_key_resolver] = lambda: _TestResolver()
+    app.dependency_overrides[get_storage] = lambda: storage
     async with db_engine.begin() as conn:
-        await conn.execute(text("TRUNCATE customers"))
+        await conn.execute(text("TRUNCATE product_images, products, categories, customers CASCADE"))
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_h(make_token):
+    return auth(make_token(admin=True, email="admin@example.com", name="Admin"))
+
+
+@pytest.fixture
+def customer_h(make_token):
+    return auth(make_token())
+
+
+@pytest_asyncio.fixture
+async def category_id(client, admin_h) -> str:
+    r = await client.post("/api/admin/categories", headers=admin_h, json={"name": "Flowers"})
+    assert r.status_code == 201
+    return r.json()["category_id"]
+
+
+@pytest.fixture
+def make_product(client, admin_h, category_id):
+    async def _make(**overrides) -> dict:
+        body = {
+            "category_id": category_id,
+            "name": "Sunflower",
+            "description": "A bright crochet sunflower",
+            "price_paisa": 125050,
+            "availability_type": "READY_TO_SHIP",
+            "stock_quantity": 5,
+            "is_visible": True,
+        }
+        body.update(overrides)
+        r = await client.post("/api/admin/products", headers=admin_h, json=body)
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    return _make

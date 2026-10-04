@@ -182,21 +182,31 @@ Implementation notes:
 
 ## Phase 3 — Catalog
 
-Status: Not Started
+Status: **Implemented and tested, except live Supabase Storage uploads (see notes)**
 
 Tasks:
 
-* categories
-* products
-* product images
-* product CRUD
-* storefront
-* product detail
-* search
-* filtering
-* sorting
-* pagination
-* availability handling
+* [x] categories (table + migration seeding the six initial categories; admin create/rename/delete; delete blocked while products exist)
+* [x] products (table, PostgreSQL enum `product_availability`, CHECK constraints, indexes; matches `database.md` §7)
+* [x] product images (table; admin register/update/delete metadata; server-generated storage paths, path validation)
+* [x] product CRUD (admin API, admin-only, validated; delete removes image rows and requests Storage file deletion)
+* [x] storefront (shop listing page; only visible products are ever returned)
+* [x] product detail (public API + page with image gallery)
+* [x] search (name/description, case-insensitive, LIKE wildcards escaped)
+* [x] filtering (category, availability type, available-only, featured, price range)
+* [x] sorting (newest, price asc/desc, name; stable tie-break)
+* [x] pagination (page/page_size, max 50 public)
+* [x] availability handling (ready-to-ship: stock > 0; made-to-order: capacity > active units)
+* [~] signed-URL image upload (endpoint implemented and unit-tested against a mocked Storage API; **not yet run against real Supabase Storage**)
+
+Implementation notes:
+
+* Tests: backend 86 passing (adds public filters/sort/pagination/visibility, admin authorization on every admin route, validation, category rules, image path validation/scoping, product-delete cascade, Storage client request shapes). Frontend 19 passing (adds shop/product pages, price formatting).
+* Verified against Supabase: catalog migration applied; 6 categories seeded; live `GET /api/categories`, `GET /api/products` and 401 on admin routes work.
+* **Made-to-order capacity:** `active_units` is a single function (`active_units_expr`) that returns 0 until orders exist (Phase 5). Until then a made-to-order product is available iff `max_active_units > 0`. Phase 5 must replace it with the real aggregate (`database.md` §24).
+* New products default to hidden (`is_visible=false`) until the admin publishes them.
+* To enable image upload: create the `product-images` bucket in Supabase (public, 5 MB limit, MIME types jpeg/png/webp) and set `SUPABASE_SERVICE_KEY` (server-only) in `backend/.env`. See `README.md`.
+* Not in this phase: admin UI screens (Phase 9), homepage featured section, reviews/wishlist integration, stock reservation (Phase 5).
 
 ---
 

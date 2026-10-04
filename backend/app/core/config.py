@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     database_url: str
     # Supabase project URL, e.g. https://<ref>.supabase.co (public value, not a secret)
     supabase_url: str
+    # SERVER-ONLY secret (Supabase "secret"/service-role key). Used solely to mint signed
+    # Storage upload URLs and delete Storage files. Never sent to the browser.
+    supabase_service_key: SecretStr | None = None
+    product_images_bucket: str = "product-images"
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")

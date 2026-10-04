@@ -44,6 +44,14 @@ where email = 'admin@example.com';
 
 They must log out and in again so the new token carries the role.
 
+## Product image storage (one-time setup)
+
+1. Supabase dashboard -> Storage -> New bucket: name `product-images`, **public**, file size limit
+   5 MB, allowed MIME types `image/jpeg, image/png, image/webp` (the bucket enforces these).
+2. Supabase dashboard -> Settings -> API Keys: copy the **secret** key into `backend/.env` as
+   `SUPABASE_SERVICE_KEY`. It is server-only: never put it in a `VITE_*` variable or commit it.
+   Without it, image upload endpoints return 503 and everything else still works.
+
 ## Tests
 
 Backend database tests need the local Docker Postgres (`make db`); they use a separate

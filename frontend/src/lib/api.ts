@@ -47,3 +47,51 @@ export type CustomerUpdate = Partial<Pick<Customer, 'name' | 'phone' | 'subscrib
 
 export const getMe = (signal?: AbortSignal) => apiGet<Customer>('/customers/me', signal)
 export const updateMe = (data: CustomerUpdate) => apiPatch<Customer>('/customers/me', data)
+
+// ---- catalog ------------------------------------------------------------------------------
+
+export type Availability = 'READY_TO_SHIP' | 'MADE_TO_ORDER'
+export type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'name'
+
+export interface Category {
+  category_id: string
+  name: string
+}
+
+export interface ProductImage {
+  image_id: string
+  url: string
+  alt_text: string | null
+  sort_order: number
+}
+
+export interface ProductSummary {
+  product_id: string
+  name: string
+  price_paisa: number
+  category: Category
+  availability_type: Availability
+  is_available: boolean
+  is_featured: boolean
+  image: ProductImage | null
+}
+
+export interface ProductDetail extends ProductSummary {
+  description: string | null
+  images: ProductImage[]
+}
+
+export interface Page<T> {
+  items: T[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export const getCategories = (signal?: AbortSignal) => apiGet<Category[]>('/categories', signal)
+
+export const getProducts = (query: URLSearchParams, signal?: AbortSignal) =>
+  apiGet<Page<ProductSummary>>(`/products?${query.toString()}`, signal)
+
+export const getProduct = (id: string, signal?: AbortSignal) =>
+  apiGet<ProductDetail>(`/products/${encodeURIComponent(id)}`, signal)
