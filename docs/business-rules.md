@@ -55,6 +55,8 @@ Statuses that no longer consume capacity:
 
 When active units reach the configured maximum, the product becomes unavailable for new purchases.
 
+The availability type of a product cannot be changed while orders containing it are Pending, Confirmed or Processing (stock and capacity are reserved and released according to the type, so changing it mid-order would misplace them). Other edits are always allowed.
+
 ---
 
 # 2. Product Visibility
@@ -736,7 +738,9 @@ Email delivery is handled separately by an external email service.
 
 Notifications are not email delivery logs.
 
-Decided: a notification is UNREAD until the customer opens it (one at a time or all at once). In-app notifications exist for registered customers only; guests are reached by email at the address they gave. Implemented events: order placed, order confirmed, status changed (processing, cancelled), shipped, delivered, payment success, payment failure and custom-order updates; each notification is saved in the same transaction as the change that caused it. NEW_PRODUCT notifications come with the admin product screens (Phase 9). An order cancelled by the automatic payment-window expiry does not yet send a notification.
+Decided: a notification is UNREAD until the customer opens it (one at a time or all at once). In-app notifications exist for registered customers only; guests are reached by email at the address they gave. Implemented events: order placed, order confirmed, status changed (processing, cancelled), shipped, delivered, payment success, payment failure and custom-order updates; each notification is saved in the same transaction as the change that caused it. An order cancelled by the automatic payment-window expiry does not yet send a notification.
+
+NEW_PRODUCT (implemented in Phase 9): when the admin publishes a product (it is created visible, or changed from hidden to visible), every customer subscribed to shop updates gets an in-app notification ("New in the shop"). Customers who unsubscribed get nothing. It is in-app only: a mass email needs the unchosen email provider and an unsubscribe flow. Hiding or editing a product announces nothing; showing it again announces it again.
 
 Email: the service provider is still to be chosen, so emails are built behind a provider interface (default: send nothing; a development option logs them). Emails are queued while a change is built and sent only after the database commit succeeds, in the background; a mail problem never breaks an order. Customers get emails for the order and payment events above (guests too); the shop gets an alert for each new order, custom order and contact message.
 
@@ -761,6 +765,14 @@ Admin can manage:
 
 Multiple admin roles are intentionally out of MVP scope.
 
+Implementation: the admin screens live at `/admin` in the web app and are shown only to the account whose server-controlled `app_metadata` role is `admin`; every admin request is authorized by the backend, so the screens are a convenience, not the security boundary. Contents:
+
+* **Dashboard:** orders needing action (Pending cash-on-delivery orders to confirm, and Confirmed orders to start preparing), orders by status, new messages, new custom-order requests, products running low (ready-to-ship, 3 or fewer left) and the five most recent orders. No sales analytics (out of scope).
+* **Products and categories:** create, edit, show/hide, feature, delete, pictures; categories with product counts (a category with products cannot be deleted).
+* **Orders and refunds/cancellations:** list with filters; the order page moves the order one step at a time, cancels (with the Processing charge and the option to waive it), confirms cash received for delivered COD orders, refunds in full or in part, and changes the address of Pending/Confirmed orders.
+* **Customers:** view only: profile, subscription, order and custom-request counts, recent orders. The admin cannot edit or delete customers (the account-deletion strategy is still an open decision).
+* **Gallery, custom orders, messages, reviews:** as described in §26 and §28–30.
+
 ---
 
 # 33. Business Settings
@@ -775,6 +787,8 @@ Admin can configure business information such as:
 * delivery information
 * delivery fee
 * social links
+
+Decided: the settings screen offers exactly these fields and nothing else (the mockup's holiday mode and payment-method switches are not part of the MVP rules). The delivery fee is entered in rupees and stored in paisa (0 to Rs 100,000) and applies to new quotes and orders only; existing orders keep the fee they were placed with. Social links are `https://` addresses only (at most ten), because they become links on the storefront. The shop details (name, email, phone, WhatsApp, address, delivery information, fee, social links) are readable by everyone through `GET /api/settings` and shown on the contact page; the business email is also where the shop's alert emails go.
 
 ---
 

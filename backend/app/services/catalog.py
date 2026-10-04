@@ -26,6 +26,7 @@ from app.schemas.catalog import (
     SortKey,
     storage_path_pattern,
 )
+from app.services import events
 
 UrlFor = Callable[[str], str]
 
@@ -270,6 +271,9 @@ async def create_product(session: AsyncSession, data: ProductCreate) -> Product:
     await _require_category(session, data.category_id)
     product = Product(**data.model_dump())
     session.add(product)
+    if product.is_visible:  # published on creation
+        await session.flush()
+        await events.new_product(session, product)
     await session.commit()
     return await get_product(session, product.product_id, visible_only=False)
 
@@ -286,6 +290,27 @@ _NOT_NULLABLE = {
 }
 
 
+async def _require_no_active_orders(session: AsyncSession, product_id: uuid.UUID) -> None:
+    """Stock and capacity are reserved according to the product's type when an order is placed
+    and released according to its type when the order ends, so the type must not change while
+    orders containing the product are still active."""
+    active = await session.scalar(
+        select(func.count())
+        .select_from(OrderItem)
+        .join(Order, Order.order_id == OrderItem.order_id)
+        .where(OrderItem.product_id == product_id, Order.status.in_(ACTIVE_ORDER_STATUSES))
+    )
+    if active:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            {
+                "code": "ACTIVE_ORDERS",
+                "message": "The availability type cannot change while orders containing this "
+                "product are Pending, Confirmed or Processing",
+            },
+        )
+
+
 async def update_product(
     session: AsyncSession, product_id: uuid.UUID, data: ProductUpdate
 ) -> Product:
@@ -296,8 +321,14 @@ async def update_product(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"{field} cannot be null")
     if "category_id" in changes:
         await _require_category(session, changes["category_id"])
+    new_type = changes.get("availability_type")
+    if new_type is not None and new_type != product.availability_type:
+        await _require_no_active_orders(session, product_id)
+    was_visible = product.is_visible
     for field, value in changes.items():
         setattr(product, field, value)
+    if product.is_visible and not was_visible:  # hidden -> visible: it was just published
+        await events.new_product(session, product)
     await session.commit()
     session.expire_all()
     return await get_product(session, product_id, visible_only=False)

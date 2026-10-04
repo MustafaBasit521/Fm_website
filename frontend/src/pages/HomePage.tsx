@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
+import { AdminLink } from './AdminLink'
 import { CartLink } from './CartLink'
 import { NotificationsLink } from './NotificationsLink'
 
@@ -16,6 +17,7 @@ export default function HomePage() {
         <Link to="/contact">Contact</Link>
         <CartLink />
         <NotificationsLink />
+        <AdminLink />
         {session ? (
           <Link to="/account">My account</Link>
         ) : (

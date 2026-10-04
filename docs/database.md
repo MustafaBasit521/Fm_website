@@ -628,7 +628,7 @@ CUSTOM_ORDER_UPDATE
 
 Notification read/unread behavior should be finalized during implementation.
 
-Decided: `type` uses the enum `notification_type` and `status` uses `notification_status` (`UNREAD` by default, `READ` once opened). `created_at` defaults to `clock_timestamp()` rather than `now()`, so notifications created in one transaction keep their creation order. Index: `(customer_id, status, created_at)`. Rows exist for registered customers only. `NEW_PRODUCT` is in the enum but is first used in Phase 9.
+Decided: `type` uses the enum `notification_type` and `status` uses `notification_status` (`UNREAD` by default, `READ` once opened). `created_at` defaults to `clock_timestamp()` rather than `now()`, so notifications created in one transaction keep their creation order. Index: `(customer_id, status, created_at)`. Rows exist for registered customers only. `NEW_PRODUCT` rows are created in bulk (one `INSERT ... SELECT` with a database-generated id per row) for every customer with `subscribed_to_updates = true` when a product is published.
 
 ---
 
@@ -658,6 +658,8 @@ updated_at TIMESTAMPTZ
 There is initially one active business-settings record.
 
 `delivery_fee_paisa` is `NOT NULL DEFAULT 0` with `CHECK (delivery_fee_paisa >= 0)`. The migration seeds the single record (`business_name` = Crochet Shop, `delivery_fee_paisa` = 20000, i.e. Rs 200).
+
+`social_links` is a JSON object of `{name: https URL}` (lowercase letters, digits and underscores in the name; `https://` only; at most 10 entries), kept as `{}` when empty. The application always reads and updates the most recently updated record. The record is readable by everyone through the API (all of it is public shop information); only the admin can change it.
 
 ---
 

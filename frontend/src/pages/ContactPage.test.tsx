@@ -6,7 +6,11 @@ import { ApiError } from '../lib/api'
 import ContactPage from './ContactPage'
 
 const sendContactMessage = vi.fn()
+const getPublicSettings = vi.fn()
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
+vi.mock('../lib/adminApi', () => ({
+  getPublicSettings: (...a: unknown[]) => getPublicSettings(...a),
+}))
 vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   sendContactMessage: (...a: unknown[]) => sendContactMessage(...a),
@@ -21,6 +25,16 @@ const renderPage = () =>
 
 beforeEach(() => {
   sendContactMessage.mockReset()
+  getPublicSettings.mockReset().mockResolvedValue({
+    business_name: 'Bundle of Loops',
+    email: null,
+    phone: '042 111',
+    whatsapp: '+92 300 1234567',
+    address: null,
+    delivery_information: null,
+    delivery_fee_paisa: 20000,
+    social_links: { instagram: 'https://instagram.com/bol' },
+  })
 })
 
 it('sends a message and thanks the customer', async () => {
@@ -61,4 +75,22 @@ it.each([
   await userEvent.type(screen.getByLabelText('Message'), 'Hello')
   await userEvent.click(screen.getByRole('button', { name: 'Send message' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(text)
+})
+
+it('shows the shop details from the public settings, and works without them', async () => {
+  const first = renderPage()
+  expect(await screen.findByRole('link', { name: 'Chat on WhatsApp' })).toHaveAttribute(
+    'href',
+    'https://wa.me/923001234567',
+  )
+  expect(screen.getByText('Phone: 042 111')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Instagram' })).toHaveAttribute(
+    'rel',
+    'noopener noreferrer',
+  )
+  first.unmount()
+  getPublicSettings.mockRejectedValue(new Error('x'))
+  renderPage()
+  expect(await screen.findByRole('button', { name: 'Send message' })).toBeInTheDocument()
+  expect(screen.queryByLabelText('Shop details')).not.toBeInTheDocument()
 })

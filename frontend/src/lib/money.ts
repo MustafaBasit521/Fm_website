@@ -14,3 +14,10 @@ export function parseRupeesToPaisa(input: string): number | null {
   const paisa = match[2] ? Number(match[2].padEnd(2, '0')) : 0
   return rupees * 100 + paisa
 }
+
+/** 125050 -> "1250.5" style text for a price input, using integer math only. */
+export function paisaToRupeesInput(paisa: number): string {
+  const rupees = Math.floor(paisa / 100)
+  const rest = paisa % 100
+  return rest === 0 ? String(rupees) : `${rupees}.${String(rest).padStart(2, '0')}`
+}

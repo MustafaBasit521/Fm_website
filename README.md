@@ -44,6 +44,11 @@ where email = 'admin@example.com';
 
 They must log out and in again so the new token carries the role.
 
+After that, open `/admin` (an **Admin** link also appears on the home and account pages for this
+account only). The admin area covers the dashboard, orders (including cancellation and refunds),
+products and pictures, categories, customers, gallery, custom orders, messages, reviews and the
+shop settings.
+
 ## Storage buckets (one-time setup)
 
 1. Supabase dashboard -> Storage -> New bucket: name `product-images`, **public**, file size limit

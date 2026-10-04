@@ -1,7 +1,60 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { getPublicSettings } from '../lib/adminApi'
 import { ApiError, sendContactMessage } from '../lib/api'
 import { buttonClass, Field, FormError } from './ui'
+
+function ShopDetails() {
+  const [info, setInfo] = useState<Awaited<ReturnType<typeof getPublicSettings>> | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    getPublicSettings(controller.signal)
+      .then(setInfo)
+      .catch(() => {}) // the contact form works without these details
+    return () => controller.abort()
+  }, [])
+  if (!info) return null
+  const wa = info.whatsapp?.replace(/[^\d]/g, '')
+  const links = Object.entries(info.social_links)
+  if (!info.phone && !wa && !info.address && !info.email && links.length === 0) return null
+  return (
+    <section
+      aria-label="Shop details"
+      className="mt-4 rounded-xl border border-sand bg-cream-100 p-4"
+    >
+      <h2 className="text-xl font-semibold">{info.business_name ?? 'Our details'}</h2>
+      <ul className="mt-2 flex flex-col gap-1">
+        {wa && (
+          <li>
+            <a
+              className="text-terracotta underline"
+              href={`https://wa.me/${wa}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Chat on WhatsApp
+            </a>
+          </li>
+        )}
+        {info.phone && <li>Phone: {info.phone}</li>}
+        {info.email && <li>Email: {info.email}</li>}
+        {info.address && <li>{info.address}</li>}
+        {links.map(([name, url]) => (
+          <li key={name}>
+            <a
+              className="text-terracotta underline"
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {name.charAt(0).toUpperCase() + name.slice(1)}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 export default function ContactPage() {
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +114,7 @@ export default function ContactPage() {
         ← Home
       </Link>
       <h1 className="mt-2 font-serif text-4xl">Contact us</h1>
+      <ShopDetails />
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <Field id="name" name="name" label="Your name" maxLength={100} required />
         <Field id="email" name="email" label="Email" type="email" />

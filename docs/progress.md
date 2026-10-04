@@ -67,6 +67,8 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 Decided: expired unpaid online orders are cleaned up by a PostgreSQL function (`expire_unpaid_online_orders()`) scheduled with Supabase pg_cron (Phase 5).
 
+Decided (Phase 9): the settings screen offers only the fields in business-rules §33 (no holiday mode or payment toggles, which appear in the mockup but not in the rules).
+
 Decided (Phase 8): custom orders go NEW > IN_DISCUSSION > ACCEPTED > IN_PROGRESS > COMPLETED, plus DECLINED / CANCELLED; customers may edit/delete their own review and the admin may remove any; notifications are UNREAD/READ and NEW_PRODUCT moves to Phase 9; the email provider is chosen later (emails are built behind a provider interface).
 
 Decided (Phase 7): each online payment attempt is its own `payments` row with a new `FAILED` status; a verified payment that arrives after the window closes leaves the order Cancelled and is refundable in full.
@@ -359,20 +361,32 @@ Implementation notes:
 
 ## Phase 9 — Admin Dashboard
 
-Status: Not Started
+Status: **Implemented and tested.** Not yet done: trying the screens in a browser against real data, and real picture uploads (they need the Storage buckets and key).
 
 Tasks:
 
-* dashboard
-* product management
-* category management
-* order management
-* customer management
-* gallery management
-* custom-order management
-* message management
-* business settings
-* refund/cancellation management
+* [x] dashboard (`GET /api/admin/dashboard`; page `/admin`: orders needing action, orders by status, new messages and custom requests, products running low, recent orders)
+* [x] product management (list with search/category filter, create, edit, show/hide, feature, delete with confirmation, picture upload/describe/remove; new guard: the availability type cannot change while orders containing the product are active)
+* [x] category management (list with product counts, add, rename, delete; deleting a used category is blocked)
+* [x] order management (list with filters/search; order page with one-step status changes, address change, payment attempts)
+* [x] customer management (view only: list with search, details with counts and recent orders)
+* [x] gallery management (upload, show/hide, change type, delete)
+* [x] custom-order management (list/filter/search, private reference picture via signed link, status transitions)
+* [x] message management (list/filter/search, status, reply by email or WhatsApp link)
+* [x] business settings (`GET/PATCH /api/admin/settings`, public read `GET /api/settings`; exactly the fields in business-rules §33)
+* [x] refund/cancellation management (from the order page: cancel with the Processing charge and waiver option, confirm cash received, full or partial refund)
+* [x] NEW_PRODUCT notifications (moved here from Phase 8: in-app, to subscribed customers, when a product is published)
+* [x] reviews moderation screen (list and remove)
+
+Implementation notes:
+
+* Tests: backend 401 passing (adds dashboard, customers, categories overview, settings validation and effects, availability-type guard, NEW_PRODUCT including a 50-customer bulk case); frontend 179 passing (adds the admin guard and every admin screen).
+* The admin area is protected twice: the backend authorizes every `/api/admin/*` request (admin role from server-controlled metadata), and the frontend guard (`AdminRoute`) only decides what to show. A non-admin who opens `/admin` sees "No access" and no admin data is requested beyond the identity check.
+* Bugs found by tests and fixed: publishing a product with two or more subscribed customers failed (the Python-side id default became one value shared by the whole `INSERT ... SELECT`; ids are now generated in SQL); admin lists flashed "Loading…" and lost their buttons on every reload (the loader now keeps the previous data during a plain reload).
+* Money rule kept in the UI: prices and fees are typed in rupees, converted with string/integer parsing (`parseRupeesToPaisa`, `paisaToRupeesInput`), never floating point.
+* Decisions (not in the rules, easy to change): "needs action" means Pending COD orders plus Confirmed orders; "running low" means 3 or fewer ready-to-ship pieces; the dashboard shows no sales totals (analytics are out of scope); NEW_PRODUCT is in-app only and repeats if a product is hidden and shown again.
+* Not implemented, by decision or scope: holiday mode and payment-method switches (in the mockup, not in the rules); editing or deleting customers (the account-deletion strategy is an open decision); a "Recent activity" feed (needs an event log that is not in the database design); the mockup's "note from customer" on orders (no such field in the design).
+* Admin access: log in as the admin account (created with the SQL in `README.md`) and open `/admin`; an "Admin" link appears on the home and account pages for that account only.
 
 ---
 
