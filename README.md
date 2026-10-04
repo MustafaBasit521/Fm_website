@@ -44,13 +44,16 @@ where email = 'admin@example.com';
 
 They must log out and in again so the new token carries the role.
 
-## Product image storage (one-time setup)
+## Storage buckets (one-time setup)
 
 1. Supabase dashboard -> Storage -> New bucket: name `product-images`, **public**, file size limit
    5 MB, allowed MIME types `image/jpeg, image/png, image/webp` (the bucket enforces these).
 2. Supabase dashboard -> Settings -> API Keys: copy the **secret** key into `backend/.env` as
    `SUPABASE_SERVICE_KEY`. It is server-only: never put it in a `VITE_*` variable or commit it.
    Without it, image upload endpoints return 503 and everything else still works.
+3. Two more buckets for the engagement features: **`gallery-images`** (public, 5 MB limit, jpeg/png/webp) and
+   **`custom-order-references`** (**private**, 5 MB limit, jpeg/png/webp). The private bucket must never be made
+   public: customers' reference pictures are shown only to the admin through short-lived signed links.
 
 ## Automatic expiry of unpaid online orders (one-time setup on Supabase)
 
@@ -95,6 +98,20 @@ Then check out choosing "Pay online". On the confirmation page click **Pay now**
 fake gateway page choose **Pay successfully** or **Fail the payment**. After a failure you can
 **Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
 afterwards (the fake gateway keeps its state in memory only).
+
+## Email (not connected yet)
+
+No email service is chosen yet, so by default no email is sent (`EMAIL_PROVIDER=none`). To see
+the emails the app would send, set `EMAIL_PROVIDER=console` in `backend/.env` and watch the
+server log (development only; the app refuses it in production). The shop alerts (new orders,
+custom orders, messages) go to the email address in the business settings:
+
+```sql
+update business_settings set email = 'you@example.com';
+```
+
+If the app runs behind a reverse proxy, also set `TRUST_PROXY_HEADERS=true` so rate limiting sees
+the real client address (leave it `false` otherwise).
 
 ## Tests
 

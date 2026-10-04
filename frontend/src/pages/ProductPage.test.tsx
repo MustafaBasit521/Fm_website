@@ -7,10 +7,12 @@ import { makeAuth } from '../test/auth'
 import ProductPage from './ProductPage'
 
 const getProduct = vi.fn()
+const getReviews = vi.fn()
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   getProduct: (...a: unknown[]) => getProduct(...a),
+  getReviews: (...a: unknown[]) => getReviews(...a),
 }))
 
 const img = (n: number) => ({
@@ -46,6 +48,14 @@ const renderPage = () => {
 
 beforeEach(() => {
   getProduct.mockReset()
+  getReviews.mockReset().mockResolvedValue({
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 10,
+    average_rating: null,
+    rating_count: 0,
+  })
 })
 
 it('shows product details and switches images', async () => {

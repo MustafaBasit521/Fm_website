@@ -293,3 +293,136 @@ export const fakeGatewayComplete = (reference: string, outcome: 'paid' | 'failed
   apiPost<{ received: boolean }>(`/dev/fake-gateway/${encodeURIComponent(reference)}/complete`, {
     outcome,
   })
+
+// ---- reviews ------------------------------------------------------------------------------
+
+export interface Review {
+  review_id: string
+  product_id: string | null
+  rating: number
+  comment: string | null
+  author: string
+  created_at: string
+}
+
+export interface ReviewList {
+  items: Review[]
+  total: number
+  page: number
+  page_size: number
+  average_rating: number | null
+  rating_count: number
+}
+
+export interface MyReviewState {
+  eligible: boolean
+  review: Review | null
+}
+
+const reviewsPath = (productId: string) => `/products/${encodeURIComponent(productId)}/reviews`
+
+export const getReviews = (productId: string, page = 1, signal?: AbortSignal) =>
+  apiGet<ReviewList>(`${reviewsPath(productId)}?page=${page}&page_size=10`, signal)
+export const getMyReviewState = (productId: string, signal?: AbortSignal) =>
+  apiGet<MyReviewState>(`${reviewsPath(productId)}/me`, signal)
+export const createReview = (productId: string, data: { rating: number; comment: string | null }) =>
+  apiPost<Review>(reviewsPath(productId), data)
+export const updateReview = (
+  productId: string,
+  data: { rating?: number; comment?: string | null },
+) => apiPatch<Review>(`${reviewsPath(productId)}/me`, data)
+export const deleteReview = (productId: string) => apiDelete(`${reviewsPath(productId)}/me`)
+
+// ---- gallery ------------------------------------------------------------------------------
+
+export type GalleryImageType = 'SHOP' | 'DESIGN' | 'BEHIND_THE_SCENES' | 'CUSTOMER_PHOTO' | 'OTHER'
+
+export interface GalleryImage {
+  gallery_image_id: string
+  url: string
+  title: string | null
+  description: string | null
+  image_type: GalleryImageType
+}
+
+export const getGallery = (type: GalleryImageType | '', page: number, signal?: AbortSignal) =>
+  apiGet<Page<GalleryImage>>(
+    `/gallery?page=${page}&page_size=24${type ? `&type=${type}` : ''}`,
+    signal,
+  )
+
+// ---- custom orders ------------------------------------------------------------------------
+
+export type CustomOrderStatus =
+  'NEW' | 'IN_DISCUSSION' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'DECLINED' | 'CANCELLED'
+
+export interface CustomOrder {
+  custom_order_id: string
+  name: string
+  whatsapp_number: string
+  description: string
+  budget_paisa: number | null
+  required_date: string | null
+  status: CustomOrderStatus
+  has_reference_image: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface UploadTarget {
+  storage_path: string
+  upload_url: string
+  token: string
+  bucket: string
+}
+
+export interface CustomOrderRequest {
+  name: string
+  whatsapp_number: string
+  description: string
+  budget_paisa?: number | null
+  required_date?: string | null
+  reference_image_path?: string | null
+}
+
+export const getCustomOrderUploadTarget = (contentType: string) =>
+  apiPost<UploadTarget>('/custom-orders/upload-url', { content_type: contentType })
+export const submitCustomOrder = (data: CustomOrderRequest) =>
+  apiPost<CustomOrder>('/custom-orders', data)
+export const getCustomOrders = (page: number, signal?: AbortSignal) =>
+  apiGet<Page<CustomOrder>>(`/custom-orders?page=${page}&page_size=10`, signal)
+export const cancelCustomOrder = (id: string) =>
+  apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/cancel`, {})
+
+// ---- contact ------------------------------------------------------------------------------
+
+export interface ContactRequest {
+  name: string
+  email?: string | null
+  phone?: string | null
+  whatsapp_number?: string | null
+  message: string
+}
+
+export const sendContactMessage = (data: ContactRequest) =>
+  apiPost<{ received: boolean }>('/contact', data)
+
+// ---- notifications ------------------------------------------------------------------------
+
+export interface AppNotification {
+  notification_id: string
+  type: string
+  title: string
+  message: string
+  status: 'UNREAD' | 'READ'
+  created_at: string
+}
+
+export const getNotifications = (page: number, signal?: AbortSignal) =>
+  apiGet<Page<AppNotification>>(`/customers/me/notifications?page=${page}&page_size=20`, signal)
+export const getUnreadCount = (signal?: AbortSignal) =>
+  apiGet<{ unread: number }>('/customers/me/notifications/unread-count', signal)
+export const markNotificationRead = (id: string) =>
+  apiPost<AppNotification>(`/customers/me/notifications/${encodeURIComponent(id)}/read`, {})
+export const markAllNotificationsRead = () =>
+  apiPost<{ updated: number }>('/customers/me/notifications/read-all', {})

@@ -20,6 +20,7 @@ from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.models.orders import Order, Payment
 from app.schemas.orders import InitiatePayment, PaymentStatusRead
 from app.services import checkout as checkout_service
+from app.services import events
 from app.services import orders as orders_service
 
 logger = logging.getLogger(__name__)
@@ -78,18 +79,23 @@ async def _apply_verified(
                 # Paid after the window closed but before the expiry job ran: same as a late
                 # payment. The order is cancelled and the full amount is owed back.
                 await orders_service.apply_cancellation(session, order, 0, False)
+                await events.payment_received(session, order, late=True)
                 return "paid_late"
             order.status = OrderStatus.CONFIRMED  # business-rules §13: verified payment
+            await events.payment_received(session, order)
+            await events.order_status_changed(session, order, OrderStatus.CONFIRMED)
             return "paid"
         if order.status == OrderStatus.CANCELLED:
             # Decided: the order stays cancelled; the payment is recorded and refundable in
             # full (cancellation_charge is 0, so refund_due = the amount paid).
+            await events.payment_received(session, order, late=True)
             return "paid_late"
         return "paid"  # e.g. a second attempt paid for an already confirmed order
 
     if info.status == ProviderStatus.FAILED:
         if payment.status == PaymentStatus.PENDING:
             payment.status = PaymentStatus.FAILED  # does not cancel the order (§20)
+            await events.payment_failed(session, order)
         return "failed"
 
     return "pending"
@@ -220,6 +226,7 @@ async def confirm_cod_payment(session: AsyncSession, order_id: uuid.UUID) -> Ord
             "Cash payment can be confirmed only after the order is delivered",
         )
     payment.status = PaymentStatus.PAID
+    await events.payment_received(session, order)
     await session.commit()
     return await orders_service.load_order(session, order_id, lock=False)
 

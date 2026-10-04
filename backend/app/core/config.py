@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # Storage upload URLs and delete Storage files. Never sent to the browser.
     supabase_service_key: SecretStr | None = None
     product_images_bucket: str = "product-images"
+    gallery_images_bucket: str = "gallery-images"  # public
+    custom_order_references_bucket: str = "custom-order-references"  # PRIVATE
     # Online payment needs a gateway (chosen/implemented in the payments phase). Until then the
     # API refuses ONLINE orders so nobody places an order they cannot pay for.
     online_payments_enabled: bool = False
@@ -26,6 +28,12 @@ class Settings(BaseSettings):
     payment_webhook_secret: SecretStr | None = None
     # Where the browser returns after paying (the storefront origin).
     frontend_url: str = "http://localhost:5173"
+    # "none" = emails are not sent. "console" only logs them (development; refused in production).
+    # A real email provider is added once one is chosen (CLAUDE.md §3).
+    email_provider: str = "none"
+    # Behind a reverse proxy (Vercel, nginx, ...) the client IP is in X-Forwarded-For. Enable only
+    # when the app is really behind such a proxy, otherwise clients could spoof their IP.
+    trust_proxy_headers: bool = False
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
 
     @field_validator("cors_origins", mode="before")
@@ -58,6 +66,10 @@ class Settings(BaseSettings):
             raise ValueError("PAYMENT_PROVIDER must be 'none' or 'fake' until a gateway is added")
         if self.payment_provider == "fake" and self.is_production:
             raise ValueError("The fake payment provider cannot be used in production")
+        if self.email_provider not in ("none", "console"):
+            raise ValueError("EMAIL_PROVIDER must be 'none' or 'console' until a provider is added")
+        if self.email_provider == "console" and self.is_production:
+            raise ValueError("The console email provider cannot be used in production")
         if self.online_payments_enabled and self.payment_provider == "none":
             raise ValueError("ONLINE_PAYMENTS_ENABLED requires a PAYMENT_PROVIDER")
         return self

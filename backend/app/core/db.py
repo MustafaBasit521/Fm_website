@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import get_settings
+from app.core.email.outbox import send_in_background, take_ready
 
 
 class Base(DeclarativeBase):
@@ -32,7 +33,15 @@ async def get_session() -> AsyncIterator[AsyncSession]:
     get_engine()
     assert _sessionmaker is not None
     async with _sessionmaker() as session:
-        yield session
+        try:
+            yield session
+        finally:
+            ready = take_ready(session)
+    if ready:  # emails for changes that committed; sent best-effort, never blocking the request
+        from app.core.config import get_settings
+        from app.core.email.providers import build_email_provider
+
+        send_in_background(ready, build_email_provider(get_settings()))
 
 
 async def dispose_engine() -> None:

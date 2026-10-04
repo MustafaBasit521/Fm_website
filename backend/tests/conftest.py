@@ -22,6 +22,9 @@ import app.models  # noqa: F401  (registers models on Base.metadata)
 from app.core.auth import KeyResolver, get_key_resolver
 from app.core.config import get_settings
 from app.core.db import get_session
+from app.core.email.base import EmailMessage
+from app.core.email.outbox import send_emails, take_ready
+from app.core.rate_limit import limiter
 from app.core.storage import SignedUpload, SupabaseStorage, get_storage
 from app.main import create_app
 
@@ -125,14 +128,21 @@ class FakeStorage(SupabaseStorage):
         super().__init__(get_settings())
         self._key = "fake-key" if configured else None
         self.deleted: list[str] = []
+        self.deleted_in: list[tuple[str, str]] = []
+        self.uploads: list[tuple[str, str]] = []
 
-    async def create_signed_upload(self, path: str) -> SignedUpload:
+    async def create_signed_upload(self, path: str, bucket: str | None = None) -> SignedUpload:
+        self.uploads.append((bucket or self.bucket, path))
         return SignedUpload(
             path=path, token="tok", upload_url=f"https://up.example/{path}?token=tok"
         )
 
-    async def delete(self, paths: list[str]) -> None:
+    async def create_signed_download(self, path: str, bucket: str, expires_in: int = 3600) -> str:
+        return f"https://down.example/{bucket}/{path}?sig=abc"
+
+    async def delete(self, paths: list[str], bucket: str | None = None) -> None:
         self.deleted.extend(paths)
+        self.deleted_in.extend((bucket or self.bucket, p) for p in paths)
 
 
 @pytest.fixture
@@ -140,14 +150,48 @@ def storage():
     return FakeStorage()
 
 
+class FakeEmail:
+    """Collects the emails the app would send."""
+
+    name = "fake"
+
+    def __init__(self) -> None:
+        self.sent: list[EmailMessage] = []
+
+    async def send(self, message: EmailMessage) -> None:
+        self.sent.append(message)
+
+    def to(self, address: str) -> list[EmailMessage]:
+        return [m for m in self.sent if m.to == address]
+
+
+@pytest.fixture
+def emails():
+    return FakeEmail()
+
+
+@pytest.fixture(autouse=True)
+def _rate_limiter_off_by_default():
+    """Tests of rate limiting turn it on themselves; everything else must not trip it."""
+    limiter.reset()
+    limiter.enabled = False
+    yield
+    limiter.reset()
+    limiter.enabled = True
+
+
 @pytest_asyncio.fixture
-async def client(db_engine, storage):
+async def client(db_engine, storage, emails):
     app = create_app()
     maker = async_sessionmaker(db_engine, expire_on_commit=False)
 
     async def _session():
         async with maker() as s:
-            yield s
+            try:
+                yield s
+            finally:
+                ready = take_ready(s)
+        await send_emails(ready, emails)  # deterministic in tests (production sends in background)
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_key_resolver] = lambda: _TestResolver()
@@ -155,7 +199,7 @@ async def client(db_engine, storage):
     async with db_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+                "TRUNCATE notifications, reviews, gallery_images, custom_orders, messages, payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
             )
         )
     async with db_engine.begin() as conn:

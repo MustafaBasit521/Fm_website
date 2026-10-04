@@ -29,15 +29,21 @@ class StorageNotConfiguredError(Exception):
 
 
 class SupabaseStorage:
+    """Talks to Supabase Storage with the server-only service key. Each call names the bucket
+    (default: product images). Gallery images are public; custom-order references are PRIVATE and
+    are read only through short-lived signed URLs."""
+
     def __init__(
         self, settings: Settings, transport: httpx.AsyncBaseTransport | None = None
     ) -> None:
         self._transport = transport  # tests inject a mock transport; None = real network
         self._base = f"{settings.supabase_url}/storage/v1"
         self._bucket = settings.product_images_bucket
+        self.gallery_bucket = settings.gallery_images_bucket
+        self.custom_orders_bucket = settings.custom_order_references_bucket
         self._key = (
             settings.supabase_service_key.get_secret_value()
-            if (settings.supabase_service_key)
+            if settings.supabase_service_key
             else None
         )
 
@@ -48,16 +54,18 @@ class SupabaseStorage:
 
     @property
     def bucket(self) -> str:
+        """The product-images bucket (kept for existing callers)."""
         return self._bucket
 
-    def public_url(self, path: str) -> str:
-        return f"{self._base}/object/public/{self._bucket}/{path}"
+    def public_url(self, path: str, bucket: str | None = None) -> str:
+        return f"{self._base}/object/public/{bucket or self._bucket}/{path}"
 
-    async def create_signed_upload(self, path: str) -> SignedUpload:
+    async def create_signed_upload(self, path: str, bucket: str | None = None) -> SignedUpload:
+        bucket = bucket or self._bucket
         headers = self._headers()
         async with httpx.AsyncClient(timeout=10, transport=self._transport) as client:
             res = await client.post(
-                f"{self._base}/object/upload/sign/{self._bucket}/{path}", headers=headers
+                f"{self._base}/object/upload/sign/{bucket}/{path}", headers=headers
             )
         res.raise_for_status()
         body = res.json()
@@ -65,10 +73,23 @@ class SupabaseStorage:
         return SignedUpload(
             path=path,
             token=token,
-            upload_url=f"{self._base}/object/upload/sign/{self._bucket}/{path}?token={token}",
+            upload_url=f"{self._base}/object/upload/sign/{bucket}/{path}?token={token}",
         )
 
-    async def delete(self, paths: list[str]) -> None:
+    async def create_signed_download(self, path: str, bucket: str, expires_in: int = 3600) -> str:
+        """A temporary URL for a file in a private bucket."""
+        headers = self._headers()
+        async with httpx.AsyncClient(timeout=10, transport=self._transport) as client:
+            res = await client.post(
+                f"{self._base}/object/sign/{bucket}/{path}",
+                headers=headers,
+                json={"expiresIn": expires_in},
+            )
+        res.raise_for_status()
+        signed = res.json()["signedURL"]
+        return f"{self._base}{signed}" if signed.startswith("/") else signed
+
+    async def delete(self, paths: list[str], bucket: str | None = None) -> None:
         """Best effort: a failure leaves an orphan file, never a broken product row."""
         if not paths:
             return
@@ -76,7 +97,7 @@ class SupabaseStorage:
             async with httpx.AsyncClient(timeout=10, transport=self._transport) as client:
                 res = await client.request(
                     "DELETE",
-                    f"{self._base}/object/{self._bucket}",
+                    f"{self._base}/object/{bucket or self._bucket}",
                     headers=self._headers(),
                     json={"prefixes": paths},
                 )

@@ -14,6 +14,7 @@ from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.models.orders import Order, Payment
 from app.schemas.checkout import Delivery, OrderItemRead, OrderRead
 from app.schemas.orders import AdminOrderRead, AdminOrderSummary, OrderSummary, PaymentRead
+from app.services import events
 
 # Normal lifecycle (business-rules §14). Cancellation is separate: it is a terminal state.
 NEXT_STATUS: dict[OrderStatus, OrderStatus] = {
@@ -235,6 +236,7 @@ async def apply_cancellation(
     # Same function the payment-window expiry uses: ready-to-ship stock returns, and
     # made-to-order capacity frees itself because the order is no longer active.
     await session.execute(text("SELECT release_order_stock(:id)"), {"id": order.order_id})
+    await events.order_status_changed(session, order, OrderStatus.CANCELLED)
 
 
 # ---- address change (business-rules §16) ---------------------------------------------------
@@ -342,5 +344,6 @@ async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: Ord
             "An online order cannot be confirmed before its payment is verified",
         )
     order.status = target
+    await events.order_status_changed(session, order, target)
     await session.commit()
     return await load_order(session, order_id, lock=False)

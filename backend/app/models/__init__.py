@@ -3,6 +3,7 @@ from app.models.business_settings import BusinessSettings
 from app.models.catalog import Category, Product, ProductImage
 from app.models.customer import Customer
 from app.models.customer_data import Address, WishlistItem
+from app.models.engagement import CustomOrder, GalleryImage, Message, Notification, Review
 from app.models.orders import Order, OrderItem, Payment
 
 __all__ = [
@@ -10,10 +11,15 @@ __all__ = [
     "BusinessSettings",
     "Category",
     "Customer",
+    "CustomOrder",
+    "GalleryImage",
+    "Message",
+    "Notification",
     "Order",
     "OrderItem",
     "Payment",
     "Product",
     "ProductImage",
+    "Review",
     "WishlistItem",
 ]

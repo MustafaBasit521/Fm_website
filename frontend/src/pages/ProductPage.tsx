@@ -4,6 +4,7 @@ import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { AddToCartButton } from './AddToCartButton'
 import { CartLink } from './CartLink'
+import { ReviewsSection } from './ReviewsSection'
 import { WishlistButton } from './WishlistButton'
 
 export default function ProductPage() {
@@ -120,6 +121,7 @@ export default function ProductPage() {
           {product.description && <p className="whitespace-pre-line">{product.description}</p>}
         </div>
       </div>
+      <ReviewsSection productId={product.product_id} />
     </main>
   )
 }

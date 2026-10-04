@@ -64,6 +64,8 @@ export default function AccountPage() {
       <p className="text-muted">{customer.email}</p>
       <nav className="flex gap-4 text-terracotta underline">
         <Link to="/orders">My orders</Link>
+        <Link to="/custom-orders">Custom orders</Link>
+        <Link to="/notifications">Notifications</Link>
         <Link to="/account/addresses">Saved addresses</Link>
         <Link to="/wishlist">Wishlist</Link>
       </nav>

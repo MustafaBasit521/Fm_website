@@ -43,7 +43,7 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 | Decision | Decided/Documented | Designed | Implemented | Tested |
 |---|---|---|---|---|
-| 30-minute online payment window | Yes | Yes (`orders.payment_deadline_at`) | No | No |
+| 30-minute online payment window | Yes | Yes (`orders.payment_deadline_at`) | Yes (deadline, expiry function; pg_cron schedule is a manual step; online payment itself needs a gateway) | Yes |
 | Payment retry during the window | Yes | Yes (one payments row per attempt, FAILED status) | Yes (against the fake provider) | Yes |
 | Automatic cancellation after expiry | Yes | Yes (decided: pg_cron + SQL function `expire_unpaid_online_orders()`) | Yes (SQL function; scheduling step pending, see Phase 5) | Yes (function) |
 | Inventory/capacity reservation and release | Yes | Yes (`database.md` §23–§24) | Yes (reserve at creation; release on expiry and on cancellation via one SQL function `release_order_stock`) | Yes |
@@ -52,14 +52,14 @@ Updating documentation does **not** mean a decision is implemented or tested.
 | Client-side cart for MVP (no cart tables) | Yes | Yes | Yes | Yes |
 | Guest cancellation/address change via admin/contact flow | Yes | Yes | Yes (admin endpoints; guests have no website route) | Yes |
 | Processing cancellation charge = 50% of original total incl. delivery fee | Yes | Yes (`cancellation_charge_paisa`, `charge_waived`) | Yes (admin cancel; floor rounding; waive option; unpaid COD waived) | Yes |
-| Review eligibility requires a Delivered order | Yes | Yes | No | No |
-| One review per customer/product | Yes | Yes (`UNIQUE(customer_id, product_id)`) | No | No |
+| Review eligibility requires a Delivered order | Yes | Yes | Yes | Yes |
+| One review per customer/product | Yes | Yes (`UNIQUE(customer_id, product_id)`) | Yes | Yes |
 | Lahore-only delivery (canonical city value) | Yes | Yes | Yes (at checkout) | Yes |
 | Made-to-order capacity measured in active units | Yes | Yes (`max_active_units`) | Yes | Yes |
-| Database fields/constraints added (see `database.md`) | Yes | Yes | Partly (customers, catalog, addresses, wishlist, orders, order_items, payments, business_settings) | Yes (constraints exercised by tests) |
-| PostgreSQL ENUMs for controlled state values | Yes | Yes (`database.md` §3) | Partly (product_availability, order_status, payment_status, payment_method) | Yes |
-| Explicit FK delete behavior | Yes | Yes (`database.md` §21) | Partly (all tables created so far) | Yes (cascade/restrict/set-null tests) |
-| Signed-URL image upload flow | Yes | Yes (`CLAUDE.md` §10) | No | No |
+| Database fields/constraints added (see `database.md`) | Yes | Yes | Yes (every table in `database.md`) | Yes (constraints exercised by tests) |
+| PostgreSQL ENUMs for controlled state values | Yes | Yes (`database.md` §3) | Yes (all enums in `database.md` §3, incl. custom_order_status, notification_type/status) | Yes |
+| Explicit FK delete behavior | Yes | Yes (`database.md` §21) | Yes (all tables) | Yes (cascade/restrict/set-null tests) |
+| Signed-URL image upload flow | Yes | Yes (`CLAUDE.md` §10) | Yes (product images, gallery, private custom-order references) | Yes against mocked Storage; real Supabase Storage calls not yet verified |
 
 ---
 
@@ -67,11 +67,14 @@ Updating documentation does **not** mean a decision is implemented or tested.
 
 Decided: expired unpaid online orders are cleaned up by a PostgreSQL function (`expire_unpaid_online_orders()`) scheduled with Supabase pg_cron (Phase 5).
 
+Decided (Phase 8): custom orders go NEW > IN_DISCUSSION > ACCEPTED > IN_PROGRESS > COMPLETED, plus DECLINED / CANCELLED; customers may edit/delete their own review and the admin may remove any; notifications are UNREAD/READ and NEW_PRODUCT moves to Phase 9; the email provider is chosen later (emails are built behind a provider interface).
+
 Decided (Phase 7): each online payment attempt is its own `payments` row with a new `FAILED` status; a verified payment that arrives after the window closes leaves the order Cancelled and is refundable in full.
 
 Decided (Phase 6): a customer asks to cancel a Processing order by contacting the shop (no request button; the admin cancels). The 50% Processing charge is rounded down to a whole paisa.
 
 * Which payment gateway to use (CLAUDE.md §3: must be chosen and documented before provider-specific code). Deferred by the owner; Phase 7 is built against a provider interface.
+* Which transactional email service to use (CLAUDE.md §3: choose before provider-specific code). Deferred by the owner; Phase 8 is built against a provider interface with a log-only development provider.
 * Exact anonymization/retention strategy for customer account deletion
 * How the admin verifies a guest's identity for WhatsApp/contact requests
 
@@ -329,16 +332,28 @@ Implementation notes:
 
 ## Phase 8 — Engagement
 
-Status: Not Started
+Status: **Implemented and tested. Not yet done: a real email provider (undecided), real Supabase Storage uploads (need the buckets and the service key), and NEW_PRODUCT notifications (moved to Phase 9).**
 
 Tasks:
 
-* product reviews
-* gallery
-* custom orders
-* contact messages
-* notifications
-* transactional email
+* [x] product reviews (`/api/products/{id}/reviews`: public list with average and count; the signed-in customer can post only after a Delivered order containing the product, once per product, rating 1–5; edit and delete own; admin list and removal; public shows first names only)
+* [x] gallery (`/api/gallery` public, visible only, filter by type; admin upload via signed URL, register, edit, hide/show, delete with file cleanup; images start hidden)
+* [x] custom orders (guest or customer submit with optional private reference image; customer list/detail/cancel while NEW or IN_DISCUSSION; admin list/search/filter, signed link to the private image, status transitions; rate limited)
+* [x] contact messages (public form, at least one way to reply, rate limited; admin list/search/filter and status NEW/READ/REPLIED/ARCHIVED)
+* [x] notifications (in-app, registered customers; list, unread count, mark one/all read; created in the same transaction as the event: order placed/confirmed/status changed/shipped/delivered, payment success/failure, custom-order updates)
+* [~] transactional email — built behind an `EmailProvider` interface (`none` default, `console` development-only logger); emails are queued and sent only after the database commit succeeds, best-effort in the background. **No real provider yet.** Customer emails for order and payment events (guests included), shop alerts to the business-settings email for new orders, custom orders and messages.
+
+Implementation notes:
+
+* Tests: backend 368 passing (adds notifications and emails, reviews, gallery, custom orders, contact, rate limiter, email outbox, private-bucket storage calls); frontend 116 passing (adds reviews section, gallery, custom order form and list, contact form, notifications page and link).
+* Rate limiting: a small in-process sliding window per client IP (no Redis, per CLAUDE.md §2) protects guest custom-order submissions (5 per hour), their image uploads (10 per hour) and contact messages (5 per hour). It is per worker, and `TRUST_PROXY_HEADERS` must be set only behind a trusted proxy. Rate limiting of other routes stays in Phase 10.
+* The private bucket: custom-order reference images are never public; the admin sees them only through short-lived signed download links.
+* Bugs found by tests and fixed: the order email read "order NONE" because the id was not assigned before the email was built (now flushed first); notifications created in one transaction had identical timestamps so their order was arbitrary (`clock_timestamp()` default).
+* Verified against Supabase: migration applied; the five new tables exist with RLS on.
+* Decisions (documented in `business-rules.md` §26–31 and `database.md`): see "Decided (Phase 8)" above; additionally: a contact message needs an email, phone or WhatsApp number; gallery images start hidden; a customer may cancel a custom order only while NEW or IN_DISCUSSION; admin moves custom orders only along the allowed transitions; reading a message does not change its status.
+* Setup needed on Supabase (README): buckets `gallery-images` (public) and `custom-order-references` (**private**), and `SUPABASE_SERVICE_KEY`. Without the key, upload endpoints return 503 and everything else works.
+* Known gaps, left for later: automatic order expiry (the SQL job) does not send a notification or email; a custom order stores no email, so guests can only be contacted on WhatsApp; uploaded-but-never-submitted custom-order images are orphans (a cleanup job is Phase 10); no real email delivery; admin screens are Phase 9; the real Supabase Storage signed-upload/download request formats are tested only against a mock.
+* Not verified: the new pages in a browser.
 
 ---
 

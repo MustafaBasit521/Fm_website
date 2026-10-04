@@ -34,6 +34,7 @@ from app.schemas.checkout import (
     Quote,
     QuoteLine,
 )
+from app.services import events
 from app.services import orders as orders_service
 from app.services.catalog import to_image
 from app.services.customers import get_or_create_customer
@@ -350,6 +351,8 @@ async def create_order(
             )
         ]
         session.add(order)
+        await session.flush()  # assigns order_id, which the notification and email mention
+        await events.order_placed(session, order)
         await session.commit()
     except IntegrityError:
         await session.rollback()

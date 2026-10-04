@@ -8,10 +8,12 @@ from app.api import (
     addresses,
     admin,
     admin_catalog,
+    admin_engagement,
     admin_orders,
     catalog,
     checkout,
     customers,
+    engagement,
     health,
     orders,
     payments,
@@ -50,6 +52,18 @@ def create_app() -> FastAPI:
     app.include_router(checkout.router, prefix="/api")
     app.include_router(orders.router, prefix="/api")
     app.include_router(payments.router, prefix="/api")
+    for router in (
+        engagement.notifications,
+        engagement.reviews,
+        engagement.gallery,
+        engagement.custom_orders,
+        engagement.contact,
+        admin_engagement.reviews,
+        admin_engagement.gallery,
+        admin_engagement.custom_orders,
+        admin_engagement.messages,
+    ):
+        app.include_router(router, prefix="/api")
     app.include_router(catalog.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(admin_catalog.router, prefix="/api")

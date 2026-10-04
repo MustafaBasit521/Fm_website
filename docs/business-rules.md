@@ -612,6 +612,8 @@ A review contains:
 
 The backend must enforce review eligibility. Frontend checks alone are insufficient.
 
+Decided: a customer may edit and delete their own review (deleting lets them review again), and the admin may remove any review. Eligibility is a Delivered order of that customer containing the product (guest orders never qualify); the most recent such order is recorded on the review. The product must be visible to be reviewed. Publicly a review shows the rating, comment, date and the customer's first name only ("Former customer" after account deletion), plus the product's average rating and count. Reviews are kept when a product or customer is deleted; the product name is snapshotted.
+
 ---
 
 # 27. Search
@@ -654,6 +656,8 @@ Gallery images are stored in Supabase Storage.
 
 Database records store image metadata/reference paths.
 
+Uploads use a signed URL (CLAUDE.md §10) into the public `gallery-images` bucket; the server generates the file path. New images start hidden until the admin publishes them. The public gallery shows only visible images and can be filtered by type; the admin can edit, hide/show and delete (the file is removed too).
+
 ---
 
 # 29. Custom Orders
@@ -683,6 +687,10 @@ Communication may occur through:
 
 The exact custom-order statuses will be finalized when this feature is implemented.
 
+Statuses (decided): NEW → IN_DISCUSSION → ACCEPTED → IN_PROGRESS → COMPLETED, plus DECLINED (the shop cannot do it) and CANCELLED. The admin moves a request only along these steps: NEW to IN_DISCUSSION, DECLINED or CANCELLED; IN_DISCUSSION to ACCEPTED, DECLINED or CANCELLED; ACCEPTED to IN_PROGRESS or CANCELLED; IN_PROGRESS to COMPLETED or CANCELLED. COMPLETED, DECLINED and CANCELLED are final. A registered customer may cancel their own request only while it is NEW or IN_DISCUSSION; later they contact the shop.
+
+A guest needs no account. The reference image goes into the **private** `custom-order-references` bucket by signed URL and is shown to the admin only through a short-lived signed link. Submissions and image uploads are rate limited per client (5 requests and 10 uploads per hour). The required date cannot be in the past and the budget is optional. Custom orders store no email address: guests are reached on WhatsApp, and registered customers are also notified in the app and by email at their account address.
+
 ---
 
 # 30. Contact Messages
@@ -703,6 +711,8 @@ Statuses:
 * Archived
 
 Admin manages these messages.
+
+A message must include at least one way to reply (email, phone or WhatsApp number). The form is rate limited per client (5 per hour). The admin can list, search and filter messages and set any status; opening a message does not change its status. The shop is alerted by email at the business-settings email address, when one is set.
 
 ---
 
@@ -725,6 +735,10 @@ Possible notification events:
 Email delivery is handled separately by an external email service.
 
 Notifications are not email delivery logs.
+
+Decided: a notification is UNREAD until the customer opens it (one at a time or all at once). In-app notifications exist for registered customers only; guests are reached by email at the address they gave. Implemented events: order placed, order confirmed, status changed (processing, cancelled), shipped, delivered, payment success, payment failure and custom-order updates; each notification is saved in the same transaction as the change that caused it. NEW_PRODUCT notifications come with the admin product screens (Phase 9). An order cancelled by the automatic payment-window expiry does not yet send a notification.
+
+Email: the service provider is still to be chosen, so emails are built behind a provider interface (default: send nothing; a development option logs them). Emails are queued while a change is built and sent only after the database commit succeeds, in the background; a mail problem never breaks an order. Customers get emails for the order and payment events above (guests too); the shop gets an alert for each new order, custom order and contact message.
 
 ---
 
