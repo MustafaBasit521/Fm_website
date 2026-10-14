@@ -765,7 +765,7 @@ Admin can manage:
 
 Multiple admin roles are intentionally out of MVP scope.
 
-Implementation: the admin screens live at `/admin` in the web app and are shown only to the account whose server-controlled `app_metadata` role is `admin`; every admin request is authorized by the backend, so the screens are a convenience, not the security boundary. Contents:
+Implementation (changed after Phase 9, with the owner's approval): the admin screens are a **separate site** (own port in development, own domain in production) from the shop, reached by logging in with the account whose server-controlled `app_metadata` role is `admin`. The admin must also complete **two-factor authentication** (authenticator app): the first login after the role is granted walks through setup with a QR code, and later logins ask for the current code. The backend refuses every admin request that lacks the role or the second factor, so the screens are a convenience, not the security boundary. The admin site has no sign-up page and is not indexed by search engines, and the shop does not link to it. Every change made in the admin area, and every refused attempt, appears in the **Activity log** screen (see database.md §28). Contents:
 
 * **Dashboard:** orders needing action (Pending cash-on-delivery orders to confirm, and Confirmed orders to start preparing), orders by status, new messages, new custom-order requests, products running low (ready-to-ship, 3 or fewer left) and the five most recent orders. No sales analytics (out of scope).
 * **Products and categories:** create, edit, show/hide, feature, delete, pictures; categories with product counts (a category with products cannot be deleted).

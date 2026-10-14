@@ -7,6 +7,7 @@ from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.audit import AdminAuditLog
 from app.models.business_settings import BusinessSettings
 from app.models.catalog import Category, Product
 from app.models.customer import Customer
@@ -23,6 +24,7 @@ from app.schemas.admin import (
     AdminCategory,
     AdminCustomer,
     AdminCustomerDetail,
+    AuditEntry,
     DashboardSummary,
     LowStockProduct,
     SettingsUpdate,
@@ -221,3 +223,23 @@ async def update_settings(session: AsyncSession, data: SettingsUpdate) -> Busine
     await session.commit()
     await session.refresh(row)
     return row
+
+
+# ---- audit log -----------------------------------------------------------------------------
+
+
+async def list_audit_log(
+    session: AsyncSession, *, user_id: uuid.UUID | None, page: int, page_size: int
+) -> tuple[list[AuditEntry], int]:
+    where = [AdminAuditLog.user_id == user_id] if user_id else []
+    total = await session.scalar(select(func.count()).select_from(AdminAuditLog).where(*where))
+    rows = (
+        await session.scalars(
+            select(AdminAuditLog)
+            .where(*where)
+            .order_by(AdminAuditLog.created_at.desc(), AdminAuditLog.audit_id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    ).all()
+    return [AuditEntry.model_validate(r) for r in rows], total or 0

@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Both apps (shop and admin) use classes from anywhere under src/, whatever their Vite root is. */
+@source '.';
 
 /* Design tokens taken from the UI mockups (Design System.dc.html). */
 @theme {

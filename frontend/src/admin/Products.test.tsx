@@ -80,9 +80,9 @@ const renderForm = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/admin/products/new" element={<ProductFormPage />} />
-        <Route path="/admin/products/:id" element={<ProductFormPage />} />
-        <Route path="/admin/products" element={<p>products list</p>} />
+        <Route path="/products/new" element={<ProductFormPage />} />
+        <Route path="/products/:id" element={<ProductFormPage />} />
+        <Route path="/products" element={<p>products list</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -115,10 +115,7 @@ it('lists products with visibility, stock and filters', async () => {
   expect(screen.getByText('Capacity 3')).toBeInTheDocument()
   expect(screen.getByText('Hidden')).toBeInTheDocument()
   expect(screen.getByText('Featured')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Add product' })).toHaveAttribute(
-    'href',
-    '/admin/products/new',
-  )
+  expect(screen.getByRole('link', { name: 'Add product' })).toHaveAttribute('href', '/products/new')
   await userEvent.selectOptions(screen.getByLabelText('Category'), 'c2')
   expect(api.getAdminProducts.mock.calls.at(-1)![0]).toMatchObject({ category_id: 'c2', page: 1 })
   await userEvent.type(screen.getByLabelText('Search'), 'bun{Enter}')
@@ -140,7 +137,7 @@ it('shows empty and error states for the list', async () => {
 it('creates a product, converting the price to paisa, and opens it for pictures', async () => {
   api.createProduct.mockResolvedValue(product())
   api.getAdminProduct.mockResolvedValue(product())
-  renderForm('/admin/products/new')
+  renderForm('/products/new')
   await userEvent.type(await screen.findByLabelText('Product name'), 'Sunflower')
   await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1')
   await userEvent.type(screen.getByLabelText('Price (Rs)'), '1250.50')
@@ -163,7 +160,7 @@ it('creates a product, converting the price to paisa, and opens it for pictures'
 })
 
 it('shows capacity (not stock) for made-to-order products', async () => {
-  renderForm('/admin/products/new')
+  renderForm('/products/new')
   await screen.findByLabelText('Product name')
   expect(screen.getByLabelText('Pieces in stock')).toBeInTheDocument()
   await userEvent.selectOptions(screen.getByLabelText('Availability'), 'MADE_TO_ORDER')
@@ -172,7 +169,7 @@ it('shows capacity (not stock) for made-to-order products', async () => {
 })
 
 it('rejects a bad price or bad numbers before calling the server', async () => {
-  renderForm('/admin/products/new')
+  renderForm('/products/new')
   await userEvent.type(await screen.findByLabelText('Product name'), 'X')
   await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1')
   await userEvent.type(screen.getByLabelText('Price (Rs)'), 'cheap')
@@ -187,7 +184,7 @@ it('loads a product, saves changes and deletes it after confirmation', async () 
   api.getAdminProduct.mockResolvedValue(product())
   api.updateProduct.mockResolvedValue(product({ price_paisa: 99900 }))
   api.deleteProduct.mockResolvedValue(undefined)
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   expect(await screen.findByDisplayValue('Sunflower')).toBeInTheDocument()
   expect(screen.getByLabelText('Price (Rs)')).toHaveValue('1250.50')
   const price = screen.getByLabelText('Price (Rs)')
@@ -210,7 +207,7 @@ it('loads a product, saves changes and deletes it after confirmation', async () 
 it('explains why the availability type cannot change while orders are active', async () => {
   api.getAdminProduct.mockResolvedValue(product())
   api.updateProduct.mockRejectedValue(new ApiError(409, 'x', { code: 'ACTIVE_ORDERS' }))
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   await userEvent.selectOptions(await screen.findByLabelText('Availability'), 'MADE_TO_ORDER')
   await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('still active')
@@ -231,7 +228,7 @@ it('uploads a picture straight to storage and registers it', async () => {
     bucket: 'product-images',
   })
   api.registerProductImage.mockResolvedValue({ image_id: 'i1' })
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   const file = new File(['x'], 'a.png', { type: 'image/png' })
   await userEvent.upload(await screen.findByLabelText(/Add a picture/), file)
   expect(api.getProductImageUpload).toHaveBeenCalledWith('p1', 'image/png')
@@ -246,7 +243,7 @@ it('uploads a picture straight to storage and registers it', async () => {
 
 it('refuses wrong picture types, and explains a missing storage key', async () => {
   api.getAdminProduct.mockResolvedValue(product())
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   const input = await screen.findByLabelText(/Add a picture/)
   await userEvent.upload(input, new File(['x'], 'a.pdf', { type: 'application/pdf' }), {
     applyAccept: false,
@@ -265,7 +262,7 @@ it('edits picture descriptions and removes pictures after confirmation', async (
   api.getAdminProduct.mockResolvedValueOnce(withImage).mockResolvedValue(product())
   api.updateProductImage.mockResolvedValue({})
   api.deleteProductImage.mockResolvedValue(undefined)
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   const alt = await screen.findByDisplayValue('old')
   await userEvent.clear(alt)
   await userEvent.type(alt, 'A sunflower')
@@ -279,6 +276,6 @@ it('edits picture descriptions and removes pictures after confirmation', async (
 
 it('shows an error state when the product cannot be loaded', async () => {
   api.getAdminProduct.mockRejectedValue(new Error('x'))
-  renderForm('/admin/products/p1')
+  renderForm('/products/p1')
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
 })

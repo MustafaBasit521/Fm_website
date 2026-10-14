@@ -2,7 +2,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { ApiError, getMe, updateMe, type Customer } from '../lib/api'
-import { AdminLink } from './AdminLink'
 import { buttonClass, Field, FormError } from './ui'
 
 export default function AccountPage() {
@@ -69,7 +68,6 @@ export default function AccountPage() {
         <Link to="/notifications">Notifications</Link>
         <Link to="/account/addresses">Saved addresses</Link>
         <Link to="/wishlist">Wishlist</Link>
-        <AdminLink />
       </nav>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field

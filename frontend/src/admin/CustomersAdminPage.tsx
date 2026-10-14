@@ -48,7 +48,7 @@ export function CustomersAdminPage() {
                 {data.items.map((c) => (
                   <li key={c.customer_id} className="rounded-xl border border-sand bg-white p-3">
                     <Link
-                      to={`/admin/customers/${c.customer_id}`}
+                      to={`/customers/${c.customer_id}`}
                       className="flex flex-wrap justify-between gap-2"
                     >
                       <span>
@@ -77,7 +77,7 @@ export function CustomerAdminPage() {
   const { data, loading, failed } = useLoad((s) => getAdminCustomer(id, s), [id])
   return (
     <>
-      <Link to="/admin/customers" className="text-terracotta underline">
+      <Link to="/customers" className="text-terracotta underline">
         ← All customers
       </Link>
       <div className="mt-2">
@@ -107,7 +107,7 @@ export function CustomerAdminPage() {
                     {data.recent_orders.map((o) => (
                       <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
                         <Link
-                          to={`/admin/orders/${o.order_id}`}
+                          to={`/orders/${o.order_id}`}
                           className="flex flex-wrap justify-between gap-2"
                         >
                           <span>{formatDate(o.created_at)}</span>

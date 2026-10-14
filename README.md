@@ -24,7 +24,8 @@ cd ../frontend && npm install && cp .env.example .env
 make db         # local Postgres (docker, port 5433) - dev only; real DB is Supabase
 make migrate    # apply migrations
 make backend    # http://localhost:8000  (docs at /docs in development)
-make frontend   # http://localhost:5173  (proxies /api to the backend)
+make frontend   # SHOP site  http://localhost:5173  (proxies /api to the backend)
+make admin      # ADMIN site http://localhost:5174  (a separate app and origin)
 make check      # lint + tests + build
 ```
 
@@ -44,10 +45,33 @@ where email = 'admin@example.com';
 
 They must log out and in again so the new token carries the role.
 
-After that, open `/admin` (an **Admin** link also appears on the home and account pages for this
-account only). The admin area covers the dashboard, orders (including cancellation and refunds),
-products and pictures, categories, customers, gallery, custom orders, messages, reviews and the
-shop settings.
+After that, run `make admin` and open **http://localhost:5174** (the admin site is a separate app on
+its own port, and the shop has no link to it). The admin area covers the dashboard, orders
+(including cancellation and refunds), products and pictures, categories, customers, gallery, custom
+orders, messages, reviews, the activity log and the shop settings.
+
+### Two-factor login (required for the admin)
+
+The API refuses every admin request unless the login completed a second factor, so a stolen
+password alone is useless. One-time setup:
+
+1. Supabase dashboard → **Authentication → Multi-Factor** → make sure **TOTP (authenticator app)**
+   is enabled.
+2. Log in at http://localhost:5174. The first time, the site shows a QR code: scan it with an
+   authenticator app (Google Authenticator, Microsoft Authenticator, Authy…) and type the 6-digit
+   code. After that, every login asks for the current code.
+
+For quick local work only, `ADMIN_REQUIRE_MFA=false` in `backend/.env` skips the check (the app
+refuses that setting in production). Also make sure `CORS_ORIGINS` in `backend/.env` lists **both**
+`http://localhost:5173` and `http://localhost:5174`.
+
+### Deploying the two sites
+
+`cd frontend && npm run build` produces two independent static sites: `dist/shop` (host it on your
+public domain, e.g. `www.yourshop.com`) and `dist/admin` (host it on its own domain, e.g.
+`admin.yourshop.com`). Both call the same API, so list **both** origins in `CORS_ORIGINS`. Giving
+the admin site its own domain means the shop can never read the admin's login session; you can also
+put extra protection (IP allowlist or an access gateway) in front of the admin domain only.
 
 ## Storage buckets (one-time setup)
 

@@ -14,6 +14,7 @@ from app.schemas.admin import (
     AdminCustomer,
     AdminCustomerDetail,
     AdminSettingsRead,
+    AuditEntry,
     DashboardSummary,
     SettingsRead,
     SettingsUpdate,
@@ -66,6 +67,20 @@ async def get_customer(customer_id: uuid.UUID, session: Session):
 @admin.get("/categories", response_model=list[AdminCategory])
 async def list_categories(session: Session):
     return await service.list_categories(session)
+
+
+@admin.get("/audit-log", response_model=Page[AuditEntry])
+async def audit_log(
+    session: Session,
+    user_id: uuid.UUID | None = None,
+    page: Annotated[int, Query(ge=1, le=10_000)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+):
+    """Who changed what in the admin area (newest first)."""
+    items, total = await service.list_audit_log(
+        session, user_id=user_id, page=page, page_size=page_size
+    )
+    return catalog_service.paginate(items, total, page, page_size)
 
 
 @admin.get("/settings", response_model=AdminSettingsRead)

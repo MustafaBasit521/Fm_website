@@ -102,7 +102,7 @@ export default function OrderAdminPage() {
 
   return (
     <>
-      <Link to="/admin/orders" className="text-terracotta underline">
+      <Link to="/orders" className="text-terracotta underline">
         ← All orders
       </Link>
       <State loading={loading && !order} failed={failed && !order}>
@@ -264,7 +264,7 @@ export default function OrderAdminPage() {
               <p className="text-sm text-muted">
                 {order.customer_id ? (
                   <Link
-                    to={`/admin/customers/${order.customer_id}`}
+                    to={`/customers/${order.customer_id}`}
                     className="text-terracotta underline"
                   >
                     View customer

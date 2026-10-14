@@ -79,7 +79,7 @@ export default function ProductFormPage() {
     try {
       if (isNew) {
         const created = await createProduct(body)
-        navigate(`/admin/products/${created.product_id}`, { replace: true })
+        navigate(`/products/${created.product_id}`, { replace: true })
       } else {
         setOverride(await updateProduct(id, body))
         setNotice('Saved.')
@@ -95,7 +95,7 @@ export default function ProductFormPage() {
     if (isNew) return
     try {
       await deleteProduct(id)
-      navigate('/admin/products', { replace: true })
+      navigate('/products', { replace: true })
     } catch {
       setError('Could not delete the product. Please try again.')
     }
@@ -152,7 +152,7 @@ export default function ProductFormPage() {
 
   return (
     <>
-      <Link to="/admin/products" className="text-terracotta underline">
+      <Link to="/products" className="text-terracotta underline">
         ← All products
       </Link>
       <h1 className="mt-2 font-serif text-4xl">{isNew ? 'Add product' : 'Edit product'}</h1>

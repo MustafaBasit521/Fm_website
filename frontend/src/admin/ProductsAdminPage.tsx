@@ -21,7 +21,7 @@ export default function ProductsAdminPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-4xl">Products</h1>
         <Link
-          to="/admin/products/new"
+          to="/products/new"
           className="rounded-lg bg-terracotta px-4 py-2 font-semibold text-white"
         >
           Add product
@@ -86,7 +86,7 @@ export default function ProductsAdminPage() {
                 {data.items.map((p) => (
                   <li key={p.product_id} className="rounded-xl border border-sand bg-white p-3">
                     <Link
-                      to={`/admin/products/${p.product_id}`}
+                      to={`/products/${p.product_id}`}
                       className="flex flex-wrap items-center justify-between gap-2"
                     >
                       <span className="flex items-center gap-3">

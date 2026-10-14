@@ -1,20 +1,23 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 
+const SHOP_URL = (import.meta.env.VITE_SHOP_URL as string | undefined) ?? 'http://localhost:5173'
+
 const LINKS: [string, string][] = [
-  ['/admin', 'Dashboard'],
-  ['/admin/orders', 'Orders'],
-  ['/admin/products', 'Products'],
-  ['/admin/categories', 'Categories'],
-  ['/admin/customers', 'Customers'],
-  ['/admin/gallery', 'Gallery'],
-  ['/admin/custom-orders', 'Custom orders'],
-  ['/admin/messages', 'Messages'],
-  ['/admin/reviews', 'Reviews'],
-  ['/admin/settings', 'Settings'],
+  ['/', 'Dashboard'],
+  ['/orders', 'Orders'],
+  ['/products', 'Products'],
+  ['/categories', 'Categories'],
+  ['/customers', 'Customers'],
+  ['/gallery', 'Gallery'],
+  ['/custom-orders', 'Custom orders'],
+  ['/messages', 'Messages'],
+  ['/reviews', 'Reviews'],
+  ['/activity', 'Activity log'],
+  ['/settings', 'Settings'],
 ]
 
-export function AdminLayout() {
+export default function AdminLayout() {
   const { signOut } = useAuth()
   return (
     <div className="min-h-screen md:flex">
@@ -28,7 +31,7 @@ export function AdminLayout() {
             <li key={to}>
               <NavLink
                 to={to}
-                end={to === '/admin'}
+                end={to === '/'}
                 className={({ isActive }) =>
                   `underline-offset-4 ${isActive ? 'font-semibold text-terracotta underline' : 'text-bark hover:underline'}`
                 }
@@ -39,9 +42,14 @@ export function AdminLayout() {
           ))}
         </ul>
         <p className="mt-4 flex flex-wrap gap-4 text-sm md:flex-col md:gap-1">
-          <Link to="/" className="text-terracotta underline">
+          <a
+            href={SHOP_URL}
+            className="text-terracotta underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             View shop
-          </Link>
+          </a>
           <button
             type="button"
             className="text-left text-terracotta underline"

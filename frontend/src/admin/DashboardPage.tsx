@@ -20,7 +20,7 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-semibold">Needs your attention</h2>
                 <ul className="mt-2 grid gap-3 sm:grid-cols-3">
                   <li className="rounded-xl border border-sand bg-white p-4">
-                    <Link to="/admin/orders" className="block">
+                    <Link to="/orders" className="block">
                       <span className="block text-3xl">{data.orders_needing_action}</span>
                       <span>
                         {data.orders_needing_action === 1
@@ -30,13 +30,13 @@ export default function DashboardPage() {
                     </Link>
                   </li>
                   <li className="rounded-xl border border-sand bg-white p-4">
-                    <Link to="/admin/messages" className="block">
+                    <Link to="/messages" className="block">
                       <span className="block text-3xl">{data.new_messages}</span>
                       <span>{data.new_messages === 1 ? 'new message' : 'new messages'}</span>
                     </Link>
                   </li>
                   <li className="rounded-xl border border-sand bg-white p-4">
-                    <Link to="/admin/custom-orders" className="block">
+                    <Link to="/custom-orders" className="block">
                       <span className="block text-3xl">{data.new_custom_orders}</span>
                       <span>
                         {data.new_custom_orders === 1
@@ -68,7 +68,7 @@ export default function DashboardPage() {
                     {data.low_stock_products.map((p) => (
                       <li key={p.product_id}>
                         <Link
-                          to={`/admin/products/${p.product_id}`}
+                          to={`/products/${p.product_id}`}
                           className="text-terracotta underline"
                         >
                           {p.name}
@@ -89,7 +89,7 @@ export default function DashboardPage() {
                     {data.recent_orders.map((o) => (
                       <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
                         <Link
-                          to={`/admin/orders/${o.order_id}`}
+                          to={`/orders/${o.order_id}`}
                           className="flex flex-wrap justify-between gap-2"
                         >
                           <span>
@@ -104,7 +104,7 @@ export default function DashboardPage() {
                   </ul>
                 )}
                 <p className="mt-2">
-                  <Link to="/admin/orders" className="text-terracotta underline">
+                  <Link to="/orders" className="text-terracotta underline">
                     See all orders
                   </Link>
                 </p>

@@ -135,3 +135,18 @@ class SettingsUpdate(BaseModel):
                 raise ValueError("links must be https:// addresses")
             cleaned[key] = url
         return cleaned
+
+
+# ---- audit log -----------------------------------------------------------------------------
+
+
+class AuditEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    audit_id: uuid.UUID
+    user_id: uuid.UUID
+    action: str
+    path: str
+    status_code: int
+    ip: str | None
+    created_at: datetime

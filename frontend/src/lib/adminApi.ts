@@ -6,6 +6,7 @@ import {
   apiPatch,
   apiPost,
   type Address,
+  type BusinessSettings,
   type CheckoutAddress,
   type Customer,
   type CustomOrder,
@@ -27,8 +28,26 @@ const qs = (params: Record<string, string | number | boolean | null | undefined>
 }
 const id = encodeURIComponent
 
-export const getAdminMe = (signal?: AbortSignal) =>
-  apiGet<{ id: string; role: string }>('/admin/me', signal)
+export interface AdminMe {
+  id: string
+  role: string
+  mfa_required: boolean
+  mfa_verified: boolean
+}
+/** Who the server thinks this admin is, and whether the second factor is still missing. */
+export const getAdminMe = (signal?: AbortSignal) => apiGet<AdminMe>('/admin/me', signal)
+
+export interface AuditEntry {
+  audit_id: string
+  user_id: string
+  action: string
+  path: string
+  status_code: number
+  ip: string | null
+  created_at: string
+}
+export const getAuditLog = (page: number, signal?: AbortSignal) =>
+  apiGet<Page<AuditEntry>>(`/admin/audit-log${qs({ page, page_size: 50 })}`, signal)
 
 // ---- dashboard ----------------------------------------------------------------------------
 
@@ -254,16 +273,6 @@ export const deleteAdminReview = (reviewId: string) => apiDelete(`/admin/reviews
 
 // ---- business settings --------------------------------------------------------------------
 
-export interface BusinessSettings {
-  business_name: string | null
-  email: string | null
-  phone: string | null
-  whatsapp: string | null
-  address: string | null
-  delivery_information: string | null
-  delivery_fee_paisa: number
-  social_links: Record<string, string>
-}
 export const getAdminSettings = (signal?: AbortSignal) =>
   apiGet<BusinessSettings & { updated_at: string }>('/admin/settings', signal)
 export const updateAdminSettings = (data: Partial<BusinessSettings>) =>

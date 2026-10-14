@@ -5,14 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && npm run build:shop && npm run build:admin",
     "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "dev:shop": "vite",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build:shop": "vite build",
+    "build:admin": "vite build --config vite.admin.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

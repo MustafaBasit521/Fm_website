@@ -14,6 +14,7 @@ vi.mock('../lib/adminApi', () => ({
 vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   sendContactMessage: (...a: unknown[]) => sendContactMessage(...a),
+  getPublicSettings: (...a: unknown[]) => getPublicSettings(...a),
 }))
 
 const renderPage = () =>

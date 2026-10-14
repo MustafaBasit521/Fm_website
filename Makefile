@@ -1,4 +1,4 @@
-.PHONY: db db-down backend frontend migrate test lint format check
+.PHONY: db db-down backend frontend admin migrate test lint format check
 
 db:        ## start local dev Postgres (docker)
 	docker compose up -d db
@@ -6,8 +6,10 @@ db-down:
 	docker compose down
 backend:   ## run API on :8000
 	cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000
-frontend:  ## run Vite on :5173
-	cd frontend && npm run dev
+frontend:  ## run the SHOP site on :5173
+	cd frontend && npm run dev:shop
+admin:     ## run the ADMIN site on :5174
+	cd frontend && npm run dev:admin
 migrate:   ## apply Alembic migrations
 	cd backend && .venv/bin/alembic upgrade head
 test:

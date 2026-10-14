@@ -392,25 +392,39 @@ Implementation notes:
 
 ## Phase 10 — Hardening
 
-Status: Not Started
+Status: **In progress** (started with the admin security work approved by the owner)
 
-Tasks:
+Done so far — admin security (an architecture change explained and approved; `CLAUDE.md` §4 and §6 updated):
 
-* security review
-* authorization review
-* input validation review
-* file-upload security
-* rate limiting
-* performance review
-* database indexes
-* N+1 review
-* accessibility review
-* responsive review
-* automated tests
-* error handling
-* logging
-* backup/recovery documentation
-* deployment configuration
+* [x] admin split into its own site: separate Vite app, development port 5174, own build (`dist/admin`), own domain in production; the shop build contains no admin code and the admin build contains no shop pages (checked by searching the bundles). The shop has no `/admin` page at all.
+* [x] two-factor authentication for the admin: the backend requires Supabase assurance level `aal2` on every `/api/admin/*` route except `/api/admin/me` (a test walks the real route table, so a future admin route cannot forget it); the admin site has a login page, first-time authenticator setup (QR code and manual key) and a code step. `ADMIN_REQUIRE_MFA=false` is allowed for local development only; production refuses it.
+* [x] audit log: `admin_audit_log` table (migration applied on Supabase), middleware recording data-changing admin requests and refused authenticated attempts (no request bodies, unauthenticated requests ignored, failures never break the request), `GET /api/admin/audit-log` and an Activity log screen.
+* [x] CORS allows both origins; admin pages are not indexed (`noindex`); tests no longer depend on a developer's `.env`.
+
+Tasks (remaining):
+
+* [ ] security review
+* [ ] authorization review (a route-table test for admin routes now exists; customer routes still to review)
+* [ ] input validation review
+* [ ] file-upload security
+* [ ] rate limiting (guest custom orders, uploads and contact are already limited; the rest of the public API is not)
+* [ ] performance review
+* [ ] database indexes
+* [ ] N+1 review
+* [ ] accessibility review
+* [ ] responsive review
+* [ ] automated tests
+* [ ] error handling
+* [ ] logging
+* [ ] backup/recovery documentation
+* [ ] deployment configuration (two static sites + the API; both origins in `CORS_ORIGINS`; `TRUST_PROXY_HEADERS` behind a proxy)
+
+Implementation notes (admin security):
+
+* Tests: backend 417 passing (adds the MFA rules, the whole-route-table MFA test, forged `user_metadata` claims, CORS origins, the audit log); frontend 194 passing (adds the admin guard states, login, MFA setup/verify, activity log, and "each app has none of the other's pages").
+* Bugs found and fixed while doing this: the admin dev page loaded its script through a relative path that the dev server answered with HTML (fixed with a root entry file); tests had read the developer's own `.env` (now pinned in `conftest.py`).
+* Not verified: the real Supabase MFA calls (enrolling and verifying an authenticator code) against your project; they are tested only against mocks. Supabase's TOTP MFA must be enabled in the project settings (Authentication → Multi-Factor).
+* Known limits: the in-process rate limiter is per worker; an IP allowlist for the admin site is possible later (at the host or in the API); the audit table can still be changed by someone with database access.
 
 ---
 

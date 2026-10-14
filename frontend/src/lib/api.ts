@@ -426,3 +426,19 @@ export const markNotificationRead = (id: string) =>
   apiPost<AppNotification>(`/customers/me/notifications/${encodeURIComponent(id)}/read`, {})
 export const markAllNotificationsRead = () =>
   apiPost<{ updated: number }>('/customers/me/notifications/read-all', {})
+
+// ---- shop settings (public) ---------------------------------------------------------------
+
+export interface BusinessSettings {
+  business_name: string | null
+  email: string | null
+  phone: string | null
+  whatsapp: string | null
+  address: string | null
+  delivery_information: string | null
+  delivery_fee_paisa: number
+  social_links: Record<string, string>
+}
+
+export const getPublicSettings = (signal?: AbortSignal) =>
+  apiGet<BusinessSettings>('/settings', signal)

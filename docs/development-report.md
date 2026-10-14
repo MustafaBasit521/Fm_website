@@ -277,3 +277,31 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Not done / open**
 
 * Real browser check against Supabase data; real picture uploads (need the buckets and the service key); a "recent activity" feed and customer notes (not in the design); customer editing/deletion (open decision on account deletion).
+
+---
+
+## Phase 10 (started) — Admin security hardening
+
+**Why (the owner's idea, refined)**
+
+* The owner proposed separating the admin from the shop (own domain/port, "own table"). Assessment: a separate table adds nothing (credentials live in Supabase Auth, the role is server-controlled metadata), but a separate **origin** matters because the browser keeps the login session per origin, so an XSS bug in the shop could otherwise read the admin's session. A separate domain does not protect a stolen password, so **two-factor authentication** was added as the main control, plus an **audit log**. This changes the architecture shown in the diagram, so it was explained and approved first (CLAUDE.md §23) and `CLAUDE.md` §4 and §6 were updated.
+
+**Built**
+
+* Frontend: two Vite apps from one repository (`vite.config.ts` for the shop, `vite.admin.config.ts` for the admin; ports 5173 and 5174; builds `dist/shop` and `dist/admin`); `src/shop/` and `src/admin/` entry points; the admin has its own login page, access guard, authenticator-app setup and code step, activity log screen, `noindex`; admin routes start at the root (`/orders`, `/products`…); the shop no longer contains any admin code or link and both apps have a not-found page.
+* Backend: `aal` read from the signed token; `get_admin_user` (role only, used by `/api/admin/me`, which now also reports `mfa_required`/`mfa_verified`) and `require_admin` (role + `aal2`); `ADMIN_REQUIRE_MFA` setting (production refuses `false`); both origins allowed by default; `admin_audit_log` table, the audit middleware and `GET /api/admin/audit-log`.
+
+**Verified**
+
+* Backend 417 tests (including a test that walks every `/api/admin/*` route in the real route table and checks anonymous = 401, customer = 403, admin without second factor = 403 `MFA_REQUIRED`), frontend 194 tests, both production builds, a search of both bundles proving neither contains the other's pages, and both dev servers (separate ports, deep-link fallback, correct HTML). The audit migration is applied on Supabase.
+
+**Bugs found and fixed**
+
+* The admin dev page's script path was relative and the dev server answered it with HTML (the build was fine, dev mode was not): added a root `admin/main.tsx` entry.
+* The CORS test read the developer's personal `backend/.env` (which still listed one origin): tests now pin every behaviour-changing setting.
+* Earlier: a transient sanity threshold in a route-count test (39 routes, not 40).
+
+**Not verified / open**
+
+* Real Supabase MFA calls (enrol, challenge, verify) against the project: tested with mocks only; TOTP must be enabled in the Supabase dashboard.
+* An IP allowlist for the admin site is a possible later addition (host level or API); deployment configuration is a remaining Phase 10 task.

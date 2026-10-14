@@ -90,4 +90,9 @@ async def test_admin_can_use_admin_endpoint(client, make_token):
     uid = uuid.uuid4()
     r = await client.get("/api/admin/me", headers=auth(make_token(sub=uid, admin=True)))
     assert r.status_code == 200
-    assert r.json() == {"id": str(uid), "role": "admin"}
+    assert r.json() == {
+        "id": str(uid),
+        "role": "admin",
+        "mfa_required": True,
+        "mfa_verified": True,
+    }

@@ -36,10 +36,7 @@ it('lists and searches customers', async () => {
   )
   expect(await screen.findByText('Ayesha Khan')).toBeInTheDocument()
   expect(screen.getByText(/2 orders/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /Ayesha Khan/ })).toHaveAttribute(
-    'href',
-    '/admin/customers/c1',
-  )
+  expect(screen.getByRole('link', { name: /Ayesha Khan/ })).toHaveAttribute('href', '/customers/c1')
   await userEvent.type(screen.getByLabelText(/Search/), 'ayesha{Enter}')
   expect(api.getAdminCustomers.mock.calls.at(-1)![0]).toMatchObject({ search: 'ayesha', page: 1 })
 })
@@ -65,19 +62,16 @@ it('shows customer details with recent orders', async () => {
   }
   api.getAdminCustomer.mockResolvedValue(detail)
   render(
-    <MemoryRouter initialEntries={['/admin/customers/c1']}>
+    <MemoryRouter initialEntries={['/customers/c1']}>
       <Routes>
-        <Route path="/admin/customers/:id" element={<CustomerAdminPage />} />
+        <Route path="/customers/:id" element={<CustomerAdminPage />} />
       </Routes>
     </MemoryRouter>,
   )
   expect(await screen.findByRole('heading', { name: 'Ayesha Khan' })).toBeInTheDocument()
   expect(screen.getByText(/subscribed to shop updates/)).toBeInTheDocument()
   expect(screen.getByText(/1 custom requests/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /Delivered/ })).toHaveAttribute(
-    'href',
-    '/admin/orders/o1',
-  )
+  expect(screen.getByRole('link', { name: /Delivered/ })).toHaveAttribute('href', '/orders/o1')
 })
 
 it('shows empty and error states', async () => {
@@ -91,9 +85,9 @@ it('shows empty and error states', async () => {
   a.unmount()
   api.getAdminCustomer.mockRejectedValue(new Error('x'))
   render(
-    <MemoryRouter initialEntries={['/admin/customers/c1']}>
+    <MemoryRouter initialEntries={['/customers/c1']}>
       <Routes>
-        <Route path="/admin/customers/:id" element={<CustomerAdminPage />} />
+        <Route path="/customers/:id" element={<CustomerAdminPage />} />
       </Routes>
     </MemoryRouter>,
   )

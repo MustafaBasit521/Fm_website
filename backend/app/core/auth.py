@@ -14,7 +14,7 @@ from functools import lru_cache
 from typing import Annotated, Any
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 
@@ -37,6 +37,9 @@ class AuthUser:
     email: str | None
     name: str | None  # from user_metadata: display data only, never used for authorization
     is_admin: bool
+    aal: str | None = (
+        None  # Supabase assurance level: aal1 = password only, aal2 = second factor done
+    )
 
 
 def _unauthorized() -> HTTPException:
@@ -99,22 +102,41 @@ async def verify_token(token: str, settings: Settings, resolver: KeyResolver) ->
         email=email.lower() if isinstance(email, str) else None,
         name=user_meta.get("name") if isinstance(user_meta.get("name"), str) else None,
         is_admin=app_meta.get("role") == ADMIN_ROLE,
+        aal=claims.get("aal") if isinstance(claims.get("aal"), str) else None,
     )
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Annotated[Settings, Depends(get_settings)],
     resolver: Annotated[KeyResolver, Depends(get_key_resolver)],
 ) -> AuthUser:
     if credentials is None:
         raise _unauthorized()
-    return await verify_token(credentials.credentials, settings, resolver)
+    user = await verify_token(credentials.credentials, settings, resolver)
+    request.state.auth_user = user  # lets the audit middleware attribute the request
+    return user
 
 
-async def require_admin(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
+async def get_admin_user(user: Annotated[AuthUser, Depends(get_current_user)]) -> AuthUser:
+    """The admin role only. Used by the identity check, so the admin site can tell whether the
+    second factor is still missing."""
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return user
+
+
+async def require_admin(
+    user: Annotated[AuthUser, Depends(get_admin_user)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AuthUser:
+    """The admin role AND a completed second factor. A stolen password alone is not enough."""
+    if settings.admin_require_mfa and user.aal != "aal2":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"code": "MFA_REQUIRED", "message": "Two-factor authentication is required"},
+        )
     return user
 
 

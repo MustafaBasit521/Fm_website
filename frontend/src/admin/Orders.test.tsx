@@ -102,9 +102,9 @@ const renderList = () =>
   )
 const renderDetail = () =>
   render(
-    <MemoryRouter initialEntries={['/admin/orders/o1']}>
+    <MemoryRouter initialEntries={['/orders/o1']}>
       <Routes>
-        <Route path="/admin/orders/:id" element={<OrderAdminPage />} />
+        <Route path="/orders/:id" element={<OrderAdminPage />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -365,7 +365,7 @@ it('lists payment attempts and links registered customers', async () => {
   expect(await screen.findAllByText(/Online attempt/)).toHaveLength(2)
   expect(screen.getByRole('link', { name: 'View customer' })).toHaveAttribute(
     'href',
-    '/admin/customers/c9',
+    '/customers/c9',
   )
 })
 

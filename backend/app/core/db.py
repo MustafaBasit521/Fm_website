@@ -28,6 +28,12 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
+def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
+    get_engine()
+    assert _sessionmaker is not None
+    return _sessionmaker
+
+
 async def get_session() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency yielding one session per request."""
     get_engine()

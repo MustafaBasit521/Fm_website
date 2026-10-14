@@ -887,3 +887,30 @@ Takes an advisory lock (runs are serialized), then for every `PENDING` order tha
 
 Scheduling: Supabase pg_cron, every minute (see the README). The API also calls it before reserving stock.
 
+---
+
+# 28. Admin Audit Log
+
+```text
+admin_audit_log
+-----------
+audit_id UUID PK
+user_id UUID NOT NULL
+action TEXT NOT NULL
+path TEXT NOT NULL
+status_code INTEGER NOT NULL
+ip TEXT NULL
+created_at TIMESTAMPTZ (default clock_timestamp())
+```
+
+Indexes: `created_at`, `user_id`. There is deliberately **no foreign key** on `user_id`: the log must outlive any account.
+
+Written only by the audit middleware, for requests under `/api/admin`:
+
+* data-changing requests (POST, PUT, PATCH, DELETE) by an authenticated user, whatever the outcome (a refused or failed change is recorded too), and
+* any authenticated request that the server refused with 403 (a customer trying admin routes, or an admin without the second factor).
+
+Not recorded: reads by the admin, and unauthenticated requests (there is no identity, and anyone could otherwise flood the table). `action` is the method plus the path with ids masked (`POST /api/admin/orders/{id}/cancel`); `path` keeps the real path. **Request bodies are never stored.** If writing a log row fails, the failure is reported in the server log and the request is not affected.
+
+The application only inserts and reads rows; no route edits or deletes them. (A database administrator can still change the table; protect database access accordingly.)
+

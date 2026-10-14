@@ -5,6 +5,18 @@ os.environ["DATABASE_URL"] = (
     "postgresql+asyncpg://crochet:crochet_dev_password@localhost:5433/crochet_test"
 )
 os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
+# Tests must not depend on a developer's personal .env: pin every setting that changes behaviour.
+for _key, _value in {
+    "APP_ENV": "development",
+    "CORS_ORIGINS": "http://localhost:5173,http://localhost:5174",
+    "ADMIN_REQUIRE_MFA": "true",
+    "ONLINE_PAYMENTS_ENABLED": "false",
+    "PAYMENT_PROVIDER": "none",
+    "EMAIL_PROVIDER": "none",
+    "TRUST_PROXY_HEADERS": "false",
+    "SUPABASE_SERVICE_KEY": "",
+}.items():
+    os.environ[_key] = _value
 
 import time
 import uuid
@@ -52,6 +64,7 @@ def make_token():
         audience: str = "authenticated",
         key=_PRIVATE_KEY,
         algorithm: str = "ES256",
+        aal: str | None = None,
     ) -> str:
         claims = {
             "sub": str(sub or uuid.uuid4()),
@@ -63,6 +76,11 @@ def make_token():
         }
         if email:
             claims["email"] = email
+        # Supabase puts the assurance level in the token: aal2 = a second factor was completed.
+        # Admin test tokens default to aal2 so ordinary admin tests are not blocked by MFA.
+        level = aal or ("aal2" if admin else "aal1")
+        claims["aal"] = level
+        claims["amr"] = [{"method": "password"}] + ([{"method": "totp"}] if level == "aal2" else [])
         return jwt.encode(claims, key, algorithm=algorithm)
 
     return _make
@@ -194,12 +212,13 @@ async def client(db_engine, storage, emails):
         await send_emails(ready, emails)  # deterministic in tests (production sends in background)
 
     app.dependency_overrides[get_session] = _session
+    app.state.audit_sessionmaker = maker  # the audit writer uses the test database/event loop
     app.dependency_overrides[get_key_resolver] = lambda: _TestResolver()
     app.dependency_overrides[get_storage] = lambda: storage
     async with db_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE notifications, reviews, gallery_images, custom_orders, messages, payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+                "TRUNCATE admin_audit_log, notifications, reviews, gallery_images, custom_orders, messages, payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
             )
         )
     async with db_engine.begin() as conn:

@@ -98,7 +98,7 @@ export default function OrdersAdminPage() {
                 {data.items.map((o) => (
                   <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
                     <Link
-                      to={`/admin/orders/${o.order_id}`}
+                      to={`/orders/${o.order_id}`}
                       className="flex flex-wrap justify-between gap-2"
                     >
                       <span>

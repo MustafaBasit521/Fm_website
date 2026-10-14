@@ -20,6 +20,7 @@ from app.api import (
     payments,
     wishlist,
 )
+from app.core.audit import AuditMiddleware
 from app.core.config import get_settings
 from app.core.db import dispose_engine
 
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url=None if settings.is_production else "/openapi.json",
     )
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

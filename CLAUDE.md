@@ -144,9 +144,8 @@ The provider should be selected before implementation.
 
 High-level architecture:
 
-Customer/Admin
-↓
-React + TypeScript + Vite
+Customer → Shop site            Admin → Admin site
+(React + TypeScript + Vite)     (React + TypeScript + Vite)
 ↓
 FastAPI REST API
 ↓
@@ -162,6 +161,17 @@ Supporting services:
 * Supabase Storage
 * External Payment Gateway
 * External Email Service
+
+## Two frontend apps (decided after the architecture diagram was drawn)
+
+The storefront and the admin dashboard are **two separate Vite apps** built from the same repository and sharing code (`frontend/src`: API client, auth, UI helpers):
+
+* **Shop site** — `frontend/index.html` → `src/shop/`, development port 5173, built to `dist/shop`, deployed on the public domain (e.g. `www.…`).
+* **Admin site** — `frontend/admin/` → `src/admin/`, development port 5174, built to `dist/admin`, deployed on its own domain (e.g. `admin.…`).
+
+Both talk to the **same** FastAPI backend and the same database. Reasons: the browser keeps the login session per origin, so the shop (and any XSS bug in it) cannot read the admin's session; the admin code is not shipped to shoppers; and the admin domain can carry extra protection (stricter content policy, IP allowlist or an access gateway). There is no separate admin database table or separate admin backend: the admin is a normal Supabase Auth user with a server-controlled role.
+
+The backend must allow both origins (`CORS_ORIGINS`). Neither app may import the other's pages; shared code lives in the shared folders only.
 
 The backend should remain reasonably stateless.
 
@@ -240,6 +250,10 @@ The initial system has one admin.
 Admin authorization must use a server-controlled mechanism such as Supabase `app_metadata` or another server-controlled role mechanism.
 
 Do not use user-editable metadata for authorization.
+
+The admin must complete **two-factor authentication** (authenticator-app code). The backend requires a token with Supabase assurance level `aal2` for every `/api/admin/*` request except the identity check `/api/admin/me`; a stolen password alone must not be enough. The setting `ADMIN_REQUIRE_MFA` may be turned off for local development only, and the application refuses to start in production without it.
+
+Data-changing admin requests, and any authenticated request refused at the admin boundary, are written to an append-only audit log (`admin_audit_log`; who, what, when, outcome, address; never request bodies).
 
 If FastAPI uses privileged database credentials, explicitly enforce application authorization because privileged database access must not be assumed to provide normal user-level RLS protection automatically.
 

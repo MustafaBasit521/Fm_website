@@ -55,12 +55,9 @@ it('shows what needs attention, status counts, low stock and recent orders', asy
   expect(await screen.findByText('orders to process')).toBeInTheDocument()
   expect(screen.getByText('new message')).toBeInTheDocument()
   expect(screen.getByText('new custom requests')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Sunflower' })).toHaveAttribute(
-    'href',
-    '/admin/products/p1',
-  )
+  expect(screen.getByRole('link', { name: 'Sunflower' })).toHaveAttribute('href', '/products/p1')
   expect(screen.getByText(/1 left/)).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: /Ayesha/ })).toHaveAttribute('href', '/admin/orders/o1')
+  expect(screen.getByRole('link', { name: /Ayesha/ })).toHaveAttribute('href', '/orders/o1')
   expect(screen.getByText(/Delivered:/)).toBeInTheDocument()
 })
 

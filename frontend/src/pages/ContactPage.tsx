@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { getPublicSettings } from '../lib/adminApi'
-import { ApiError, sendContactMessage } from '../lib/api'
+import { ApiError, getPublicSettings, sendContactMessage } from '../lib/api'
 import { buttonClass, Field, FormError } from './ui'
 
 function ShopDetails() {

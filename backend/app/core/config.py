@@ -34,7 +34,14 @@ class Settings(BaseSettings):
     # Behind a reverse proxy (Vercel, nginx, ...) the client IP is in X-Forwarded-For. Enable only
     # when the app is really behind such a proxy, otherwise clients could spoof their IP.
     trust_proxy_headers: bool = False
-    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:5173"]
+    # The shop and the admin are separate sites (separate origins), so both are allowed here.
+    cors_origins: Annotated[list[str], NoDecode] = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+    # Every /api/admin/* call (except the identity check) needs a login that completed a second
+    # factor (Supabase aal2). Production refuses to turn this off.
+    admin_require_mfa: bool = True
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -66,6 +73,8 @@ class Settings(BaseSettings):
             raise ValueError("PAYMENT_PROVIDER must be 'none' or 'fake' until a gateway is added")
         if self.payment_provider == "fake" and self.is_production:
             raise ValueError("The fake payment provider cannot be used in production")
+        if self.is_production and not self.admin_require_mfa:
+            raise ValueError("ADMIN_REQUIRE_MFA cannot be turned off in production")
         if self.email_provider not in ("none", "console"):
             raise ValueError("EMAIL_PROVIDER must be 'none' or 'console' until a provider is added")
         if self.email_provider == "console" and self.is_production:
