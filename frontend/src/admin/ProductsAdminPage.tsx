@@ -97,7 +97,7 @@ export default function ProductsAdminPage() {
                             className="h-12 w-12 rounded-lg object-cover"
                           />
                         ) : (
-                          <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-cream-200 text-xs text-muted">
+                          <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-cream-200 text-xs text-bark">
                             No photo
                           </span>
                         )}

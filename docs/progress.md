@@ -392,7 +392,7 @@ Implementation notes:
 
 ## Phase 10 — Hardening
 
-Status: **In progress** (started with the admin security work approved by the owner)
+Status: **Implemented and tested; four items remain unverified until deployment or real devices (marked `[~]`)**
 
 Done so far — admin security (an architecture change explained and approved; `CLAUDE.md` §4 and §6 updated):
 
@@ -401,23 +401,25 @@ Done so far — admin security (an architecture change explained and approved; `
 * [x] audit log: `admin_audit_log` table (migration applied on Supabase), middleware recording data-changing admin requests and refused authenticated attempts (no request bodies, unauthenticated requests ignored, failures never break the request), `GET /api/admin/audit-log` and an Activity log screen.
 * [x] CORS allows both origins; admin pages are not indexed (`noindex`); tests no longer depend on a developer's `.env`.
 
-Tasks (remaining):
+Tasks:
 
-* [ ] security review
-* [ ] authorization review (a route-table test for admin routes now exists; customer routes still to review)
-* [ ] input validation review
-* [ ] file-upload security
-* [ ] rate limiting (guest custom orders, uploads and contact are already limited; the rest of the public API is not)
-* [ ] performance review
-* [ ] database indexes
-* [ ] N+1 review
-* [ ] accessibility review
-* [ ] responsive review
-* [ ] automated tests
-* [ ] error handling
-* [ ] logging
-* [ ] backup/recovery documentation
-* [ ] deployment configuration (two static sites + the API; both origins in `CORS_ORIGINS`; `TRUST_PROXY_HEADERS` behind a proxy)
+* [x] security review: all 81 API routes inventoried by protection level (39 admin, 1 admin identity, 25 customer, 2 optional-login, 14 public); secrets, CORS, error leakage and dependency audits checked (`npm audit` and `pip-audit`: 0 known vulnerabilities)
+* [x] authorization review: admin routes covered by the route-table test; customer routes: every id lookup reachable by customers is owner-scoped or checked straight after loading, backed by the per-feature isolation tests
+* [x] input validation review: a scan of every request model found every string and list length-capped and the one dictionary (social links) validated; unknown fields are rejected on all write models
+* [~] file-upload security: server-generated paths, strict path pattern, image-type allowlist, rate-limited guest uploads, private bucket for custom-order pictures — all tested. **Not verified:** the actual bucket limits (5 MB, jpeg/png/webp) are manual Supabase settings that cannot be checked from here, and the server does not look at the uploaded file itself.
+* [x] rate limiting: per-route limits on every public write (orders 10/h, quote 120/min, pay 20/h, payment refresh 60/min, DB health 30/min, plus the existing contact and custom-order limits) and a global backstop of 600 requests/min per client; webhooks, health and CORS preflight are exempt from the backstop
+* [x] performance review: no N+1 (13 list endpoints guarded by a statement-count test); the admin custom-orders list signs picture links concurrently (6 pictures in about 0.2 s, not 1.2 s)
+* [x] database indexes: all foreign keys indexed (checked in the database); trigram search index deliberately deferred
+* [x] N+1 review (see above)
+* [x] accessibility review: axe-core runs on 34 real pages of both sites (0 violations; the checker is proven to catch problems) and a colour-contrast test reads the real colour tokens; it found and fixed one failure ("No image" tiles, 4.28:1, now AA)
+* [~] responsive review: code-level only (no fixed widths below tablet size, no tables, viewport tag present). **Not verified on real phone-size screens.**
+* [x] automated tests (backend 430, frontend 259; new suites for HTTP safety, query counts, accessibility, contrast and deployment headers)
+* [x] error handling: any unexpected error returns a generic JSON 500 with a request id (traceback only in the server log), still readable by the browser (CORS headers present)
+* [x] logging: one line per request with an id (no query strings), `X-Request-ID` header, log level setting, app log lines visible under uvicorn
+* [x] backup/recovery documentation: `README.md`; the dump/restore procedure was run and verified on the local database
+* [~] deployment configuration: two Vercel configs with strict security headers (`deploy/shop`, `deploy/admin`, checked by tests), production environment checklist, startup warning for the proxy setting. **Not verified:** nothing has been deployed; the Vercel root-directory build, the `API_DOMAIN` placeholder and the content security policy against the live pages must be checked on the first deployment. No domain is chosen yet (decided later).
+
+Also added to every API response: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, a locked-down content security policy, `Cache-Control: no-store` on private or data-changing responses, and HSTS in production.
 
 Implementation notes (admin security):
 

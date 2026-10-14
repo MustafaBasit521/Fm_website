@@ -5,6 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
+from app.core.rate_limit import rate_limit
 
 router = APIRouter(tags=["health"])
 
@@ -15,7 +16,7 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/health/db")
+@router.get("/health/db", dependencies=[Depends(rate_limit("health-db", 30, 60))])
 async def health_db(
     response: Response, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> dict[str, str]:

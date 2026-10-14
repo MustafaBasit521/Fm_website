@@ -305,3 +305,24 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 * Real Supabase MFA calls (enrol, challenge, verify) against the project: tested with mocks only; TOTP must be enabled in the Supabase dashboard.
 * An IP allowlist for the admin site is a possible later addition (host level or API); deployment configuration is a remaining Phase 10 task.
+
+---
+
+## Phase 10 (completed) — Hardening reviews
+
+**Approach:** measure first, then fix. Each review produced a number or a failing test before any change.
+
+**Findings and fixes**
+
+* Route inventory (81 routes) showed public write routes without rate limits, most importantly `POST /orders` (a bot could lock stock with fake orders). Added per-route limits and a global backstop; the limiter is per worker and needs `TRUST_PROXY_HEADERS` behind a proxy (the API now warns in production when it is off).
+* No global error handler: an unexpected error returned the framework's plain text and could not be traced. Added request ids, a request log line (no query strings) and a generic JSON 500 that stays readable by the browser; the traceback goes only to the log.
+* No security headers on API responses: added them, plus `no-store` on private/data-changing responses so a shared cache can never show one customer's data to another.
+* Validation scan: clean. Authorization scan: clean. Dependency audits: clean.
+* N+1: a statement-count test over 13 list endpoints found none in SQL; it did not cover HTTP calls, and the admin custom-orders list made one sequential storage call per picture (up to 20): now concurrent.
+* Indexes: all foreign keys indexed (queried from the catalogue).
+* Accessibility: axe found nothing on 34 pages; the contrast test found one real failure ("No image" placeholder 4.28:1) which was fixed.
+* Backup/recovery: the dump and restore commands were executed and the restored copy compared with the original.
+
+**Bugs in my own tests, fixed:** `all()` over an async generator; a path lookup that `jsdom` cannot do; a missing Node type setting; a sanity-count threshold.
+
+**Left for deployment or real devices (not verifiable here):** bucket limits on Supabase; phone-size layout; the Vercel root-directory build and the content security policy on live pages; real MFA calls; real Storage calls; pg_cron scheduling.

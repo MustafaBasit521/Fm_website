@@ -142,6 +142,68 @@ update business_settings set email = 'you@example.com';
 If the app runs behind a reverse proxy, also set `TRUST_PROXY_HEADERS=true` so rate limiting sees
 the real client address (leave it `false` otherwise).
 
+## Going to production (checklist)
+
+**Hosting layout.** Three things are deployed separately: the **shop site** (`deploy/shop`), the
+**admin site** (`deploy/admin`) and the **API** (FastAPI, any host that runs Python 3.12). Both
+sites are static builds. On Vercel, create two projects from this repository and set each project's
+*Root Directory* to `deploy/shop` or `deploy/admin`; each folder contains a `vercel.json` with the
+build command, single-page-app rewrite and the browser security headers (content security policy,
+no framing, no sniffing, HTTPS-only, and `noindex` for the admin). **Before deploying, replace
+`API_DOMAIN` in both `vercel.json` files with your API's domain** (it is the only network address
+the sites are allowed to call besides Supabase). Choose the domains later; nothing in the code
+depends on them.
+
+**API environment (`backend/.env` on the host, never in the repository):**
+
+| Setting | Production value |
+|---|---|
+| `APP_ENV` | `production` (hides the API docs, turns on HSTS, forces two-factor login on) |
+| `DATABASE_URL` | the Supabase *session pooler* string, with `postgresql+asyncpg://` |
+| `SUPABASE_URL` | your project URL |
+| `SUPABASE_SERVICE_KEY` | the secret key (server only) |
+| `CORS_ORIGINS` | exactly your two site origins, e.g. `https://www.yourshop.com,https://admin.yourshop.com` |
+| `TRUST_PROXY_HEADERS` | `true` only if a trusted reverse proxy sets `X-Forwarded-For` (otherwise every visitor shares one rate-limit budget; the API logs a warning in production when this is off) |
+| `PAYMENT_PROVIDER`, `ONLINE_PAYMENTS_ENABLED` | `none` / `false` until a real gateway adapter exists (the fake gateway is refused in production) |
+| `EMAIL_PROVIDER` | `none` until a real provider adapter exists (`console` is refused in production) |
+| `GLOBAL_RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL` | defaults `600` and `INFO` are fine |
+
+**Supabase checklist:** the migrations applied (`make migrate`), Authentication → Multi-Factor →
+TOTP enabled, the three Storage buckets with their limits (see *Storage buckets*), pg_cron
+scheduled (see *Automatic expiry*), and the admin account created and given its role.
+**The 5 MB / jpeg-png-webp limits on the buckets are enforced by Supabase, not by this app, so
+set them carefully.**
+
+**Logs.** The API writes one line per request (`request <id> METHOD /path -> status in N ms`; query
+strings are never logged) and every response carries an `X-Request-ID` header. An unexpected error
+returns `{"detail": "Internal server error", "request_id": ...}` and the full traceback is in the
+server log under that id: when a customer reports a problem, ask for the id.
+
+## Backups and recovery
+
+Your data lives in Supabase PostgreSQL (orders, customers, products) and Supabase Storage
+(pictures). **Check what your Supabase plan includes for backups** (some plans have none or only a
+short history); do not rely on a plan you have not looked at. A dependable extra is your own dump.
+The commands below were tested against the local database (the restored copy had identical row
+counts, data, the migration version and both database functions); run the dump against the
+Supabase *direct* connection string from Settings → Database (not the pooler):
+
+```bash
+# back up (schema + data, compressed)
+pg_dump "postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres" -Fc -f shop-$(date +%F).dump
+
+# prove a backup is usable: restore into a scratch database and compare
+createdb restore_test
+pg_restore -d restore_test --no-owner shop-2026-01-01.dump
+psql restore_test -c "select count(*) from orders"
+```
+
+Keep dumps somewhere other than the machine that made them, and treat them as secret (they hold
+customer names, addresses and phone numbers). Pictures in Storage are not in the dump: keep the
+originals of your product photos. To recover: create a fresh Supabase project, run
+`pg_restore --no-owner` into it, re-create the Storage buckets, set the environment variables, and
+re-run the pg_cron schedule from this file. Restore only into an empty database.
+
 ## Tests
 
 Backend database tests need the local Docker Postgres (`make db`); they use a separate

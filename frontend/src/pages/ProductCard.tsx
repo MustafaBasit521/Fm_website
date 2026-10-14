@@ -17,7 +17,7 @@ export function ProductCard({ product }: { product: ProductSummary }) {
             className="aspect-square w-full object-cover"
           />
         ) : (
-          <div className="flex aspect-square items-center justify-center bg-cream-200 text-muted">
+          <div className="flex aspect-square items-center justify-center bg-cream-200 text-bark">
             No image
           </div>
         )}

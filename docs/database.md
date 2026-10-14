@@ -776,6 +776,8 @@ Do not add large numbers of indexes without a reason.
 
 Implemented so far: `addresses(customer_id)`; `products(category_id)`, `products(is_visible)`, `products(availability_type)`; `product_images(product_id)`; `wishlist_items(product_id)` (customer lookups use the primary key); `orders(customer_id)`, `orders(status)`, `orders(created_at)`, `orders(payment_deadline_at)`; `order_items(order_id)`, `order_items(product_id)`; `payments(order_id)`.
 
+Review result (Phase 10): a query against the catalogue confirmed that **every foreign-key column is the first column of an index** (no unindexed foreign keys). Product and customer text search uses `ILIKE '%term%'`, which a normal index cannot serve; at the size of a small shop a sequential scan is instant, and if the catalogue ever reaches many thousands of products a `pg_trgm` GIN index on the searched columns is the fix (not added now, without evidence of a problem). The N+1 guard (`tests/test_query_counts.py`) checks that 13 list endpoints run the same number of SQL statements for 3 rows as for 9.
+
 Added with the engagement tables: `reviews(product_id)`, `reviews(order_id)`; `gallery_images(is_visible, image_type)`; `custom_orders(customer_id)`, `custom_orders(status)`, `custom_orders(created_at)`; `messages(status)`; `notifications(customer_id, status, created_at)`.
 
 ---

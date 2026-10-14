@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -23,16 +24,30 @@ from app.api import (
 from app.core.audit import AuditMiddleware
 from app.core.config import get_settings
 from app.core.db import dispose_engine
+from app.core.http_safety import (
+    GlobalRateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+    configure_logging,
+)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    if settings.is_production and not settings.trust_proxy_headers:
+        logging.getLogger(__name__).warning(
+            "TRUST_PROXY_HEADERS is off in production. If the API runs behind a reverse proxy, "
+            "every visitor shares the proxy's address and ONE rate-limit budget. Turn it on "
+            "when (and only when) a trusted proxy sets X-Forwarded-For."
+        )
     yield
     await dispose_engine()
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    configure_logging(settings)
     app = FastAPI(
         title="Crochet Shop API",
         lifespan=lifespan,
@@ -40,7 +55,16 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url=None if settings.is_production else "/openapi.json",
     )
+    # Order: the LAST one added is the OUTERMOST. CORS must stay outermost so that even error and
+    # rate-limit responses carry the CORS headers the browser needs to show them.
     app.add_middleware(AuditMiddleware)
+    app.add_middleware(
+        GlobalRateLimitMiddleware,
+        per_minute=settings.global_rate_limit_per_minute,
+        trust_proxy_headers=settings.trust_proxy_headers,
+    )
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production)
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

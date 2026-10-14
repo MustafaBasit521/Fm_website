@@ -79,7 +79,7 @@ export default function ProductPage() {
               className="aspect-square w-full rounded-xl object-cover"
             />
           ) : (
-            <div className="flex aspect-square items-center justify-center rounded-xl bg-cream-200 text-muted">
+            <div className="flex aspect-square items-center justify-center rounded-xl bg-cream-200 text-bark">
               No image
             </div>
           )}

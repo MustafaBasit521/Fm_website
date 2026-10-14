@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthUser, get_optional_user
 from app.core.config import Settings, get_settings
 from app.core.db import get_session
+from app.core.rate_limit import rate_limit
 from app.core.storage import SupabaseStorage, get_storage
 from app.schemas.checkout import OrderCreate, OrderRead, Quote, QuoteRequest
 from app.services import checkout as service
@@ -18,13 +19,23 @@ AppSettings = Annotated[Settings, Depends(get_settings)]
 OptionalUser = Annotated[AuthUser | None, Depends(get_optional_user)]
 
 
-@router.post("/checkout/quote", response_model=Quote)
+@router.post(
+    "/checkout/quote",
+    response_model=Quote,
+    dependencies=[Depends(rate_limit("quote", 120, 60))],
+)
 async def quote(data: QuoteRequest, session: Session, storage: Storage, settings: AppSettings):
     """Authoritative price/availability for a browser cart. Public: guests can check out."""
     return await service.quote(session, data.items, settings, storage.public_url)
 
 
-@router.post("/orders", response_model=OrderRead, status_code=status.HTTP_201_CREATED)
+# Order creation reserves stock, so a bot could otherwise lock up the shop with fake orders.
+@router.post(
+    "/orders",
+    response_model=OrderRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit("create-order", 10, 3600))],
+)
 async def create_order(
     data: OrderCreate, user: OptionalUser, session: Session, settings: AppSettings
 ):

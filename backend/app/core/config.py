@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Every /api/admin/* call (except the identity check) needs a login that completed a second
     # factor (Supabase aal2). Production refuses to turn this off.
     admin_require_mfa: bool = True
+    # Backstop for the whole API: requests per client per minute (0 turns it off).
+    global_rate_limit_per_minute: int = 600
+    log_level: str = "INFO"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -73,6 +76,8 @@ class Settings(BaseSettings):
             raise ValueError("PAYMENT_PROVIDER must be 'none' or 'fake' until a gateway is added")
         if self.payment_provider == "fake" and self.is_production:
             raise ValueError("The fake payment provider cannot be used in production")
+        if self.log_level.upper() not in ("DEBUG", "INFO", "WARNING", "ERROR"):
+            raise ValueError("LOG_LEVEL must be DEBUG, INFO, WARNING or ERROR")
         if self.is_production and not self.admin_require_mfa:
             raise ValueError("ADMIN_REQUIRE_MFA cannot be turned off in production")
         if self.email_provider not in ("none", "console"):

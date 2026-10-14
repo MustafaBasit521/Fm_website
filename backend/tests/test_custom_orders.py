@@ -293,3 +293,27 @@ async def test_guests_get_no_customer_email_because_none_is_collected(
     assert emails.sent == []  # no shop email configured and no customer email exists
     async with db_engine.connect() as conn:
         assert (await conn.execute(text("SELECT count(*) FROM notifications"))).scalar() == 0
+
+
+async def test_admin_list_signs_pictures_concurrently_not_one_by_one(client, admin_h, storage):
+    import asyncio
+    import time
+
+    for i in range(6):
+        await submit(client, reference_image_path=f"custom-orders/{str(i) * 32}.jpg")
+    active = {"now": 0, "peak": 0}
+
+    async def slow_sign(path, bucket, expires_in=3600):
+        active["now"] += 1
+        active["peak"] = max(active["peak"], active["now"])
+        await asyncio.sleep(0.2)
+        active["now"] -= 1
+        return f"https://down.example/{bucket}/{path}"
+
+    storage.create_signed_download = slow_sign
+    started = time.perf_counter()
+    r = await client.get(ADMIN, headers=admin_h)
+    elapsed = time.perf_counter() - started
+    assert r.status_code == 200 and all(i["reference_image_url"] for i in r.json()["items"])
+    assert active["peak"] > 1  # overlapped
+    assert elapsed < 0.2 * 6  # six sequential calls would take 1.2 s

@@ -1,5 +1,6 @@
 """Admin routes for reviews, gallery, custom orders and contact messages (admin-only)."""
 
+import asyncio
 import uuid
 from typing import Annotated
 
@@ -132,7 +133,8 @@ async def list_custom_orders(
     rows, total = await custom_service.list_admin(
         session, custom_status=status, search=search, page=page, page_size=page_size
     )
-    items = [await custom_service.to_admin_read(c, storage) for c in rows]
+    # one signed-link request per picture: send them all at once, not one after another
+    items = list(await asyncio.gather(*(custom_service.to_admin_read(c, storage) for c in rows)))
     return catalog_service.paginate(items, total, page, page_size)
 
 

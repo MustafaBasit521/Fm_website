@@ -8,6 +8,7 @@ from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.core.payments.base import PaymentProvider, WebhookError
 from app.core.payments.registry import get_payment_provider
+from app.core.rate_limit import rate_limit
 from app.schemas.orders import InitiatePayment, PaymentStatusRead
 from app.services import payments as service
 
@@ -21,13 +22,21 @@ AppSettings = Annotated[Settings, Depends(get_settings)]
 # These two routes are public so guests can pay too. The (unguessable) order id is the
 # capability; they reveal nothing beyond the order/payment status, and only the provider's
 # verified answer ever changes state.
-@router.post("/orders/{order_id}/pay", response_model=InitiatePayment)
+@router.post(
+    "/orders/{order_id}/pay",
+    response_model=InitiatePayment,
+    dependencies=[Depends(rate_limit("pay", 20, 3600))],
+)
 async def pay(order_id: uuid.UUID, session: Session, provider: Provider, settings: AppSettings):
     """Start paying for an online order. Redirect the customer to `redirect_url`."""
     return await service.initiate_payment(session, provider, settings, order_id)
 
 
-@router.post("/orders/{order_id}/payment/refresh", response_model=PaymentStatusRead)
+@router.post(
+    "/orders/{order_id}/payment/refresh",
+    response_model=PaymentStatusRead,
+    dependencies=[Depends(rate_limit("payment-refresh", 60, 60))],
+)
 async def refresh(order_id: uuid.UUID, session: Session, provider: Provider):
     """The customer returned from the gateway: verify with the provider and report the status."""
     return await service.refresh_payment(session, provider, order_id)
