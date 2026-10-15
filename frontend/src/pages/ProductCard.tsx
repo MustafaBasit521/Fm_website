@@ -1,38 +1,37 @@
 import { Link } from 'react-router-dom'
 import type { ProductSummary } from '../lib/api'
 import { formatPrice } from '../lib/money'
+import { stockLabel } from './stock'
 
 export function ProductCard({ product }: { product: ProductSummary }) {
+  const stock = stockLabel(product)
   return (
-    <div className="overflow-hidden rounded-xl border border-sand bg-white">
+    <div>
       <Link
         to={`/shop/${product.product_id}`}
-        className="block focus-visible:outline-2 focus-visible:outline-terracotta"
+        className="group block rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-terracotta"
       >
         {product.image ? (
           <img
             src={product.image.url}
             alt={product.image.alt_text ?? product.name}
             loading="lazy"
-            className="aspect-square w-full object-cover"
+            className="aspect-[4/5] w-full rounded-2xl bg-cream-200 object-cover transition group-hover:opacity-90"
           />
         ) : (
-          <div className="flex aspect-square items-center justify-center bg-cream-200 text-bark">
+          <div className="flex aspect-[4/5] items-center justify-center rounded-2xl bg-cream-200 text-bark">
             No image
           </div>
         )}
-        <div className="flex flex-col gap-1 p-3">
-          <span className="text-sm text-muted">{product.category.name}</span>
-          <h2 className="font-semibold">{product.name}</h2>
-          <span>{formatPrice(product.price_paisa)}</span>
-          <span className={product.is_available ? 'text-moss-dark' : 'text-danger'}>
-            {product.is_available
-              ? product.availability_type === 'MADE_TO_ORDER'
-                ? 'Made to order'
-                : 'In stock'
-              : 'Currently unavailable'}
-          </span>
+        <p className="mt-3 text-sm text-muted">{product.category.name}</p>
+        <div className="flex flex-nowrap items-baseline justify-between gap-3">
+          <h2 className="font-semibold group-hover:underline">{product.name}</h2>
+          <span className="whitespace-nowrap">{formatPrice(product.price_paisa)}</span>
         </div>
+        <p className="mt-1 flex items-center gap-2 text-sm text-bark">
+          <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${stock.dot}`} />
+          {stock.text}
+        </p>
       </Link>
     </div>
   )

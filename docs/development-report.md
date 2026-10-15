@@ -328,3 +328,15 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Left for deployment or real devices (not verifiable here):** bucket limits on Supabase; phone-size layout; the Vercel root-directory build and the content security policy on live pages; real MFA calls; real Storage calls; pg_cron scheduling.
 
 **Follow-up (owner's phone check):** the home page link row overflowed at 360 px. Cause: flex rows with wide gaps and no wrapping; 24 such rows existed. Fixed all, added `responsive.test.ts` (fails on any new non-wrapping row; proven against a deliberately bad file), and confirmed with headless-Chrome screenshots of the home, shop and contact pages. My earlier code-level responsive check missed this because it looked only for fixed widths.
+
+---
+
+## UI polish — increment 1 (storefront frame and shop page)
+
+**Why:** the owner found the first shop page awkward on a phone (four stacked form fields for search and filters) and pointed to a reference shop: search near the top, filters tucked into a drawer. Decision: keep the project's own mockup (colours, fonts, wording) and adopt only those layout ideas.
+
+**Built:** `ShopLayout` (announcement bar, header, footer, skip link; settings-driven name and contact), `Drawer` (reusable accessible side panel), icons, a rewritten `ShopPage` (category pills, Filters drawer, removable chips, price range converted to paisa with integer parsing), restyled `ProductCard`, a `HomePage` following the mockup. The old per-page cart links were removed (the header has the cart).
+
+**Verified:** 280 frontend tests; axe on every page (the layout now wraps all of them); both builds; the admin bundle contains none of the shop layout; screenshots of the home and shop pages at phone and desktop widths in headless Chrome.
+
+**Notes:** the responsive guard immediately flagged new non-wrapping rows in this very increment; rows that must stay on one line are now marked `flex-nowrap` on purpose. The header is re-created on each page change (keyed by the address) so the menu and search bar start closed. Not verified: real-device behaviour of the drawer; the rest of the shop pages and the whole admin are not yet restyled.

@@ -22,7 +22,13 @@ it('no horizontal flex row with a wide gap is unable to wrap', () => {
         for (const m of line.matchAll(/className=["'`]([^"'`]*)["'`]/g)) {
           const c = m[1].split(/\s+/)
           const row = c.includes('flex') && c.some((x) => /^gap-[3-9]$/.test(x))
-          const safe = c.includes('flex-wrap') || c.includes('flex-col') || c.includes('grid')
+          // `flex-nowrap` means "this row is meant to stay on one line" (e.g. a radio button next to
+          // its label): the author has decided, so it is accepted.
+          const safe =
+            c.includes('flex-wrap') ||
+            c.includes('flex-nowrap') ||
+            c.includes('flex-col') ||
+            c.includes('grid')
           if (row && !safe) offenders.push(`${file.replace(process.cwd() + '/', '')}:${i + 1}`)
         }
       })

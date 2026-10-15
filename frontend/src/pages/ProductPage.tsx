@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { AddToCartButton } from './AddToCartButton'
-import { CartLink } from './CartLink'
 import { ReviewsSection } from './ReviewsSection'
 import { WishlistButton } from './WishlistButton'
 
@@ -39,7 +38,6 @@ export default function ProductPage() {
       <Link to="/shop" className="text-terracotta underline">
         ← Back to shop
       </Link>
-      <CartLink />
     </span>
   )
 

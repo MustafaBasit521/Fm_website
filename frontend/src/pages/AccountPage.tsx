@@ -59,7 +59,7 @@ export default function AccountPage() {
     )
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-4">
+    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-4 px-4">
       <h1 className="font-serif text-4xl">My account</h1>
       <p className="text-muted">{customer.email}</p>
       <nav className="flex flex-wrap gap-4 text-terracotta underline">

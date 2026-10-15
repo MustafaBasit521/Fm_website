@@ -88,6 +88,23 @@ After Phase 6, `business-rules.md` and `database.md` were updated to record ever
 
 ---
 
+# UI Polish (after Phase 10)
+
+Status: **Started.** The owner asked for the storefront to follow the project's own mockup (`UI mockups for craft e-commerce`) with the better layout ideas of a reference shop (search at the top, filters out of the way).
+
+Done in the first increment (shop site only):
+
+* [x] shared storefront frame (`src/shop/ShopLayout.tsx`): announcement bar, header (menu button on phones, nav on desktop, shop name from the business settings, search, wishlist, account, cart with item count), footer with the business contact details, skip-to-content link; replaces the improvised links each page used to carry
+* [x] search: an icon in the header opens a search bar at the top; submitting goes to the shop with the search term (shown as a removable chip)
+* [x] shop page: category pills, a product count and a **Filters** button that opens a side drawer (sort, type, availability, price range in Rs); active filters appear as removable chips with "Clear all"; the URL still holds every filter
+* [x] product cards in the mockup's style (borderless, name and price on one row, availability as dot plus words), and a home page with the mockup's hero wording, promise strip and featured collection (falls back to the newest pieces)
+* [x] accessible drawer (modal dialog, focus moves in and is kept inside, Escape and outside click close it, focus returns, page does not scroll behind it)
+* [x] tests: 280 frontend (adds layout, drawer, shop filters, home page); axe finds no violations on the new frame; the "row cannot wrap" guard now also covers the new code (an explicit `flex-nowrap` marks rows that are meant to stay on one line)
+
+Not done yet: the product page, cart, checkout, account and admin screens still have the plain styling; hero photography (needs real photos); wishlist hearts on product cards; the "About / meet the maker" section of the mockup (no content for it exists); the drawer and header have been checked in headless Chrome screenshots and tests, but not by the owner on real devices.
+
+---
+
 # Technology Stack
 
 ## Frontend

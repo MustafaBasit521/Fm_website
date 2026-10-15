@@ -30,7 +30,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4">
+    <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
       <h1 className="font-serif text-4xl">Log in</h1>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field id="email" name="email" label="Email" type="email" autoComplete="email" required />
