@@ -125,7 +125,7 @@ export default function OrderAdminPage() {
 
             <section
               aria-label="Actions"
-              className="flex flex-col gap-3 rounded-xl border border-sand bg-cream-100 p-4"
+              className="flex flex-col gap-3 rounded-[18px] border border-sand bg-paper p-4"
             >
               <h2 className="text-xl font-semibold">Actions</h2>
               {NEXT[order.status] && (
@@ -298,7 +298,7 @@ export default function OrderAdminPage() {
                 <form
                   onSubmit={onAddress}
                   aria-label="Change delivery address"
-                  className="mt-2 flex flex-col gap-3 rounded-xl border border-sand bg-white p-4"
+                  className="mt-2 flex flex-col gap-3 rounded-[18px] border border-sand bg-paper p-4"
                 >
                   <Field
                     id="recipient_name"

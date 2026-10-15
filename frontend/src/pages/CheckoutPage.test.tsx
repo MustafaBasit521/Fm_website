@@ -86,7 +86,7 @@ it('lets a guest place a COD order: sends the expected total, clears the cart, s
   api.createOrder.mockResolvedValue(order)
   renderCheckout()
   await fillGuestForm()
-  await userEvent.click(screen.getByRole('button', { name: 'Place order' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Place order/ }))
 
   expect(await screen.findByText('confirmation page')).toBeInTheDocument()
   const sent = api.createOrder.mock.calls[0][0]
@@ -112,7 +112,7 @@ it('prefills a registered customer and uses a saved address id', async () => {
   expect(await screen.findByDisplayValue('Reg User')).toBeInTheDocument()
   expect(screen.getByLabelText(/Home, 12-B/)).toBeChecked()
   expect(screen.queryByLabelText('House number')).not.toBeInTheDocument()
-  await userEvent.click(screen.getByRole('button', { name: 'Place order' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Place order/ }))
   await screen.findByText('confirmation page')
   const sent = api.createOrder.mock.calls[0][0]
   expect(sent.delivery.address_id).toBe('a1')
@@ -125,7 +125,7 @@ it('shows the new total when it changed and keeps the cart', async () => {
   )
   renderCheckout()
   await fillGuestForm()
-  await userEvent.click(screen.getByRole('button', { name: 'Place order' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Place order/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent('The total has changed to Rs 3,000')
   expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toHaveLength(1)
 })
@@ -137,7 +137,7 @@ it.each([
   api.createOrder.mockRejectedValue(new ApiError(status, 'x', { code }))
   renderCheckout()
   await fillGuestForm()
-  await userEvent.click(screen.getByRole('button', { name: 'Place order' }))
+  await userEvent.click(screen.getByRole('button', { name: /^Place order/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent(text)
   expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toHaveLength(1)
 })
@@ -146,9 +146,9 @@ it('blocks checkout when the quote has problems', async () => {
   api.getQuote.mockResolvedValue({ ...okQuote, can_checkout: false })
   renderCheckout()
   expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Some items in your cart are unavailable',
+    'Some items in your bag are unavailable',
   )
-  expect(screen.queryByRole('button', { name: 'Place order' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^Place order/ })).not.toBeInTheDocument()
 })
 
 it('offers online payment only when the backend lists it', async () => {
@@ -161,5 +161,17 @@ it('offers online payment only when the backend lists it', async () => {
 it('shows an empty-cart message', () => {
   window.localStorage.clear()
   renderCheckout()
-  expect(screen.getByText(/Your cart is empty/)).toBeInTheDocument()
+  expect(screen.getByText(/Your bag is empty/)).toBeInTheDocument()
+})
+
+it('puts the total on the Place order button and shows payment choices as cards', async () => {
+  api.getQuote.mockResolvedValue({ ...okQuote, payment_methods: ['COD', 'ONLINE'] })
+  renderCheckout()
+  expect(await screen.findByRole('button', { name: 'Place order · Rs 2,701' })).toBeInTheDocument()
+  const cod = screen.getByLabelText('Cash on delivery')
+  expect(cod).toBeChecked()
+  expect(cod.closest('label')).toHaveClass('border-ink') // the chosen card is outlined
+  expect(screen.getByLabelText('Pay online').closest('label')).toHaveClass('border-linen')
+  await userEvent.click(screen.getByLabelText('Pay online'))
+  expect(screen.getByLabelText('Pay online').closest('label')).toHaveClass('border-ink')
 })

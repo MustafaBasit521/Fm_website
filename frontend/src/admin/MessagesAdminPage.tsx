@@ -104,7 +104,10 @@ export default function MessagesAdminPage() {
                   const m = override[original.message_id] ?? original
                   const wa = m.whatsapp_number?.replace(/[^\d]/g, '')
                   return (
-                    <li key={m.message_id} className="rounded-xl border border-sand bg-white p-4">
+                    <li
+                      key={m.message_id}
+                      className="rounded-[18px] border border-sand bg-paper p-4"
+                    >
                       <p className="flex flex-wrap items-center justify-between gap-2">
                         <strong>{m.name}</strong>
                         <span className="flex items-center gap-2">

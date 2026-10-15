@@ -29,7 +29,7 @@ from app.models.enums import (
 )
 from app.models.orders import Order
 
-SHOP = "Crochet Shop"
+DEFAULT_SHOP_NAME = "Bundle of Loops"  # used until the owner sets a name in the settings
 
 _STATUS_EVENTS: dict[OrderStatus, tuple[NotificationType, str, str]] = {
     OrderStatus.CONFIRMED: (
@@ -82,6 +82,14 @@ def _items_text(order: Order) -> str:
     )
 
 
+async def _shop_name(session: AsyncSession) -> str:
+    """The shop name from the business settings, so emails follow what the owner edits there."""
+    name = await session.scalar(
+        select(BusinessSettings.business_name).order_by(BusinessSettings.updated_at.desc()).limit(1)
+    )
+    return name or DEFAULT_SHOP_NAME
+
+
 async def _business_email(session: AsyncSession) -> str | None:
     return await session.scalar(
         select(BusinessSettings.email).order_by(BusinessSettings.updated_at.desc()).limit(1)
@@ -109,15 +117,17 @@ def _notify(
 
 
 async def _alert_shop(session: AsyncSession, subject: str, body: str) -> None:
+    shop = await _shop_name(session)
     to = await _business_email(session)
     if to:
-        queue_email(session, EmailMessage(to=to, subject=f"[{SHOP}] {subject}", body=body))
+        queue_email(session, EmailMessage(to=to, subject=f"[{shop}] {subject}", body=body))
 
 
 # ---- orders --------------------------------------------------------------------------------
 
 
 async def order_placed(session: AsyncSession, order: Order) -> None:
+    shop = await _shop_name(session)
     ref = short_ref(order)
     total = format_price(order.total_amount_paisa)
     _notify(
@@ -145,7 +155,7 @@ async def order_placed(session: AsyncSession, order: Order) -> None:
                 f"Delivery: {format_price(order.delivery_fee_paisa)}\n"
                 f"Total: {total}\n\n{payment_line}\n\n"
                 f"Delivering to: {order.delivery_name}, {order.delivery_house_no}, "
-                f"{order.delivery_city}, {order.delivery_postal_code}\n\n- {SHOP}"
+                f"{order.delivery_city}, {order.delivery_postal_code}\n\n- {shop}"
             ),
         ),
     )
@@ -160,6 +170,7 @@ async def order_placed(session: AsyncSession, order: Order) -> None:
 async def order_status_changed(
     session: AsyncSession, order: Order, new_status: OrderStatus
 ) -> None:
+    shop = await _shop_name(session)
     event = _STATUS_EVENTS.get(new_status)
     if event is None:
         return  # Pending is the starting state; nothing to announce
@@ -171,12 +182,13 @@ async def order_status_changed(
         EmailMessage(
             to=order.customer_email,
             subject=f"{title} - order {ref}",
-            body=f"Hi {order.customer_name},\n\n{text}\n\nOrder: {ref}\n\n- {SHOP}",
+            body=f"Hi {order.customer_name},\n\n{text}\n\nOrder: {ref}\n\n- {shop}",
         ),
     )
 
 
 async def payment_received(session: AsyncSession, order: Order, *, late: bool = False) -> None:
+    shop = await _shop_name(session)
     ref = short_ref(order)
     total = format_price(order.total_amount_paisa)
     if late:
@@ -192,12 +204,13 @@ async def payment_received(session: AsyncSession, order: Order, *, late: bool = 
         EmailMessage(
             to=order.customer_email,
             subject=f"Payment received - order {ref}",
-            body=f"Hi {order.customer_name},\n\n{text}\n\n- {SHOP}",
+            body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
         ),
     )
 
 
 async def payment_failed(session: AsyncSession, order: Order) -> None:
+    shop = await _shop_name(session)
     ref = short_ref(order)
     text = (
         f"Your payment for order {ref} did not go through. You can try again while the order is "
@@ -209,7 +222,7 @@ async def payment_failed(session: AsyncSession, order: Order) -> None:
         EmailMessage(
             to=order.customer_email,
             subject=f"Payment failed - order {ref}",
-            body=f"Hi {order.customer_name},\n\n{text}\n\n- {SHOP}",
+            body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
         ),
     )
 
@@ -227,6 +240,7 @@ async def _customer_email(session: AsyncSession, custom_order: CustomOrder) -> s
 
 
 async def custom_order_received(session: AsyncSession, custom_order: CustomOrder) -> None:
+    shop = await _shop_name(session)
     text = _CUSTOM_STATUS_TEXT[CustomOrderStatus.NEW]
     _notify(
         session,
@@ -244,7 +258,7 @@ async def custom_order_received(session: AsyncSession, custom_order: CustomOrder
                 subject="We received your custom order request",
                 body=(
                     f"Hi {custom_order.name},\n\n{text} We will contact you on WhatsApp."
-                    f"\n\n- {SHOP}"
+                    f"\n\n- {shop}"
                 ),
             ),
         )
@@ -257,6 +271,7 @@ async def custom_order_received(session: AsyncSession, custom_order: CustomOrder
 
 
 async def custom_order_status_changed(session: AsyncSession, custom_order: CustomOrder) -> None:
+    shop = await _shop_name(session)
     text = _CUSTOM_STATUS_TEXT[custom_order.status]
     _notify(
         session,
@@ -272,7 +287,7 @@ async def custom_order_status_changed(session: AsyncSession, custom_order: Custo
             EmailMessage(
                 to=email,
                 subject="Update on your custom order",
-                body=f"Hi {custom_order.name},\n\n{text}\n\n- {SHOP}",
+                body=f"Hi {custom_order.name},\n\n{text}\n\n- {shop}",
             ),
         )
 

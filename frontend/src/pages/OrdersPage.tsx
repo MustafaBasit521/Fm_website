@@ -53,7 +53,7 @@ export default function OrdersPage() {
         <>
           <ul className="mt-6 flex flex-col gap-3">
             {data.items.map((o) => (
-              <li key={o.order_id} className="rounded-xl border border-sand bg-white p-4">
+              <li key={o.order_id} className="rounded-[18px] border border-sand bg-paper p-4">
                 <Link
                   to={`/orders/${o.order_id}`}
                   className="flex flex-col gap-1 focus-visible:outline-2 focus-visible:outline-terracotta"
@@ -79,7 +79,7 @@ export default function OrdersPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -90,7 +90,7 @@ export default function OrdersPage() {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>

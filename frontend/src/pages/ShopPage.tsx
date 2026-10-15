@@ -29,7 +29,7 @@ const FILTER_KEYS = ['availability', 'available_only', 'sort', 'min_price', 'max
 
 const pill = (active: boolean) =>
   `whitespace-nowrap rounded-full border px-4 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta ${
-    active ? 'border-ink bg-ink text-cream' : 'border-sand bg-white hover:bg-cream-200'
+    active ? 'border-ink bg-ink text-cream' : 'border-sand bg-paper hover:bg-cream-200'
   }`
 
 export default function ShopPage() {
@@ -344,7 +344,7 @@ export default function ShopPage() {
                       ? paisaToRupeesInput(Number(params.get('min_price')))
                       : ''
                   }
-                  className="mt-1 w-full rounded-lg border border-sand bg-white px-3 py-2"
+                  className="mt-1 w-full rounded-[10px] border border-linen bg-paper px-4 py-3"
                 />
               </div>
               <div className="flex-1">
@@ -360,7 +360,7 @@ export default function ShopPage() {
                       ? paisaToRupeesInput(Number(params.get('max_price')))
                       : ''
                   }
-                  className="mt-1 w-full rounded-lg border border-sand bg-white px-3 py-2"
+                  className="mt-1 w-full rounded-[10px] border border-linen bg-paper px-4 py-3"
                 />
               </div>
             </div>

@@ -19,7 +19,7 @@ function ShopDetails() {
   return (
     <section
       aria-label="Shop details"
-      className="mt-4 rounded-xl border border-sand bg-cream-100 p-4"
+      className="mt-4 rounded-[18px] border border-sand bg-paper p-4"
     >
       <h2 className="text-xl font-semibold">{info.business_name ?? 'Our details'}</h2>
       <ul className="mt-2 flex flex-col gap-1">
@@ -136,7 +136,7 @@ export default function ContactPage() {
             rows={5}
             maxLength={3000}
             required
-            className="rounded-lg border border-sand px-3 py-2"
+            className="rounded-[10px] border border-linen bg-paper px-4 py-3"
           />
         </div>
         <FormError message={error} />

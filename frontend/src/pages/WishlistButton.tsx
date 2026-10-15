@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
+import { HeartIcon } from '../shop/icons'
+import { secondaryButtonClass } from './ui'
 import { addToWishlist, ApiError, getWishlistIds, removeFromWishlist } from '../lib/api'
 
 /** Wishlist is for registered customers only: signed-out visitors are pointed to log in. */
@@ -57,9 +59,10 @@ export function WishlistButton({ productId }: { productId: string }) {
         aria-pressed={saved}
         disabled={!known}
         onClick={() => void toggle()}
-        className="rounded-lg border border-terracotta px-4 py-2 text-terracotta hover:bg-cream-100 disabled:opacity-50"
+        className={`${secondaryButtonClass} w-full ${saved ? 'border-terracotta text-terracotta' : ''}`}
       >
-        {saved ? '♥ Saved to wishlist' : '♡ Add to wishlist'}
+        <HeartIcon fill={saved ? 'currentColor' : 'none'} />
+        {saved ? 'Saved to wishlist' : 'Add to wishlist'}
       </button>
       {error && (
         <p role="alert" className="mt-1 text-danger">

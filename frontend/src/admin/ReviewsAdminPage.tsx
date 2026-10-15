@@ -28,7 +28,7 @@ export default function ReviewsAdminPage() {
             <>
               <ul className="flex flex-col gap-3">
                 {data.items.map((r) => (
-                  <li key={r.review_id} className="rounded-xl border border-sand bg-white p-4">
+                  <li key={r.review_id} className="rounded-[18px] border border-sand bg-paper p-4">
                     <p className="flex flex-wrap justify-between gap-2">
                       <span>
                         <strong>{r.product_name_snapshot}</strong> —{' '}

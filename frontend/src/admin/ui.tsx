@@ -19,7 +19,7 @@ export function Pager({
         type="button"
         disabled={page <= 1}
         onClick={() => onPage(page - 1)}
-        className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+        className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
       >
         Previous
       </button>
@@ -30,7 +30,7 @@ export function Pager({
         type="button"
         disabled={page >= pages}
         onClick={() => onPage(page + 1)}
-        className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+        className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
       >
         Next
       </button>
@@ -63,13 +63,11 @@ export function State({
 }
 
 export const Badge = ({ children }: { children: ReactNode }) => (
-  <span className="rounded-full border border-sand bg-cream-100 px-2 py-0.5 text-sm">
-    {children}
-  </span>
+  <span className="rounded-full border border-sand bg-paper px-2 py-0.5 text-sm">{children}</span>
 )
 
 export const inputClass =
-  'rounded-lg border border-sand bg-white px-3 py-2 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta'
+  'rounded-[10px] border border-linen bg-paper px-4 py-3 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta'
 
 /** A button that needs a second click ("Are you sure?") before running a destructive action. */
 export function ConfirmButton({

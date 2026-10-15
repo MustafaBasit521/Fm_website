@@ -67,7 +67,7 @@ export default function CategoriesAdminPage() {
             {data?.map((c) => (
               <li
                 key={c.category_id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-sand bg-white p-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-sand bg-paper p-3"
               >
                 {editing === c.category_id ? (
                   <form

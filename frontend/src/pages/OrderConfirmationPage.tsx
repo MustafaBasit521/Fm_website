@@ -35,7 +35,7 @@ export default function OrderConfirmationPage() {
       </p>
 
       {order.payment_method === 'ONLINE' && order.payment_status === 'PENDING' && (
-        <div className="mt-4 flex flex-col gap-2 rounded-xl border border-sand bg-cream-100 p-4">
+        <div className="mt-4 flex flex-col gap-2 rounded-[18px] border border-sand bg-paper p-4">
           <p>
             Please complete your payment within 30 minutes
             {order.payment_deadline_at

@@ -287,7 +287,7 @@ export default function ProductFormPage() {
                 {current.images.map((img) => (
                   <li
                     key={img.image_id}
-                    className="flex flex-wrap items-center gap-3 rounded-xl border border-sand bg-white p-3"
+                    className="flex flex-wrap items-center gap-3 rounded-[18px] border border-sand bg-paper p-3"
                   >
                     <img
                       src={img.url}

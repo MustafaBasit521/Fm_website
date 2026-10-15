@@ -106,7 +106,7 @@ export default function AddressesPage() {
       )}
       <ul className="mt-6 flex flex-col gap-3">
         {addresses.map((a) => (
-          <li key={a.address_id} className="rounded-xl border border-sand bg-white p-4">
+          <li key={a.address_id} className="rounded-[18px] border border-sand bg-paper p-4">
             {a.label && <p className="font-semibold">{a.label}</p>}
             <p>
               {[a.house_no, a.street_number, a.city, a.province, a.postal_code, a.country]
@@ -173,7 +173,7 @@ export default function AddressesPage() {
         <form
           key={initial?.address_id ?? 'new'}
           onSubmit={onSubmit}
-          className="mt-6 flex flex-col gap-4 rounded-xl border border-sand bg-white p-4"
+          className="mt-6 flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-4"
           aria-label={editing.mode === 'new' ? 'New address' : 'Edit address'}
         >
           <Field

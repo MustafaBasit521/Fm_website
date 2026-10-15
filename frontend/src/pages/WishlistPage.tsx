@@ -106,7 +106,7 @@ export default function WishlistPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -117,7 +117,7 @@ export default function WishlistPage() {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>

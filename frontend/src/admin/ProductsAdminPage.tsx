@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getAdminCategories, getAdminProducts } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
+import { buttonClass } from '../pages/ui'
 import { inputClass } from './styles'
 import { Badge, Pager, State } from './ui'
 import { useLoad } from './useLoad'
@@ -20,10 +21,7 @@ export default function ProductsAdminPage() {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-4xl">Products</h1>
-        <Link
-          to="/products/new"
-          className="rounded-lg bg-terracotta px-4 py-2 font-semibold text-white"
-        >
+        <Link to="/products/new" className={buttonClass}>
           Add product
         </Link>
       </div>
@@ -84,7 +82,7 @@ export default function ProductsAdminPage() {
               <p className="text-muted">{data.total} products</p>
               <ul className="mt-2 flex flex-col gap-2">
                 {data.items.map((p) => (
-                  <li key={p.product_id} className="rounded-xl border border-sand bg-white p-3">
+                  <li key={p.product_id} className="rounded-[18px] border border-sand bg-paper p-3">
                     <Link
                       to={`/products/${p.product_id}`}
                       className="flex flex-wrap items-center justify-between gap-2"

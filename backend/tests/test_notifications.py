@@ -286,3 +286,27 @@ async def test_saved_address_order_still_notifies(client, make_product, alice):
     )
     assert r.status_code == 201
     assert await types(client, alice) == ["ORDER_PLACED"]
+
+
+async def test_emails_use_the_shop_name_from_the_settings(client, make_product, emails, db_engine):
+    a = await make_product(stock_quantity=5)
+    await set_shop_email(db_engine)
+    await place(client, [(a["product_id"], 1)])
+    assert "- Test Shop" in emails.to("ayesha@example.com")[0].body  # the name in the settings
+    assert emails.to(SHOP_EMAIL)[0].subject.startswith("[Test Shop]")
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET business_name = 'Loop & Co'"))
+    emails.sent.clear()
+    await place(client, [(a["product_id"], 1)])
+    assert "- Loop & Co" in emails.to("ayesha@example.com")[0].body
+    assert emails.to(SHOP_EMAIL)[0].subject.startswith("[Loop & Co]")
+
+
+async def test_emails_fall_back_to_the_default_name_when_no_name_is_set(
+    client, make_product, emails, db_engine
+):
+    a = await make_product(stock_quantity=5)
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET business_name = NULL"))
+    await place(client, [(a["product_id"], 1)])
+    assert "- Bundle of Loops" in emails.to("ayesha@example.com")[0].body

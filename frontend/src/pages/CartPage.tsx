@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../cart/context'
 import { getQuote, type Quote, type QuoteLine } from '../lib/api'
-import { MAX_LINE_QUANTITY } from '../lib/cart'
 import { formatPrice } from '../lib/money'
-import { buttonClass } from './ui'
+import { QuantityStepper } from './QuantityStepper'
+import { buttonClass, secondaryButtonClass } from './ui'
 
 function issueText(line: QuoteLine): string | null {
   if (line.issue === 'NOT_FOUND') return 'This product is no longer available.'
@@ -35,12 +35,14 @@ export default function CartPage() {
 
   if (items.length === 0) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Your cart</h1>
-        <p className="mt-4">Your cart is empty.</p>
-        <p className="mt-2">
-          <Link to="/shop" className="text-terracotta underline">
-            Browse the shop
+      <main className="mx-auto max-w-3xl px-4 py-12 text-center">
+        <h1 className="font-serif text-5xl">Your bag is empty</h1>
+        <p className="mt-3 text-bark">
+          Nothing here yet — the newest pieces are waiting in the shop.
+        </p>
+        <p className="mt-6">
+          <Link to="/shop" className={secondaryButtonClass}>
+            Browse the collection
           </Link>
         </p>
       </main>
@@ -51,11 +53,8 @@ export default function CartPage() {
   const quote = current?.quote ?? null
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link to="/shop" className="text-terracotta underline">
-        ← Continue shopping
-      </Link>
-      <h1 className="mt-2 font-serif text-4xl">Your cart</h1>
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <h1 className="font-serif text-5xl">Your bag</h1>
 
       {!current && (
         <p role="status" className="mt-6">
@@ -64,94 +63,122 @@ export default function CartPage() {
       )}
       {current && !quote && (
         <p role="alert" className="mt-6 text-danger">
-          Could not load your cart. Please try again.
+          Could not load your bag. Please try again.
         </p>
       )}
 
       {quote && (
-        <>
-          <ul className="mt-6 flex flex-col gap-4">
+        <div className="mt-6 grid items-start gap-8 md:grid-cols-[1fr_20rem]">
+          <ul className="flex flex-col gap-4">
             {quote.lines.map((line) => {
               const problem = issueText(line)
+              const name = line.name ?? 'product'
               return (
                 <li
                   key={line.product_id}
-                  className="flex flex-col gap-2 rounded-xl border border-sand bg-white p-4"
+                  className="flex flex-nowrap gap-4 rounded-[18px] border border-sand bg-paper p-4"
                 >
-                  <div className="flex flex-wrap justify-between gap-4">
-                    <span className="font-semibold">{line.name ?? 'Unavailable product'}</span>
-                    {line.line_total_paisa !== null && (
-                      <span>{formatPrice(line.line_total_paisa)}</span>
+                  {line.image ? (
+                    <img
+                      src={line.image.url}
+                      alt=""
+                      className="h-24 w-20 shrink-0 rounded-[10px] bg-cream-200 object-cover"
+                    />
+                  ) : (
+                    <div
+                      aria-hidden="true"
+                      className="h-24 w-20 shrink-0 rounded-[10px] bg-cream-200"
+                    />
+                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex flex-nowrap justify-between gap-3">
+                      <span className="font-semibold">{line.name ?? 'Unavailable product'}</span>
+                      {line.line_total_paisa !== null && (
+                        <span className="whitespace-nowrap font-semibold">
+                          {formatPrice(line.line_total_paisa)}
+                        </span>
+                      )}
+                    </div>
+                    {line.unit_price_paisa !== null && (
+                      <span className="text-sm text-muted">
+                        {formatPrice(line.unit_price_paisa)} each
+                      </span>
                     )}
-                  </div>
-                  {line.unit_price_paisa !== null && (
-                    <span className="text-sm text-muted">
-                      {formatPrice(line.unit_price_paisa)} each
-                    </span>
-                  )}
-                  {problem && (
-                    <p role="alert" className="text-danger">
-                      {problem}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-4">
-                    {line.issue !== 'NOT_FOUND' && (
-                      <label className="flex items-center gap-2">
-                        Quantity
-                        <input
-                          type="number"
-                          min={1}
-                          max={MAX_LINE_QUANTITY}
+                    {problem && (
+                      <p
+                        role="alert"
+                        className="rounded-[10px] bg-accent-tint px-3 py-2 text-danger"
+                      >
+                        {problem}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      {line.issue !== 'NOT_FOUND' && (
+                        <QuantityStepper
                           value={line.quantity}
-                          aria-label={`Quantity for ${line.name ?? 'product'}`}
-                          onChange={(e) => {
-                            const n = Number(e.target.value)
-                            if (Number.isFinite(n)) setQuantity(line.product_id, n)
-                          }}
-                          className="w-20 rounded-lg border border-sand px-2 py-1"
+                          label={name}
+                          onChange={(n) => setQuantity(line.product_id, n)}
                         />
-                      </label>
-                    )}
-                    {line.issue === 'EXCEEDS_AVAILABLE' && line.max_quantity && (
+                      )}
+                      {line.issue === 'EXCEEDS_AVAILABLE' && line.max_quantity && (
+                        <button
+                          type="button"
+                          className="text-terracotta underline"
+                          onClick={() => setQuantity(line.product_id, line.max_quantity!)}
+                        >
+                          Reduce to {line.max_quantity}
+                        </button>
+                      )}
                       <button
                         type="button"
-                        className="text-terracotta underline"
-                        onClick={() => setQuantity(line.product_id, line.max_quantity!)}
+                        className="text-sm text-bark underline"
+                        aria-label={`Remove ${name} from bag`}
+                        onClick={() => remove(line.product_id)}
                       >
-                        Reduce to {line.max_quantity}
+                        Remove
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="text-danger underline"
-                      aria-label={`Remove ${line.name ?? 'product'} from cart`}
-                      onClick={() => remove(line.product_id)}
-                    >
-                      Remove
-                    </button>
+                    </div>
                   </div>
                 </li>
               )
             })}
           </ul>
 
-          <dl className="mt-6 grid grid-cols-2 gap-1 text-right">
-            <dt className="text-left">Subtotal</dt>
-            <dd>{formatPrice(quote.subtotal_paisa)}</dd>
-            <dt className="text-left">Delivery (Lahore)</dt>
-            <dd>{formatPrice(quote.delivery_fee_paisa)}</dd>
-            <dt className="text-left font-semibold">Total</dt>
-            <dd className="font-semibold">{formatPrice(quote.total_paisa)}</dd>
-          </dl>
-
-          {quote.can_checkout ? (
-            <Link to="/checkout" className={`${buttonClass} mt-6 inline-block`}>
-              Proceed to checkout
-            </Link>
-          ) : (
-            <p className="mt-6 text-muted">Fix the items above to continue to checkout.</p>
-          )}
-        </>
+          <aside
+            aria-label="Order summary"
+            className="rounded-[18px] border border-sand bg-paper p-5 md:sticky md:top-24"
+          >
+            <dl className="flex flex-col gap-2">
+              <div className="flex flex-nowrap justify-between gap-4">
+                <dt>Subtotal</dt>
+                <dd>{formatPrice(quote.subtotal_paisa)}</dd>
+              </div>
+              <div className="flex flex-nowrap justify-between gap-4">
+                <dt>Delivery in Lahore</dt>
+                <dd>{formatPrice(quote.delivery_fee_paisa)}</dd>
+              </div>
+              <div className="flex flex-nowrap justify-between gap-4 border-t border-sand pt-3 text-lg font-semibold">
+                <dt>Total</dt>
+                <dd>{formatPrice(quote.total_paisa)}</dd>
+              </div>
+            </dl>
+            {quote.can_checkout ? (
+              <Link to="/checkout" className={`${buttonClass} mt-5 w-full`}>
+                Proceed to checkout
+              </Link>
+            ) : (
+              <p className="mt-5 text-bark">Fix the items on the left to continue to checkout.</p>
+            )}
+            <p className="mt-3 text-sm text-bark">
+              Cash on Delivery or online payment · Lahore only
+            </p>
+            <p className="mt-3">
+              <Link to="/shop" className="text-sm text-terracotta underline">
+                Continue shopping
+              </Link>
+            </p>
+          </aside>
+        </div>
       )}
     </main>
   )

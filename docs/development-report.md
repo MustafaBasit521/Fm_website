@@ -340,3 +340,17 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Verified:** 280 frontend tests; axe on every page (the layout now wraps all of them); both builds; the admin bundle contains none of the shop layout; screenshots of the home and shop pages at phone and desktop widths in headless Chrome.
 
 **Notes:** the responsive guard immediately flagged new non-wrapping rows in this very increment; rows that must stay on one line are now marked `flex-nowrap` on purpose. The header is re-created on each page change (keyed by the address) so the menu and search bar start closed. Not verified: real-device behaviour of the drawer; the rest of the shop pages and the whole admin are not yet restyled.
+
+---
+
+## UI polish — increment 2 (design system, product page, bag, checkout, shop name)
+
+**Owner's questions:** rename the shop to "Bundle of Loops" with the italic orange "of", and whether the UI follows the mockups. Honest answer after reading the mockups: only partly, so this increment aligned the design system itself.
+
+**Findings from the mockups:** Paper and Cream roles were swapped in the first build; buttons are pills; inputs 10 px with a dashed focus ring; cards 18 px; the product flow uses "bag" wording, a quantity stepper and "Place order · total". Some mockup copy states business rules that do not exist (free delivery over Rs 3,000, 2–4 day delivery, newsletter, journal), so it was not reproduced.
+
+**Built:** colour tokens and page/paper roles, shared pill/input classes (`buttonClass`, `primaryButtonClass`, `secondaryButtonClass`, `inputClass`) used by the shop and the admin, `ShopName` (logo with italic "of"), `QuantityStepper`, restyled product page, bag page and checkout, "bag" wording. Backend: emails now take the shop name from the business settings (default "Bundle of Loops") instead of a hard-coded name.
+
+**Verified:** 292 frontend and 445 backend tests, contrast matrix (page/paper/footer surfaces × all text colours), axe on all pages, builds, and Chrome screenshots of product, bag, checkout, filters and menu at phone and desktop sizes (via a throw-away automation tool in a scratch folder, not added to the project).
+
+**Notes:** a visual check found a broken divider in the summary box (grid gap) and default-blue radio buttons: both fixed. The live Supabase settings still hold the old name until the owner edits it.

@@ -96,7 +96,7 @@ export default function OrdersAdminPage() {
               <p className="text-muted">{data.total} orders</p>
               <ul className="mt-2 flex flex-col gap-2">
                 {data.items.map((o) => (
-                  <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
+                  <li key={o.order_id} className="rounded-[18px] border border-sand bg-paper p-3">
                     <Link
                       to={`/orders/${o.order_id}`}
                       className="flex flex-wrap justify-between gap-2"

@@ -90,18 +90,26 @@ After Phase 6, `business-rules.md` and `database.md` were updated to record ever
 
 # UI Polish (after Phase 10)
 
-Status: **Started.** The owner asked for the storefront to follow the project's own mockup (`UI mockups for craft e-commerce`) with the better layout ideas of a reference shop (search at the top, filters out of the way).
+Status: **In progress.** The owner asked for the storefront to follow the project's own mockup (`UI mockups for craft e-commerce`: `Design System.dc.html`, `Home.dc.html`, `Admin Dashboard.dc.html`) with the better layout ideas of a reference shop (search at the top, filters out of the way).
 
-Done in the first increment (shop site only):
+Done — shop site:
 
-* [x] shared storefront frame (`src/shop/ShopLayout.tsx`): announcement bar, header (menu button on phones, nav on desktop, shop name from the business settings, search, wishlist, account, cart with item count), footer with the business contact details, skip-to-content link; replaces the improvised links each page used to carry
-* [x] search: an icon in the header opens a search bar at the top; submitting goes to the shop with the search term (shown as a removable chip)
-* [x] shop page: category pills, a product count and a **Filters** button that opens a side drawer (sort, type, availability, price range in Rs); active filters appear as removable chips with "Clear all"; the URL still holds every filter
-* [x] product cards in the mockup's style (borderless, name and price on one row, availability as dot plus words), and a home page with the mockup's hero wording, promise strip and featured collection (falls back to the newest pieces)
-* [x] accessible drawer (modal dialog, focus moves in and is kept inside, Escape and outside click close it, focus returns, page does not scroll behind it)
-* [x] tests: 280 frontend (adds layout, drawer, shop filters, home page); axe finds no violations on the new frame; the "row cannot wrap" guard now also covers the new code (an explicit `flex-nowrap` marks rows that are meant to stay on one line)
+* [x] design-system alignment: page colour is Cream `#F5EFE6`, cards/inputs/panels Paper `#FBF8F3` (these two were swapped before), new tokens (linen, accent hover/tint, attention); pill buttons 48 px (dark = main action, accent = commit actions such as Add to bag / Place order, outlined = secondary); inputs with 10 px corners and the dashed "stitched" focus ring; 18 px cards; dark radio/checkbox colour
+* [x] storefront frame (`src/shop/ShopLayout.tsx`): announcement bar, header (menu on phones, nav on desktop, search, wishlist, account, bag with count), footer with contact details from the settings, skip link; the shop name is shown as the logo with the italic orange "of" (`ShopName`), taken from the business settings (fallback "Bundle of Loops"), also used in emails
+* [x] search (icon in the header opens a search bar), shop page (category pills, product count, Filters drawer, removable filter chips), product cards in the mockup style, home page (hero wording, promise strip, featured collection)
+* [x] product page: large image with thumbnails, category eyebrow, price, availability dot and words, quantity stepper, "Add to bag · total" and a wishlist button
+* [x] "Your bag" page: line cards with image, stepper and Remove, order summary beside them (Subtotal, Delivery in Lahore, Total) and "Proceed to checkout"
+* [x] checkout: contact, delivery and payment as cards (payment and saved addresses as selectable cards), order summary with "Place order · total"
+* [x] wording follows the mockup: "bag" instead of "cart" on screen (URLs and code names unchanged)
+* [x] accessible drawer; colour-contrast matrix over every text colour on every surface (passes AA); axe on every page; guards: no non-wrapping rows (`flex-nowrap` marks deliberate ones)
+* [x] tests: 292 frontend
 
-Not done yet: the product page, cart, checkout, account and admin screens still have the plain styling; hero photography (needs real photos); wishlist hearts on product cards; the "About / meet the maker" section of the mockup (no content for it exists); the drawer and header have been checked in headless Chrome screenshots and tests, but not by the owner on real devices.
+Not done yet:
+
+* order confirmation, orders list/detail, account, addresses, wishlist, notifications, reviews, gallery, custom order, contact, login/register pages keep the new colours and buttons but not yet the mockup's layout; coloured order-status badges (pending/confirmed/...) from the design system; wishlist hearts and quick view on cards; the "meet the maker", studio gallery strip and the studio-letters sign-up of the home mockup; hero photography; the whole admin (it uses the new colours, buttons and inputs, but not the mockup's table/sidebar layout yet)
+* Deliberately NOT copied from the mockup because the business rules do not say so: "Free delivery over Rs 3,000", "Delivered in 2–4 days", a newsletter, a journal/articles section. They can be added if the owner confirms them as rules.
+* Not verified on the owner's own devices (checked with automated tests and Chrome screenshots at phone and desktop widths).
+* The shop name in the live database settings must be changed by the owner (Admin → Settings → Business name, or SQL) to "Bundle of Loops"; the code default is already that name.
 
 ---
 

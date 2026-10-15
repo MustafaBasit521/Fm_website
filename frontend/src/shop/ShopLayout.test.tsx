@@ -50,9 +50,12 @@ beforeEach(() => {
 
 it('shows the shop name from the settings in the header and footer, with contact details', async () => {
   renderLayout()
-  expect(await screen.findByRole('link', { name: 'Bundle of Loops' })).toHaveAttribute('href', '/')
+  const logo = await screen.findByRole('link', { name: 'Bundle of Loops, home' })
+  expect(logo).toHaveAttribute('href', '/')
+  expect(within(logo).getByText('of').tagName).toBe('EM') // the italic accent from the mockup
   const footer = screen.getByRole('contentinfo')
-  expect(within(footer).getByText('Bundle of Loops', { selector: 'p' })).toBeInTheDocument()
+  expect(within(footer).getAllByText(/Loops/, { selector: 'p' }).length).toBeGreaterThan(0)
+  expect(footer.querySelector('em')).toHaveTextContent('of')
   expect(within(footer).getByRole('link', { name: 'WhatsApp' })).toHaveAttribute(
     'href',
     'https://wa.me/923001234567',
@@ -67,7 +70,7 @@ it('shows the shop name from the settings in the header and footer, with contact
 it('still works with a default name when the settings cannot be loaded', async () => {
   getPublicSettings.mockRejectedValue(new Error('x'))
   renderLayout()
-  expect(await screen.findByRole('link', { name: 'Crochet Shop' })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: 'Bundle of Loops, home' })).toBeInTheDocument()
   expect(screen.getByText(/Delivering across Lahore/)).toBeInTheDocument()
 })
 
@@ -89,12 +92,12 @@ it('shows the cart count from the cart in the header', async () => {
     { product_id: 'b', quantity: 1 },
   ])
   renderLayout()
-  expect(screen.getByRole('link', { name: 'Cart, 3 items' })).toHaveAttribute('href', '/cart')
+  expect(screen.getByRole('link', { name: 'Bag, 3 items' })).toHaveAttribute('href', '/cart')
 })
 
 it('has an empty-cart link without a count', () => {
   renderLayout()
-  expect(screen.getByRole('link', { name: 'Cart' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Bag' })).toBeInTheDocument()
 })
 
 it('opens a search bar from the search icon and searches the shop', async () => {

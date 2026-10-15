@@ -23,7 +23,7 @@ export default function AdminLayout() {
     <div className="min-h-screen md:flex">
       <nav
         aria-label="Admin"
-        className="border-b border-sand bg-cream-100 p-4 md:w-56 md:border-b-0 md:border-r"
+        className="border-b border-sand bg-paper p-4 md:w-56 md:border-b-0 md:border-r"
       >
         <p className="font-serif text-2xl">Shop admin</p>
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 md:flex-col md:gap-y-2">

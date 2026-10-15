@@ -22,39 +22,29 @@ export const ratio = (a: string, b: string) => {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-// [text colour, background, where it is used]. WCAG AA needs 4.5:1 for normal text.
+// Every text colour on every surface it can appear on. WCAG AA needs 4.5:1 for normal text.
+//   cream-100 = the page, paper = cards/inputs/panels, cream-200 = footer and placeholder tiles.
+const SURFACES = ['cream-100', 'paper', 'cream-200']
+const TEXT = ['ink', 'bark', 'terracotta', 'danger', 'moss-dark']
 const WHITE = '#ffffff'
-const PAIRS: [string, string, string][] = [
-  ['ink', 'cream', 'body text'],
-  ['ink', 'cream-100', 'text on cards'],
-  ['bark', 'cream', 'form labels'],
-  ['bark', 'cream-100', 'admin menu'],
-  ['muted', 'cream', 'secondary text'],
-  ['muted', 'cream-100', 'secondary text on panels'],
-  ['bark', 'cream-200', 'placeholder tiles ("No image")'],
-  ['terracotta', 'cream', 'links'],
-  ['terracotta', 'cream-100', 'links on panels'],
-  ['danger', 'cream', 'errors'],
-  ['danger', 'cream-100', 'errors on panels'],
-  ['moss-dark', 'cream', 'in-stock labels'],
-]
-const ON_WHITE: [string, string][] = [
-  ['ink', 'text on white cards'],
-  ['muted', 'secondary text on cards'],
-  ['terracotta', 'links on cards'],
-  ['danger', 'errors on cards'],
-  ['moss-dark', 'in-stock label on cards'],
-  ['bark', 'labels on cards'],
-]
 
-it.each(PAIRS)('%s on %s has AA contrast (%s)', (fg, bg) => {
+const MATRIX = SURFACES.flatMap((bg) => TEXT.map((fg) => [fg, bg] as const))
+it.each(MATRIX)('%s text on %s has AA contrast', (fg, bg) => {
   expect(ratio(color(fg), color(bg))).toBeGreaterThanOrEqual(4.5)
 })
-it.each(ON_WHITE)('%s on white has AA contrast (%s)', (fg) => {
-  expect(ratio(color(fg), WHITE)).toBeGreaterThanOrEqual(4.5)
+
+// "muted" (secondary text, placeholders) is only allowed on the lighter surfaces: on the footer
+// colour it falls below AA (4.28:1), so secondary text there must use "bark" instead.
+it.each(['cream-100', 'paper'])('muted text on %s has AA contrast', (bg) => {
+  expect(ratio(color('muted'), color(bg))).toBeGreaterThanOrEqual(4.5)
 })
-it('white text on the terracotta buttons has AA contrast', () => {
-  expect(ratio(WHITE, color('terracotta'))).toBeGreaterThanOrEqual(4.5)
+it('white and cream text on the buttons have AA contrast', () => {
+  expect(ratio(WHITE, color('terracotta'))).toBeGreaterThanOrEqual(4.5) // accent pill
+  expect(ratio(WHITE, color('accent-hover'))).toBeGreaterThanOrEqual(4.5) // its hover
+  expect(ratio(color('paper'), color('ink'))).toBeGreaterThanOrEqual(4.5) // dark pill, header bar
+})
+it('the dashed focus ring (bark) is clearly visible against every surface', () => {
+  for (const bg of SURFACES) expect(ratio(color('bark'), color(bg))).toBeGreaterThanOrEqual(3)
 })
 it('the contrast calculator itself is right (black/white = 21, same colour = 1)', () => {
   expect(ratio('#000000', '#ffffff')).toBeCloseTo(21, 0)

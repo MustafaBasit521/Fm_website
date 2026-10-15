@@ -92,7 +92,10 @@ export default function CustomOrdersPage() {
             {data.items.map((original) => {
               const c = override[original.custom_order_id] ?? original
               return (
-                <li key={c.custom_order_id} className="rounded-xl border border-sand bg-white p-4">
+                <li
+                  key={c.custom_order_id}
+                  className="rounded-[18px] border border-sand bg-paper p-4"
+                >
                   <p className="flex justify-between">
                     <span className="font-semibold">{LABELS[c.status]}</span>
                     <span className="text-sm text-muted">Sent {formatDate(c.created_at)}</span>
@@ -143,7 +146,7 @@ export default function CustomOrdersPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -154,7 +157,7 @@ export default function CustomOrdersPage() {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>

@@ -118,7 +118,7 @@ export default function CustomOrderPage() {
             rows={5}
             maxLength={3000}
             required
-            className="rounded-lg border border-sand px-3 py-2"
+            className="rounded-[10px] border border-linen bg-paper px-4 py-3"
           />
         </div>
         <Field id="budget" name="budget" label="Budget in Rs (optional)" inputMode="decimal" />

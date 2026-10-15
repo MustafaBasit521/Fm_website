@@ -90,7 +90,7 @@ export function MfaStep({ onDone }: { onDone: () => void }) {
               <img
                 src={phase.qr}
                 alt="QR code to scan with your authenticator app"
-                className="mx-auto h-48 w-48 bg-white p-2"
+                className="mx-auto h-48 w-48 bg-paper p-2"
               />
               <p className="text-sm text-muted">
                 Cannot scan? Enter this key in the app instead:{' '}

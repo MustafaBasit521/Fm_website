@@ -91,7 +91,7 @@ export default function NotificationsPage() {
             {data.items.map((n) => (
               <li
                 key={n.notification_id}
-                className={`rounded-xl border p-4 ${isUnread(n) ? 'border-terracotta bg-cream-100' : 'border-sand bg-white'}`}
+                className={`rounded-[18px] border p-4 ${isUnread(n) ? 'border-terracotta bg-paper' : 'border-sand bg-paper'}`}
               >
                 <p className="flex flex-wrap justify-between gap-4">
                   <span className="font-semibold">
@@ -120,7 +120,7 @@ export default function NotificationsPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -131,7 +131,7 @@ export default function NotificationsPage() {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>

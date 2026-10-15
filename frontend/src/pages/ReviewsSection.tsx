@@ -130,7 +130,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
       )}
 
       {state?.review && !editing && (
-        <div className="mt-4 rounded-xl border border-sand bg-cream-100 p-4">
+        <div className="mt-4 rounded-[18px] border border-sand bg-paper p-4">
           <p className="font-semibold">Your review</p>
           <p>
             <Stars rating={state.review.rating} />
@@ -160,7 +160,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
         <form
           onSubmit={onSubmit}
           aria-label="Write a review"
-          className="mt-4 flex flex-col gap-3 rounded-xl border border-sand bg-white p-4"
+          className="mt-4 flex flex-col gap-3 rounded-[18px] border border-sand bg-paper p-4"
         >
           <fieldset className="flex flex-wrap items-center gap-3">
             <legend className="mb-1 font-medium text-bark">Your rating</legend>
@@ -186,7 +186,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
               rows={3}
               maxLength={2000}
               defaultValue={state.review?.comment ?? ''}
-              className="rounded-lg border border-sand px-3 py-2"
+              className="rounded-[10px] border border-linen bg-paper px-4 py-3"
             />
           </div>
           <FormError message={error} />
@@ -234,7 +234,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Previous
               </button>
@@ -245,7 +245,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="rounded-lg border border-sand px-3 py-1 disabled:opacity-40"
+                className="min-h-11 rounded-full border border-linen px-5 py-2 disabled:opacity-40"
               >
                 Next
               </button>

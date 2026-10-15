@@ -6,7 +6,8 @@
 @theme {
   --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
   --font-serif: 'Instrument Serif', serif;
-  --color-cream: #fbf8f3;
+  --color-cream: #fbf8f3; /* kept for existing light-on-dark text; same value as paper */
+  --color-paper: #fbf8f3; /* cards, inputs, panels */
   --color-cream-100: #f5efe6;
   --color-cream-200: #ede3d4;
   --color-sand: #e6dccd;
@@ -17,8 +18,18 @@
   --color-moss: #5f7550;
   --color-moss-dark: #3f5233;
   --color-danger: #b0362f;
+  --color-linen: #ddcdb7; /* strong borders, dashed 'running stitch' lines */
+  --color-accent-hover: #8e3e21;
+  --color-accent-tint: #f3e1d6;
+  --color-attention: #a87a22;
 }
 
 body {
-  @apply bg-cream font-sans text-ink antialiased;
+  @apply bg-cream-100 font-sans text-ink antialiased;
+}
+
+/* Radio buttons and checkboxes use the dark ink colour (as in the design system), not browser blue. */
+input[type='radio'],
+input[type='checkbox'] {
+  accent-color: var(--color-ink);
 }

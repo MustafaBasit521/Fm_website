@@ -7,8 +7,8 @@ import { AddToCartButton } from './AddToCartButton'
 it('adds to the cart and persists it', async () => {
   const { wrap } = makeAuth()
   render(wrap(<AddToCartButton productId="p1" productName="Sunflower" />))
-  await userEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Add to cart' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Add to bag' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Add to bag' }))
   expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toEqual([
     { product_id: 'p1', quantity: 2 },
   ])

@@ -19,7 +19,7 @@ export default function DashboardPage() {
               <section aria-label="Needs attention">
                 <h2 className="text-xl font-semibold">Needs your attention</h2>
                 <ul className="mt-2 grid gap-3 sm:grid-cols-3">
-                  <li className="rounded-xl border border-sand bg-white p-4">
+                  <li className="rounded-[18px] border border-sand bg-paper p-4">
                     <Link to="/orders" className="block">
                       <span className="block text-3xl">{data.orders_needing_action}</span>
                       <span>
@@ -29,13 +29,13 @@ export default function DashboardPage() {
                       </span>
                     </Link>
                   </li>
-                  <li className="rounded-xl border border-sand bg-white p-4">
+                  <li className="rounded-[18px] border border-sand bg-paper p-4">
                     <Link to="/messages" className="block">
                       <span className="block text-3xl">{data.new_messages}</span>
                       <span>{data.new_messages === 1 ? 'new message' : 'new messages'}</span>
                     </Link>
                   </li>
-                  <li className="rounded-xl border border-sand bg-white p-4">
+                  <li className="rounded-[18px] border border-sand bg-paper p-4">
                     <Link to="/custom-orders" className="block">
                       <span className="block text-3xl">{data.new_custom_orders}</span>
                       <span>
@@ -52,7 +52,7 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-semibold">Orders by status</h2>
                 <ul className="mt-2 flex flex-wrap gap-3">
                   {STATUSES.map((s) => (
-                    <li key={s} className="rounded-lg border border-sand bg-white px-3 py-2">
+                    <li key={s} className="rounded-[10px] border border-linen bg-paper px-4 py-3">
                       {statusLabel(s)}: <strong>{data.orders_by_status[s] ?? 0}</strong>
                     </li>
                   ))}
@@ -87,7 +87,10 @@ export default function DashboardPage() {
                 ) : (
                   <ul className="mt-2 flex flex-col gap-2">
                     {data.recent_orders.map((o) => (
-                      <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
+                      <li
+                        key={o.order_id}
+                        className="rounded-[18px] border border-sand bg-paper p-3"
+                      >
                         <Link
                           to={`/orders/${o.order_id}`}
                           className="flex flex-wrap justify-between gap-2"

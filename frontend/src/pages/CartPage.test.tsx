@@ -52,7 +52,7 @@ beforeEach(() => {
 
 it('shows an empty cart without calling the API', () => {
   renderCart()
-  expect(screen.getByText('Your cart is empty.')).toBeInTheDocument()
+  expect(screen.getByText('Your bag is empty')).toBeInTheDocument()
   expect(getQuote).not.toHaveBeenCalled()
 })
 
@@ -103,13 +103,50 @@ it('removes a line', async () => {
   saveCart([{ product_id: 'p1', quantity: 2 }])
   getQuote.mockResolvedValue(quote([line()]))
   renderCart()
-  await userEvent.click(await screen.findByRole('button', { name: 'Remove Sunflower from cart' }))
-  expect(await screen.findByText('Your cart is empty.')).toBeInTheDocument()
+  await userEvent.click(await screen.findByRole('button', { name: 'Remove Sunflower from bag' }))
+  expect(await screen.findByText('Your bag is empty')).toBeInTheDocument()
 })
 
 it('shows an error state', async () => {
   saveCart([{ product_id: 'p1', quantity: 1 }])
   getQuote.mockRejectedValue(new Error('x'))
   renderCart()
-  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your cart')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not load your bag')
+})
+
+it('changes the quantity with the stepper (and the quote follows the new quantity)', async () => {
+  saveCart([{ product_id: 'p1', quantity: 2 }])
+  // like the real server, answer with the quantity that was asked for
+  getQuote.mockImplementation((items: { quantity: number }[]) =>
+    Promise.resolve(quote([line({ quantity: items[0].quantity })])),
+  )
+  renderCart()
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Increase quantity of Sunflower' }),
+  )
+  expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)[0].quantity).toBe(3)
+  await vi.waitFor(() =>
+    expect(getQuote.mock.calls.at(-1)![0]).toEqual([{ product_id: 'p1', quantity: 3 }]),
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Decrease quantity of Sunflower' }))
+  expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)[0].quantity).toBe(2)
+})
+
+it('cannot step below one (the shopper uses Remove instead)', async () => {
+  saveCart([{ product_id: 'p1', quantity: 1 }])
+  getQuote.mockResolvedValue(quote([line({ quantity: 1 })]))
+  renderCart()
+  expect(
+    await screen.findByRole('button', { name: 'Decrease quantity of Sunflower' }),
+  ).toBeDisabled()
+})
+
+it('summarises the order beside the lines and links on to checkout', async () => {
+  saveCart([{ product_id: 'p1', quantity: 2 }])
+  getQuote.mockResolvedValue(quote([line()]))
+  renderCart()
+  const summary = await screen.findByRole('complementary', { name: 'Order summary' })
+  expect(summary).toHaveTextContent('Delivery in Lahore')
+  expect(summary).toHaveTextContent('Cash on Delivery or online payment · Lahore only')
+  expect(summary.querySelector('a[href="/checkout"]')).toHaveTextContent('Proceed to checkout')
 })

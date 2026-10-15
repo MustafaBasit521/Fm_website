@@ -82,3 +82,26 @@ it('shows an error for server failures', async () => {
   renderPage()
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load this product')
 })
+
+it('lets the shopper pick a quantity, shows the total on the button and adds that many to the bag', async () => {
+  getProduct.mockResolvedValue(detail)
+  renderPage()
+  await screen.findByRole('heading', { name: 'Sunflower' })
+  expect(screen.getByRole('button', { name: 'Add to bag · Rs 999' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Increase quantity of Sunflower' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Increase quantity of Sunflower' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Add to bag · Rs 2,997' }))
+  expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toEqual([
+    { product_id: 'p1', quantity: 3 },
+  ])
+  expect(await screen.findByText(/Added to your bag/)).toBeInTheDocument()
+})
+
+it('offers no quantity or add button for an unavailable product', async () => {
+  getProduct.mockResolvedValue({ ...detail, is_available: false })
+  renderPage()
+  await screen.findByRole('heading', { name: 'Sunflower' })
+  expect(screen.queryByRole('group', { name: /Quantity/ })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Unavailable' })).toBeDisabled()
+  expect(screen.getByText('Currently unavailable')).toBeInTheDocument()
+})

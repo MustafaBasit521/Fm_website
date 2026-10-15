@@ -46,7 +46,10 @@ export function CustomersAdminPage() {
               <p className="text-muted">{data.total} customers</p>
               <ul className="mt-2 flex flex-col gap-2">
                 {data.items.map((c) => (
-                  <li key={c.customer_id} className="rounded-xl border border-sand bg-white p-3">
+                  <li
+                    key={c.customer_id}
+                    className="rounded-[18px] border border-sand bg-paper p-3"
+                  >
                     <Link
                       to={`/customers/${c.customer_id}`}
                       className="flex flex-wrap justify-between gap-2"
@@ -105,7 +108,10 @@ export function CustomerAdminPage() {
                 ) : (
                   <ul className="mt-2 flex flex-col gap-2">
                     {data.recent_orders.map((o) => (
-                      <li key={o.order_id} className="rounded-xl border border-sand bg-white p-3">
+                      <li
+                        key={o.order_id}
+                        className="rounded-[18px] border border-sand bg-paper p-3"
+                      >
                         <Link
                           to={`/orders/${o.order_id}`}
                           className="flex flex-wrap justify-between gap-2"

@@ -74,9 +74,9 @@ it('moves a wishlist item to the cart (wishlist -> cart flow)', async () => {
     page([product('p1', 'Rose'), { ...product('p2', 'Tulip'), is_available: false }]),
   )
   renderPage()
-  await userEvent.click(await screen.findByRole('button', { name: 'Add Rose to cart' }))
+  await userEvent.click(await screen.findByRole('button', { name: 'Add Rose to bag' }))
   expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toEqual([
     { product_id: 'p1', quantity: 1 },
   ])
-  expect(screen.getByRole('button', { name: 'Add Tulip to cart' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Add Tulip to bag' })).toBeDisabled()
 })

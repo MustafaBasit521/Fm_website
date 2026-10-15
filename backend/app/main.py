@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
     app = FastAPI(
-        title="Crochet Shop API",
+        title="Bundle of Loops API",
         lifespan=lifespan,
         docs_url=None if settings.is_production else "/docs",
         redoc_url=None,

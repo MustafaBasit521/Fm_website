@@ -1,2 +1,2 @@
-export const inputClass =
-  'rounded-lg border border-sand bg-white px-3 py-2 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta'
+// Admin inputs share the shop's design-system input (10 px corners, dashed focus ring).
+export { inputClass } from '../pages/ui'

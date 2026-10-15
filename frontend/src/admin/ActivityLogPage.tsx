@@ -24,7 +24,7 @@ export default function ActivityLogPage() {
             <>
               <ul className="flex flex-col gap-2">
                 {data.items.map((e) => (
-                  <li key={e.audit_id} className="rounded-xl border border-sand bg-white p-3">
+                  <li key={e.audit_id} className="rounded-[18px] border border-sand bg-paper p-3">
                     <p className="flex flex-wrap justify-between gap-2">
                       <strong className="break-all">{e.action}</strong>
                       <span className={e.status_code >= 400 ? 'text-danger' : ''}>

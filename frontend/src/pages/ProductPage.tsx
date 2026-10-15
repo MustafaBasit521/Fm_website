@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom'
 import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { AddToCartButton } from './AddToCartButton'
+import { QuantityStepper } from './QuantityStepper'
+import { stockLabel } from './stock'
 import { ReviewsSection } from './ReviewsSection'
 import { WishlistButton } from './WishlistButton'
 
@@ -64,62 +66,99 @@ export default function ProductPage() {
       </main>
     )
 
-  const image = product.images[selected]
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8">
+    <main className="mx-auto max-w-5xl px-4 py-8">
       {back}
-      <div className="mt-4 grid gap-8 md:grid-cols-2">
-        <div>
-          {image ? (
-            <img
-              src={image.url}
-              alt={image.alt_text ?? product.name}
-              className="aspect-square w-full rounded-xl object-cover"
-            />
-          ) : (
-            <div className="flex aspect-square items-center justify-center rounded-xl bg-cream-200 text-bark">
-              No image
-            </div>
-          )}
-          {product.images.length > 1 && (
-            <ul className="mt-3 flex gap-2">
-              {product.images.map((img, i) => (
-                <li key={img.image_id}>
-                  <button
-                    type="button"
-                    aria-label={`Show image ${i + 1}`}
-                    aria-pressed={i === selected}
-                    onClick={() => setSelection({ id, index: i })}
-                    className={`overflow-hidden rounded-lg border-2 ${i === selected ? 'border-terracotta' : 'border-sand'}`}
-                  >
-                    <img src={img.url} alt="" className="h-16 w-16 object-cover" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="flex flex-col gap-3">
-          <span className="text-sm text-muted">{product.category.name}</span>
-          <h1 className="font-serif text-4xl">{product.name}</h1>
-          <p className="text-2xl">{formatPrice(product.price_paisa)}</p>
-          <p className={product.is_available ? 'text-moss-dark' : 'text-danger'}>
-            {product.is_available
-              ? product.availability_type === 'MADE_TO_ORDER'
-                ? 'Made to order'
-                : 'In stock'
-              : 'Currently unavailable'}
-          </p>
-          <AddToCartButton
-            productId={product.product_id}
-            productName={product.name}
-            disabled={!product.is_available}
-          />
-          <WishlistButton productId={product.product_id} />
-          {product.description && <p className="whitespace-pre-line">{product.description}</p>}
-        </div>
-      </div>
+      <ProductDetailView
+        key={product.product_id}
+        product={product}
+        selected={selected}
+        onSelect={(i) => setSelection({ id, index: i })}
+      />
       <ReviewsSection productId={product.product_id} />
     </main>
+  )
+}
+
+function ProductDetailView({
+  product,
+  selected,
+  onSelect,
+}: {
+  product: ProductDetail
+  selected: number
+  onSelect: (index: number) => void
+}) {
+  const [quantity, setQuantity] = useState(1)
+  const image = product.images[selected]
+  const stock = stockLabel(product)
+  const total = product.price_paisa * quantity // shown for convenience; the server recalculates at checkout
+
+  return (
+    <div className="mt-6 grid gap-8 md:grid-cols-2 md:gap-12">
+      <div>
+        {image ? (
+          <img
+            src={image.url}
+            alt={image.alt_text ?? product.name}
+            className="aspect-[4/5] w-full rounded-[18px] bg-cream-200 object-cover"
+          />
+        ) : (
+          <div className="flex aspect-[4/5] items-center justify-center rounded-[18px] bg-cream-200 text-bark">
+            No image
+          </div>
+        )}
+        {product.images.length > 1 && (
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {product.images.map((img, i) => (
+              <li key={img.image_id}>
+                <button
+                  type="button"
+                  aria-label={`Show image ${i + 1}`}
+                  aria-pressed={i === selected}
+                  onClick={() => onSelect(i)}
+                  className={`overflow-hidden rounded-[10px] border-2 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-bark ${i === selected ? 'border-ink' : 'border-linen'}`}
+                >
+                  <img src={img.url} alt="" className="h-16 w-16 object-cover" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <p className="text-sm font-medium uppercase tracking-widest text-bark">
+          {product.category.name}
+        </p>
+        <h1 className="font-serif text-5xl leading-tight">{product.name}</h1>
+        <p className="text-2xl font-semibold">{formatPrice(product.price_paisa)}</p>
+        <p className="flex items-center gap-2 text-bark">
+          <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${stock.dot}`} />
+          {stock.text}
+        </p>
+        {product.description && (
+          <p className="whitespace-pre-line text-bark">{product.description}</p>
+        )}
+
+        {product.is_available && (
+          <div className="flex flex-nowrap items-center justify-between gap-4">
+            <span className="font-medium">Quantity</span>
+            <QuantityStepper value={quantity} onChange={setQuantity} label={product.name} />
+          </div>
+        )}
+        <AddToCartButton
+          productId={product.product_id}
+          productName={product.name}
+          disabled={!product.is_available}
+          quantity={quantity}
+          label={`Add to bag · ${formatPrice(total)}`}
+        />
+        <WishlistButton productId={product.product_id} />
+        <p className="text-sm text-bark">
+          Cash on Delivery or secure online payment · Delivered across Lahore
+        </p>
+      </div>
+    </div>
   )
 }

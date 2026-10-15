@@ -134,7 +134,7 @@ export default function OrderDetailPage() {
       {order.payment_method === 'ONLINE' &&
         order.payment_status === 'PENDING' &&
         order.status === 'PENDING' && (
-          <div className="mt-4 flex flex-col gap-2 rounded-xl border border-sand bg-cream-100 p-4">
+          <div className="mt-4 flex flex-col gap-2 rounded-[18px] border border-sand bg-paper p-4">
             <p>
               This order is waiting for payment
               {order.payment_deadline_at
@@ -147,7 +147,7 @@ export default function OrderDetailPage() {
         )}
 
       {order.status === 'CANCELLED' && (
-        <div role="status" className="mt-4 rounded-xl border border-sand bg-cream-100 p-4">
+        <div role="status" className="mt-4 rounded-[18px] border border-sand bg-paper p-4">
           <p>
             This order was cancelled
             {order.cancelled_at ? ` on ${formatDate(order.cancelled_at)}` : ''}.
@@ -209,7 +209,7 @@ export default function OrderDetailPage() {
         <form
           onSubmit={onAddressSubmit}
           aria-label="Change delivery address"
-          className="mt-2 flex flex-col gap-4 rounded-xl border border-sand bg-white p-4"
+          className="mt-2 flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-4"
         >
           <Field
             id="recipient_name"

@@ -83,7 +83,7 @@ export default function GalleryAdminPage() {
       <form
         onSubmit={onUpload}
         aria-label="Add a gallery picture"
-        className="mt-4 flex max-w-xl flex-col gap-3 rounded-xl border border-sand bg-white p-4"
+        className="mt-4 flex max-w-xl flex-col gap-3 rounded-[18px] border border-sand bg-paper p-4"
       >
         <div className="flex flex-col gap-1">
           <label htmlFor="g-file" className="text-sm font-medium text-bark">
@@ -129,7 +129,7 @@ export default function GalleryAdminPage() {
                 {data.items.map((img) => (
                   <li
                     key={img.gallery_image_id}
-                    className="flex flex-col gap-2 rounded-xl border border-sand bg-white p-3"
+                    className="flex flex-col gap-2 rounded-[18px] border border-sand bg-paper p-3"
                   >
                     <img
                       src={img.url}

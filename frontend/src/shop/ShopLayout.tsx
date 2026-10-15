@@ -5,6 +5,7 @@ import { useCart } from '../cart/context'
 import { getPublicSettings, type BusinessSettings } from '../lib/api'
 import { NotificationsLink } from '../pages/NotificationsLink'
 import { Drawer } from './Drawer'
+import { ShopName } from './ShopName'
 import { BagIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from './icons'
 
 const NAV: [string, string][] = [
@@ -45,7 +46,7 @@ function SearchBar({ onDone }: { onDone: () => void }) {
       role="search"
       onSubmit={onSubmit}
       onKeyDown={(e) => e.key === 'Escape' && onDone()}
-      className="border-t border-sand bg-cream"
+      className="border-t border-sand bg-cream-100"
     >
       <div className="mx-auto flex max-w-6xl flex-nowrap items-center gap-3 px-4 py-3">
         <label htmlFor="site-search" className="sr-only">
@@ -57,7 +58,7 @@ function SearchBar({ onDone }: { onDone: () => void }) {
           type="search"
           maxLength={100}
           placeholder="Search the shop"
-          className="min-w-0 flex-1 rounded-full border border-sand bg-white px-4 py-2 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta"
+          className="min-w-0 flex-1 rounded-full border border-sand bg-paper px-4 py-2 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta"
         />
         <button type="submit" className="rounded-full bg-ink px-5 py-2 font-semibold text-cream">
           Search
@@ -75,7 +76,7 @@ function SiteHeader({ name }: { name: string }) {
   const signedIn = session !== null
 
   return (
-    <header className="sticky top-0 z-40 border-b border-sand bg-cream">
+    <header className="sticky top-0 z-40 border-b border-sand bg-cream-100">
       <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center px-2 py-2 md:px-4">
         <div className="flex items-center">
           <button
@@ -101,8 +102,12 @@ function SiteHeader({ name }: { name: string }) {
           </nav>
         </div>
 
-        <Link to="/" className="px-2 text-center font-serif text-2xl leading-tight md:text-3xl">
-          {name}
+        <Link
+          to="/"
+          aria-label={`${name}, home`}
+          className="px-2 text-center font-serif text-2xl leading-tight md:text-3xl"
+        >
+          <ShopName name={name} />
         </Link>
 
         <div className="flex items-center justify-end">
@@ -134,7 +139,7 @@ function SiteHeader({ name }: { name: string }) {
           <Link
             to="/cart"
             className={iconButton}
-            aria-label={units > 0 ? `Cart, ${units} items` : 'Cart'}
+            aria-label={units > 0 ? `Bag, ${units} items` : 'Bag'}
           >
             <BagIcon />
             {units > 0 && (
@@ -200,10 +205,12 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
   const wa = settings?.whatsapp?.replace(/[^\d]/g, '')
   const social = Object.entries(settings?.social_links ?? {})
   return (
-    <footer className="mt-16 border-t border-sand bg-cream-100">
+    <footer className="mt-16 border-t border-sand bg-cream-200">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
-          <p className="font-serif text-2xl">{name}</p>
+          <p className="font-serif text-2xl">
+            <ShopName name={name} />
+          </p>
           <p className="mt-2 text-bark">Handmade crochet, made with care in Lahore.</p>
         </div>
         <nav aria-label="Footer">
@@ -262,12 +269,12 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
 export default function ShopLayout() {
   const location = useLocation()
   const settings = useShopSettings()
-  const name = settings?.business_name ?? 'Crochet Shop'
+  const name = settings?.business_name ?? 'Bundle of Loops'
   return (
     <div className="flex min-h-screen flex-col">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-paper focus:px-4 focus:py-2"
       >
         Skip to content
       </a>

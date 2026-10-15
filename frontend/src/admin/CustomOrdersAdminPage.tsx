@@ -130,7 +130,7 @@ export default function CustomOrdersAdminPage() {
                   return (
                     <li
                       key={c.custom_order_id}
-                      className="rounded-xl border border-sand bg-white p-4"
+                      className="rounded-[18px] border border-sand bg-paper p-4"
                     >
                       <p className="flex flex-wrap items-center justify-between gap-2">
                         <span>
@@ -166,7 +166,7 @@ export default function CustomOrdersAdminPage() {
                             <button
                               key={target}
                               type="button"
-                              className="rounded-lg border border-terracotta px-3 py-1 text-terracotta hover:bg-cream-100"
+                              className="min-h-11 rounded-full border border-terracotta px-4 py-1 text-terracotta hover:bg-cream-200"
                               onClick={() => void move(c.custom_order_id, target)}
                             >
                               {label}
