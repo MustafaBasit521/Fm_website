@@ -105,7 +105,7 @@ export default function CustomOrdersPage() {
                   </p>
                   {CANCELLABLE.includes(c.status) &&
                     (confirming === c.custom_order_id ? (
-                      <p className="mt-2 flex gap-4">
+                      <p className="mt-2 flex flex-wrap gap-4">
                         <button
                           type="button"
                           className="text-danger underline"
@@ -138,7 +138,7 @@ export default function CustomOrdersPage() {
             })}
           </ul>
           {totalPages > 1 && (
-            <nav aria-label="Pagination" className="mt-6 flex items-center gap-4">
+            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center gap-4">
               <button
                 type="button"
                 disabled={page <= 1}

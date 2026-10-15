@@ -89,7 +89,7 @@ export default function ProductsAdminPage() {
                       to={`/products/${p.product_id}`}
                       className="flex flex-wrap items-center justify-between gap-2"
                     >
-                      <span className="flex items-center gap-3">
+                      <span className="flex flex-wrap items-center gap-3">
                         {p.image ? (
                           <img
                             src={p.image.url}

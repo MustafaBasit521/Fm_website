@@ -107,7 +107,7 @@ export default function CategoriesAdminPage() {
                         {c.product_count} {c.product_count === 1 ? 'product' : 'products'}
                       </span>
                     </span>
-                    <span className="flex gap-4">
+                    <span className="flex flex-wrap gap-4">
                       <button
                         type="button"
                         className="text-terracotta underline"

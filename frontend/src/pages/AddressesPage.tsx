@@ -113,7 +113,7 @@ export default function AddressesPage() {
                 .filter(Boolean)
                 .join(', ')}
             </p>
-            <div className="mt-2 flex gap-4">
+            <div className="mt-2 flex flex-wrap gap-4">
               <button
                 type="button"
                 className="text-terracotta underline"
@@ -230,7 +230,7 @@ export default function AddressesPage() {
             required
           />
           <FormError message={error} />
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button type="submit" className={buttonClass} disabled={busy}>
               {busy ? 'Saving…' : 'Save address'}
             </button>

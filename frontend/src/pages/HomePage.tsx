@@ -9,7 +9,7 @@ export default function HomePage() {
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-4 px-4">
       <h1 className="font-serif text-5xl">Crochet Shop</h1>
       <p className="text-muted">Handmade crochet, made with care in Lahore.</p>
-      <nav className="flex gap-4 text-terracotta underline">
+      <nav className="flex flex-wrap gap-4 text-terracotta underline">
         <Link to="/shop">Shop</Link>
         <Link to="/gallery">Gallery</Link>
         <Link to="/custom-order">Custom order</Link>

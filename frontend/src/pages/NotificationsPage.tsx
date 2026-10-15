@@ -93,7 +93,7 @@ export default function NotificationsPage() {
                 key={n.notification_id}
                 className={`rounded-xl border p-4 ${isUnread(n) ? 'border-terracotta bg-cream-100' : 'border-sand bg-white'}`}
               >
-                <p className="flex justify-between gap-4">
+                <p className="flex flex-wrap justify-between gap-4">
                   <span className="font-semibold">
                     {isUnread(n) && <span className="mr-2 text-sm text-terracotta">New</span>}
                     {n.title}
@@ -115,7 +115,7 @@ export default function NotificationsPage() {
             ))}
           </ul>
           {totalPages > 1 && (
-            <nav aria-label="Pagination" className="mt-6 flex items-center gap-4">
+            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center gap-4">
               <button
                 type="button"
                 disabled={page <= 1}

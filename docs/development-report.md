@@ -326,3 +326,5 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Bugs in my own tests, fixed:** `all()` over an async generator; a path lookup that `jsdom` cannot do; a missing Node type setting; a sanity-count threshold.
 
 **Left for deployment or real devices (not verifiable here):** bucket limits on Supabase; phone-size layout; the Vercel root-directory build and the content security policy on live pages; real MFA calls; real Storage calls; pg_cron scheduling.
+
+**Follow-up (owner's phone check):** the home page link row overflowed at 360 px. Cause: flex rows with wide gaps and no wrapping; 24 such rows existed. Fixed all, added `responsive.test.ts` (fails on any new non-wrapping row; proven against a deliberately bad file), and confirmed with headless-Chrome screenshots of the home, shop and contact pages. My earlier code-level responsive check missed this because it looked only for fixed widths.

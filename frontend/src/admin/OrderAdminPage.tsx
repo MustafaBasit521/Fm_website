@@ -347,7 +347,7 @@ export default function OrderAdminPage() {
                     defaultValue={order.delivery_country}
                     required
                   />
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     <button type="submit" className={buttonClass} disabled={busy}>
                       Save address
                     </button>

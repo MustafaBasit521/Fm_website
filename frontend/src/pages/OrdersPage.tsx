@@ -74,7 +74,7 @@ export default function OrdersPage() {
             ))}
           </ul>
           {totalPages > 1 && (
-            <nav aria-label="Pagination" className="mt-6 flex items-center gap-4">
+            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center gap-4">
               <button
                 type="button"
                 disabled={page <= 1}

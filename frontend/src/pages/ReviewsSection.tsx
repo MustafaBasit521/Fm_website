@@ -136,7 +136,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
             <Stars rating={state.review.rating} />
           </p>
           {state.review.comment && <p>{state.review.comment}</p>}
-          <div className="mt-2 flex gap-4">
+          <div className="mt-2 flex flex-wrap gap-4">
             <button
               type="button"
               className="text-terracotta underline"
@@ -190,7 +190,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
             />
           </div>
           <FormError message={error} />
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button type="submit" className={buttonClass} disabled={busy}>
               {busy ? 'Saving…' : state.review ? 'Save changes' : 'Post review'}
             </button>
@@ -229,7 +229,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
             ))}
           </ul>
           {totalPages > 1 && (
-            <nav aria-label="Review pages" className="mt-4 flex items-center gap-4">
+            <nav aria-label="Review pages" className="mt-4 flex flex-wrap items-center gap-4">
               <button
                 type="button"
                 disabled={page <= 1}

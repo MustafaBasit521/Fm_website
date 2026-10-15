@@ -14,7 +14,7 @@ export function Pager({
   const pages = Math.max(1, Math.ceil(total / pageSize))
   if (pages <= 1) return null
   return (
-    <nav aria-label="Pagination" className="mt-4 flex items-center gap-4">
+    <nav aria-label="Pagination" className="mt-4 flex flex-wrap items-center gap-4">
       <button
         type="button"
         disabled={page <= 1}
@@ -96,7 +96,7 @@ export function ConfirmButton({
       </button>
     )
   return (
-    <span className="flex gap-3">
+    <span className="flex flex-wrap gap-3">
       <button
         type="button"
         className="text-danger underline"

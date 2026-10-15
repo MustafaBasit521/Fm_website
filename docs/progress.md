@@ -412,7 +412,7 @@ Tasks:
 * [x] database indexes: all foreign keys indexed (checked in the database); trigram search index deliberately deferred
 * [x] N+1 review (see above)
 * [x] accessibility review: axe-core runs on 34 real pages of both sites (0 violations; the checker is proven to catch problems) and a colour-contrast test reads the real colour tokens; it found and fixed one failure ("No image" tiles, 4.28:1, now AA)
-* [~] responsive review: code-level only (no fixed widths below tablet size, no tables, viewport tag present). **Not verified on real phone-size screens.**
+* [~] responsive review: the owner's phone-size check found a real bug (the home page's link row could not wrap and "Create account" ran off the screen); 24 rows of links/buttons across the shop and admin could not wrap and now do, and a test scans the source so a non-wrapping row cannot return. Headless Chrome screenshots at 360 px confirmed the home, shop and contact pages. **Not yet checked at phone size: the signed-in shop pages and the admin screens.**
 * [x] automated tests (backend 430, frontend 259; new suites for HTTP safety, query counts, accessibility, contrast and deployment headers)
 * [x] error handling: any unexpected error returns a generic JSON 500 with a request id (traceback only in the server log), still readable by the browser (CORS headers present)
 * [x] logging: one line per request with an id (no query strings), `X-Request-ID` header, log level setting, app log lines visible under uvicorn

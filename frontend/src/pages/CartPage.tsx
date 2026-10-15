@@ -78,7 +78,7 @@ export default function CartPage() {
                   key={line.product_id}
                   className="flex flex-col gap-2 rounded-xl border border-sand bg-white p-4"
                 >
-                  <div className="flex justify-between gap-4">
+                  <div className="flex flex-wrap justify-between gap-4">
                     <span className="font-semibold">{line.name ?? 'Unavailable product'}</span>
                     {line.line_total_paisa !== null && (
                       <span>{formatPrice(line.line_total_paisa)}</span>
@@ -94,7 +94,7 @@ export default function CartPage() {
                       {problem}
                     </p>
                   )}
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-4">
                     {line.issue !== 'NOT_FOUND' && (
                       <label className="flex items-center gap-2">
                         Quantity

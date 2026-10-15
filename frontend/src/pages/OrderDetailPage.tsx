@@ -265,7 +265,7 @@ export default function OrderDetailPage() {
             required
           />
           <FormError message={error} />
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <button type="submit" className={buttonClass} disabled={busy}>
               {busy ? 'Saving…' : 'Save address'}
             </button>
@@ -283,7 +283,7 @@ export default function OrderDetailPage() {
             Items and quantities cannot be changed after ordering. You can cancel and order again.
           </p>
           {confirmCancel ? (
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <button
                 type="button"
                 className="text-danger underline"
