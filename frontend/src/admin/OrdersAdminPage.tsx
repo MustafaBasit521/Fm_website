@@ -6,6 +6,7 @@ import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
 import { inputClass } from './styles'
 import { Pager, State } from './ui'
 import { useLoad } from './useLoad'
+import { StatusBadge } from '../pages/StatusBadge'
 
 const STATUSES = ['', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 
@@ -110,7 +111,7 @@ export default function OrdersAdminPage() {
                         </span>
                       </span>
                       <span className="text-right">
-                        {statusLabel(o.status)}
+                        <StatusBadge status={o.status} />
                         <span className="block text-sm text-muted">
                           {formatPrice(o.total_amount_paisa)} ·{' '}
                           {o.payment_method === 'COD'

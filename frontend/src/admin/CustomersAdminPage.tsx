@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAdminCustomer, getAdminCustomers } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
-import { formatDate, statusLabel } from '../lib/orderStatus'
+import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
 import { Pager, State } from './ui'
 import { useLoad } from './useLoad'
+import { StatusBadge } from '../pages/StatusBadge'
 
 export function CustomersAdminPage() {
   const [search, setSearch] = useState('')
@@ -118,7 +119,7 @@ export function CustomerAdminPage() {
                         >
                           <span>{formatDate(o.created_at)}</span>
                           <span>
-                            {statusLabel(o.status)} · {formatPrice(o.total_amount_paisa)}
+                            <StatusBadge status={o.status} /> {formatPrice(o.total_amount_paisa)}
                           </span>
                         </Link>
                       </li>

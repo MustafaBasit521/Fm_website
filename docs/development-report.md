@@ -354,3 +354,5 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Verified:** 292 frontend and 445 backend tests, contrast matrix (page/paper/footer surfaces × all text colours), axe on all pages, builds, and Chrome screenshots of product, bag, checkout, filters and menu at phone and desktop sizes (via a throw-away automation tool in a scratch folder, not added to the project).
 
 **Notes:** a visual check found a broken divider in the summary box (grid gap) and default-blue radio buttons: both fixed. The live Supabase settings still hold the old name until the owner edits it.
+
+**Follow-up:** the shop name is renamed in the live settings by migration `rename default shop name` (conditional on the old default, so an owner-chosen name is never overwritten; applied on Supabase). Added `StatusBadge` (design-system colours, words always shown, contrast tested) to the shop and admin order screens.

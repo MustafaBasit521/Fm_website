@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getOrders, type OrderSummary, type Page } from '../lib/api'
 import { formatPrice } from '../lib/money'
-import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
+import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
+import { StatusBadge } from './StatusBadge'
 
 export default function OrdersPage() {
   const [page, setPage] = useState(1)
@@ -63,8 +64,8 @@ export default function OrdersPage() {
                     <span>{formatPrice(o.total_amount_paisa)}</span>
                   </span>
                   <span className="text-sm text-muted">
-                    {o.item_count} {o.item_count === 1 ? 'item' : 'items'} · {statusLabel(o.status)}{' '}
-                    ·{' '}
+                    {o.item_count} {o.item_count === 1 ? 'item' : 'items'} ·{' '}
+                    <StatusBadge status={o.status} /> · ·{' '}
                     {o.payment_method === 'COD'
                       ? 'Cash on delivery'
                       : paymentStatusLabel(o.payment_status)}

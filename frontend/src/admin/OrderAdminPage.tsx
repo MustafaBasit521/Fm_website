@@ -11,11 +11,12 @@ import {
 } from '../lib/adminApi'
 import { ApiError } from '../lib/api'
 import { formatPrice, parseRupeesToPaisa } from '../lib/money'
-import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
+import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { Badge, ConfirmButton, State } from './ui'
 import { useLoad } from './useLoad'
+import { StatusBadge } from '../pages/StatusBadge'
 
 const NEXT: Record<string, [string, string]> = {
   PENDING: ['CONFIRMED', 'Confirm order'],
@@ -112,7 +113,7 @@ export default function OrderAdminPage() {
               <h1 className="font-serif text-4xl">Order</h1>
               <p className="break-all text-sm text-muted">{order.order_id}</p>
               <p className="mt-1 flex flex-wrap items-center gap-2">
-                <Badge>{statusLabel(order.status)}</Badge>
+                <StatusBadge status={order.status} />
                 <Badge>
                   {order.payment_method === 'COD' ? 'Cash on delivery' : 'Online'} ·{' '}
                   {paymentStatusLabel(order.payment_status)}

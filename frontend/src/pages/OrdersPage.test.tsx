@@ -46,8 +46,10 @@ it('lists orders with status in words and links to the detail page', async () =>
   )
   renderPage()
   expect(await screen.findAllByText(/Order placed/)).toHaveLength(2)
-  expect(screen.getByText(/2 items · Pending · Cash on delivery/)).toBeInTheDocument()
-  expect(screen.getByText(/1 item · Cancelled/)).toBeInTheDocument()
+  expect(screen.getByText('Pending')).toBeInTheDocument()
+  expect(screen.getByText('Cancelled')).toBeInTheDocument()
+  expect(screen.getByText(/2 items/)).toBeInTheDocument()
+  expect(screen.getAllByText(/Cash on delivery/, { selector: 'span' }).length).toBeGreaterThan(0)
   expect(screen.getAllByText('Rs 2,701')).toHaveLength(2)
   expect(screen.getAllByRole('link', { name: /Order placed/ })[0]).toHaveAttribute(
     'href',

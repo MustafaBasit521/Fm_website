@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, cancelOrder, changeOrderAddress, getOrder, type Order } from '../lib/api'
 import { formatPrice } from '../lib/money'
-import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
+import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { PayNowButton } from './PayNowButton'
 import { buttonClass, Field, FormError } from './ui'
+import { StatusBadge } from './StatusBadge'
 
 // Which actions the customer is offered. The server enforces the same rules (business-rules
 // §15, §16); the UI only decides what to show.
@@ -125,7 +126,7 @@ export default function OrderDetailPage() {
       <h1 className="mt-2 font-serif text-4xl">Order</h1>
       <p className="text-sm text-muted break-all">Reference: {order.order_id}</p>
       <p className="mt-2">
-        <strong>{statusLabel(order.status)}</strong> · placed {formatDate(order.created_at)} ·{' '}
+        <StatusBadge status={order.status} /> · placed {formatDate(order.created_at)} ·{' '}
         {order.payment_method === 'COD'
           ? 'Cash on delivery'
           : paymentStatusLabel(order.payment_status)}

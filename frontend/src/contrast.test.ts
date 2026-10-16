@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, it } from 'vitest'
+import { STATUS_COLORS } from './pages/statusColors'
 
 // Reads the real colour tokens, so changing a colour re-checks the contrast automatically.
 const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8')
@@ -50,3 +51,10 @@ it('the contrast calculator itself is right (black/white = 21, same colour = 1)'
   expect(ratio('#000000', '#ffffff')).toBeCloseTo(21, 0)
   expect(ratio('#777777', '#777777')).toBeCloseTo(1, 5)
 })
+
+it.each(Object.entries(STATUS_COLORS))(
+  'the %s status badge text has AA contrast on its background',
+  (_status, c) => {
+    expect(ratio(c.fg, c.bg)).toBeGreaterThanOrEqual(4.5)
+  },
+)

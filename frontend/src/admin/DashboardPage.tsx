@@ -4,6 +4,7 @@ import { formatPrice } from '../lib/money'
 import { formatDate, statusLabel } from '../lib/orderStatus'
 import { State } from './ui'
 import { useLoad } from './useLoad'
+import { StatusBadge } from '../pages/StatusBadge'
 
 const STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 
@@ -99,7 +100,7 @@ export default function DashboardPage() {
                             <strong>{o.customer_name}</strong> · {formatDate(o.created_at)}
                           </span>
                           <span>
-                            {statusLabel(o.status)} · {formatPrice(o.total_amount_paisa)}
+                            <StatusBadge status={o.status} /> {formatPrice(o.total_amount_paisa)}
                           </span>
                         </Link>
                       </li>
