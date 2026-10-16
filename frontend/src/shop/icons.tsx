@@ -61,3 +61,9 @@ export const ArrowIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </svg>
 )
+export const ChatIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M4 20l1.4-4.2A8 8 0 1 1 8.3 18.6L4 20Z" />
+    <path d="M9 9.5c.3 2.2 2.3 4.2 4.5 4.5l1.3-1.2-1.7-1-.8.6c-.7-.3-1.4-1-1.7-1.7l.6-.8-1-1.7L9 9.5Z" />
+  </svg>
+)

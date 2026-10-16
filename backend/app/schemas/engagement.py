@@ -149,6 +149,7 @@ class GalleryImageRead(BaseModel):
 
 class AdminGalleryImage(GalleryImageRead):
     is_visible: bool
+    show_in_hero: bool
     created_at: datetime
 
 
@@ -160,6 +161,7 @@ class GalleryCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     image_type: GalleryImageType
     is_visible: bool = False  # like products: hidden until the admin publishes it
+    show_in_hero: bool = False
 
     _clean = field_validator("title", "description")(_optional_text)
 
@@ -171,6 +173,7 @@ class GalleryUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
     image_type: GalleryImageType | None = None
     is_visible: bool | None = None
+    show_in_hero: bool | None = None
 
     _clean = field_validator("title", "description")(_optional_text)
 

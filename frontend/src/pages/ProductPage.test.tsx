@@ -8,11 +8,13 @@ import ProductPage from './ProductPage'
 
 const getProduct = vi.fn()
 const getReviews = vi.fn()
+const getPublicSettings = vi.fn()
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   getProduct: (...a: unknown[]) => getProduct(...a),
   getReviews: (...a: unknown[]) => getReviews(...a),
+  getPublicSettings: (...a: unknown[]) => getPublicSettings(...a),
 }))
 
 const img = (n: number) => ({
@@ -47,6 +49,7 @@ const renderPage = () => {
 }
 
 beforeEach(() => {
+  getPublicSettings.mockReset().mockRejectedValue(new Error('x'))
   getProduct.mockReset()
   getReviews.mockReset().mockResolvedValue({
     items: [],
@@ -104,4 +107,23 @@ it('offers no quantity or add button for an unavailable product', async () => {
   expect(screen.queryByRole('group', { name: /Quantity/ })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Unavailable' })).toBeDisabled()
   expect(screen.getByText('Currently unavailable')).toBeInTheDocument()
+})
+
+it('offers a WhatsApp chat about this piece, with the name, price and link typed in', async () => {
+  getPublicSettings.mockResolvedValue({ whatsapp: '0300 1234567' })
+  getProduct.mockResolvedValue(detail)
+  renderPage()
+  const chat = await screen.findByRole('link', { name: /Ask about this on WhatsApp/ })
+  const href = chat.getAttribute('href')!
+  expect(href).toMatch(/^https:\/\/wa\.me\/923001234567\?text=/)
+  const text = decodeURIComponent(href.split('?text=')[1])
+  expect(text).toContain('Sunflower')
+  expect(text).toContain('/shop/p1')
+})
+
+it('shows no WhatsApp link when the shop has no number', async () => {
+  getProduct.mockResolvedValue(detail)
+  renderPage()
+  await screen.findByRole('heading', { name: 'Sunflower' })
+  expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
 })

@@ -205,6 +205,7 @@ export interface AdminGalleryImage {
   description: string | null
   image_type: GalleryImageType
   is_visible: boolean
+  show_in_hero: boolean
   created_at: string
 }
 export const getAdminGallery = (page: number, signal?: AbortSignal) =>
@@ -217,6 +218,7 @@ export const createGalleryImage = (data: {
   description?: string | null
   image_type: GalleryImageType
   is_visible: boolean
+  show_in_hero: boolean
 }) => apiPost<AdminGalleryImage>('/admin/gallery', data)
 export const updateGalleryImage = (
   imageId: string,
@@ -225,6 +227,7 @@ export const updateGalleryImage = (
     description: string | null
     image_type: GalleryImageType
     is_visible: boolean
+    show_in_hero: boolean
   }>,
 ) => apiPatch<AdminGalleryImage>(`/admin/gallery/${id(imageId)}`, data)
 export const deleteGalleryImage = (imageId: string) => apiDelete(`/admin/gallery/${id(imageId)}`)

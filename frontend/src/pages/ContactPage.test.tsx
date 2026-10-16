@@ -82,7 +82,7 @@ it('shows the shop details from the public settings, and works without them', as
   const first = renderPage()
   expect(await screen.findByRole('link', { name: 'Chat on WhatsApp' })).toHaveAttribute(
     'href',
-    'https://wa.me/923001234567',
+    'https://wa.me/923001234567?text=Hi!%20I%20have%20a%20question.',
   )
   expect(screen.getByText('Phone: 042 111')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Instagram' })).toHaveAttribute(

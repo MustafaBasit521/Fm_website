@@ -375,3 +375,35 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Notes:** a test of mine returned the mock from `beforeEach`, which Vitest runs as a cleanup function; it threw the mocked rejection after the test (fixed by using a block body). Not verified: delivery of any email (no provider), the panels on real devices.
 
+## UI polish — increment 4 (design deck, contact page, admin-chosen hero)
+
+**Owner's requests:** the contact page looked awkward (a lot of empty space at the sides), the admin should control the hero pictures, and a 52-page design deck (`bundleofloops.pdf`, now git-ignored) should be matched.
+
+**Findings:** the contact page was a two-column grid whose details column is empty until the owner fills the business settings, so the form sat in one narrow column. The deck shows the hero as a photo collage with a caption card, the admin gallery with per-photo "on home page" switches, and a custom-order page with the headline and numbered steps on the left and the form card on the right.
+
+**Built:** `gallery_images.show_in_hero` (migration, admin API field, public `?hero=true` filter, tests); hero collage on the home page using the admin's picks (fallback: featured pieces); admin Gallery tick boxes and a short explanation; contact page and custom-order page layouts; footer pills.
+
+**Not built (not in the business rules, listed in progress.md):** the deck's delivery promises, About and policy pages, holiday mode, admin sidebar layout.
+
+**Verified:** 458 backend and 323 frontend tests; Chrome screenshots of the contact, custom-order and home pages at desktop and phone width (home hero checked with a mocked API; no horizontal overflow at 390 px). The owner's running dev server on port 5173 once served a stale `Drawer` module (restart `npm run dev` if the page shows a blank screen).
+
+## UI polish — increment 5 (speed and WhatsApp)
+
+**Owner's questions:** why pages load slowly, and whether customers can reach the shop on WhatsApp with one tap.
+
+**Diagnosis:** `/api/health` answered in 2 ms but database endpoints took 1–1.8 s, even when warm. A small script against the pool showed a fixed cost of about 0.6 s per request from `pool_pre_ping` (a liveness check on every checkout) on a database in Tokyo; each real query adds roughly 0.2–0.3 s.
+
+**Changes:** `pool_pre_ping` off with `pool_recycle=240`; category loaded with `joinedload` in the product queries; `getPublicSettings` is cached in the browser for a minute (the shared request ignores abort signals so one page leaving cannot cancel it for others). Measured afterwards: settings 0.4 s, gallery 0.6 s, products 1.0 s. A second-order cost remains and needs hosting decisions, not code.
+
+**WhatsApp:** `lib/whatsapp.ts` (number normalisation, `wa.me` link with an encoded message, `useShopWhatsapp`), a floating button, product-page and custom-order buttons; hidden when no number is set. This is click-to-chat only; automatic replies would need the paid WhatsApp Business API (out of scope, CLAUDE.md §27).
+
+**Verified:** 339 frontend tests (number formats, links, hidden-without-number, custom-order message content); catalog and query-count backend tests.
+
+## Email provider: Resend
+
+**Decision (owner):** Resend. Note: React Email components are a JavaScript templating tool; our emails are built in the Python backend as plain text, so no React is needed and the adapter is a small HTTP call.
+
+**Built:** `ResendEmailProvider` (POST to `https://api.resend.com/emails` with a bearer key, sender from `EMAIL_FROM`), settings `RESEND_API_KEY` (secret) and `EMAIL_FROM`, validation that the provider needs both, `.env.example` and README steps. Failures raise `EmailError` (status and a short reason, never the key) and are logged by the existing best-effort outbox, so a refused email never breaks a request.
+
+**Verified:** 9 new tests with a mock transport (no network); full suite passes. **Not verified:** real delivery (needs the owner's API key; until a domain is verified Resend delivers only to the owner's own address).
+

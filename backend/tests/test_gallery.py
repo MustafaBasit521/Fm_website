@@ -120,3 +120,30 @@ async def test_update_and_delete(client, admin_h, storage):
     assert storage.deleted_in == [("gallery-images", PATH())]  # the file is removed too
     assert (await client.get("/api/gallery")).json()["total"] == 0
     assert (await client.delete(url, headers=admin_h)).status_code == 404
+
+
+async def test_the_admin_chooses_the_home_hero_photos(client, admin_h):
+    plain = await make_image(client, admin_h, storage_path=PATH("a"))
+    chosen = await make_image(
+        client, admin_h, storage_path=PATH("b"), title="Chick", show_in_hero=True
+    )
+    hidden = await make_image(
+        client, admin_h, storage_path=PATH("c"), is_visible=False, show_in_hero=True
+    )
+    assert plain["show_in_hero"] is False and chosen["show_in_hero"] is True
+
+    got = (await client.get("/api/gallery", params={"hero": "true"})).json()
+    assert [i["gallery_image_id"] for i in got["items"]] == [chosen["gallery_image_id"]]
+    assert hidden["gallery_image_id"] not in [i["gallery_image_id"] for i in got["items"]]
+    assert "show_in_hero" not in got["items"][0]  # an admin-only detail
+
+    r = await client.patch(
+        f"{ADMIN}/{plain['gallery_image_id']}", headers=admin_h, json={"show_in_hero": True}
+    )
+    assert r.status_code == 200 and r.json()["show_in_hero"] is True
+    r = await client.patch(
+        f"{ADMIN}/{plain['gallery_image_id']}", headers=admin_h, json={"show_in_hero": None}
+    )
+    assert r.status_code == 422
+    assert (await client.get("/api/gallery", params={"hero": "true"})).json()["total"] == 2
+    assert (await client.get("/api/gallery")).json()["total"] == 2  # normal listing is unchanged

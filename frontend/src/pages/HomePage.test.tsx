@@ -8,6 +8,7 @@ import HomePage from './HomePage'
 const getProducts = vi.fn()
 const getWishlistIds = vi.fn()
 const getGallery = vi.fn()
+const getHeroPhotos = vi.fn()
 const addToWishlist = vi.fn()
 const removeFromWishlist = vi.fn()
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
@@ -16,6 +17,7 @@ vi.mock('../lib/api', async (orig) => ({
   getProducts: (...a: unknown[]) => getProducts(...a),
   getWishlistIds: (...a: unknown[]) => getWishlistIds(...a),
   getGallery: (...a: unknown[]) => getGallery(...a),
+  getHeroPhotos: (...a: unknown[]) => getHeroPhotos(...a),
   addToWishlist: (...a: unknown[]) => addToWishlist(...a),
   removeFromWishlist: (...a: unknown[]) => removeFromWishlist(...a),
 }))
@@ -35,6 +37,7 @@ const renderHome = (auth = {}) => render(makeAuth(auth).wrap(<HomePage />))
 
 beforeEach(() => {
   getProducts.mockReset()
+  getHeroPhotos.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 2 })
   getGallery.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 24 })
   getWishlistIds.mockReset().mockResolvedValue([])
   addToWishlist.mockReset().mockResolvedValue({})
@@ -75,7 +78,7 @@ it('still shows the hero when products cannot be loaded or there are none', asyn
   renderHome()
   await vi.waitFor(() => expect(getProducts).toHaveBeenCalledTimes(2))
   expect(screen.queryByRole('heading', { name: /Fresh off the/ })).not.toBeInTheDocument()
-  expect(screen.queryByRole('list', { name: 'From the shop' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('figure', { name: 'From the studio' })).not.toBeInTheDocument()
 })
 
 it('shows no hearts when signed out, and does not ask for the wishlist', async () => {
@@ -114,10 +117,34 @@ it('fills the hero with photos of the featured pieces', async () => {
   })
   getProducts.mockResolvedValue(page([withPhoto(1), withPhoto(2), item(3)]))
   renderHome()
-  const hero = await screen.findByRole('list', { name: 'From the shop' })
-  const links = hero.querySelectorAll('a')
-  expect(links).toHaveLength(2) // only pieces that have a photo
-  expect(links[0]).toHaveAttribute('href', '/shop/p1')
+  const hero = await screen.findByRole('figure', { name: 'From the studio' })
+  expect(hero.querySelectorAll('img')).toHaveLength(2) // only pieces that have a photo
+  expect(hero.querySelector('a')).toHaveAttribute('href', '/shop/p1')
+  expect(hero).toHaveTextContent('In the photo')
+})
+
+it('uses the photos the admin chose for the hero, with their caption', async () => {
+  getProducts.mockResolvedValue(page([item(1)]))
+  getHeroPhotos.mockResolvedValue({
+    items: [
+      {
+        gallery_image_id: 'h1',
+        url: 'https://img/h1.jpg',
+        title: 'Chick Car Hanger',
+        description: 'Spotted on Canal Road',
+      },
+      { gallery_image_id: 'h2', url: 'https://img/h2.jpg', title: null, description: null },
+    ],
+    total: 2,
+    page: 1,
+    page_size: 2,
+  })
+  renderHome()
+  const hero = await screen.findByRole('figure', { name: 'From the studio' })
+  expect(hero).toHaveTextContent('Chick Car Hanger')
+  expect(hero).toHaveTextContent('Spotted on Canal Road')
+  expect(hero.querySelectorAll('img')).toHaveLength(2)
+  expect(hero.querySelector('a')).toBeNull() // gallery photos are not links
 })
 
 it('shows a gallery section with a button to the full gallery page', async () => {

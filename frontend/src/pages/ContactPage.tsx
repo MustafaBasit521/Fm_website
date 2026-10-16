@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, getPublicSettings, sendContactMessage } from '../lib/api'
+import { waDigits, waLink } from '../lib/whatsapp'
 import { PageHeader } from './PageHeader'
 import { buttonClass, Field, FormError, inputClass, primaryButtonClass } from './ui'
 
@@ -14,7 +15,7 @@ function ShopDetails() {
     return () => controller.abort()
   }, [])
   if (!info) return null
-  const wa = info.whatsapp?.replace(/[^\d]/g, '')
+  const wa = waDigits(info.whatsapp)
   const links = Object.entries(info.social_links)
   if (!info.phone && !wa && !info.address && !info.email && links.length === 0) return null
   return (
@@ -25,7 +26,7 @@ function ShopDetails() {
           <li>
             <a
               className={`${primaryButtonClass} w-full`}
-              href={`https://wa.me/${wa}`}
+              href={waLink(wa, 'Hi! I have a question.')}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -103,24 +104,30 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <PageHeader
-        eyebrow="Contact"
-        title={
-          <>
-            Say <em className="text-terracotta">hello</em>
-          </>
-        }
-      >
-        Questions about a piece, an order or a custom idea? Write to us.
-      </PageHeader>
-      <div className="grid items-start gap-8 md:grid-cols-[1fr_1.6fr]">
-        <ShopDetails />
-        <form
-          onSubmit={onSubmit}
-          aria-label="Contact form"
-          className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+    <main className="mx-auto grid max-w-5xl items-start gap-10 px-4 py-10 md:grid-cols-[1fr_1.15fr] md:py-14">
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          eyebrow="Contact"
+          title={
+            <>
+              Say <em className="text-terracotta">hello</em>
+            </>
+          }
         >
+          Questions about a piece, an order or a custom idea? Write to us.
+        </PageHeader>
+        <ShopDetails />
+        <p className="border-y border-dashed border-linen py-4 text-bark">
+          We reply by email, phone or WhatsApp — whichever you leave us.
+        </p>
+      </div>
+      <form
+        onSubmit={onSubmit}
+        aria-label="Contact form"
+        className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5 md:p-6"
+      >
+        <h2 className="font-serif text-2xl">Send us a message</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field id="name" name="name" label="Your name" maxLength={100} required />
           <Field id="email" name="email" label="Email" type="email" />
           <Field id="phone" name="phone" label="Phone" type="tel" maxLength={20} />
@@ -130,27 +137,29 @@ export default function ContactPage() {
             label="WhatsApp number"
             type="tel"
             maxLength={20}
-            hint="Give at least one way for us to reply (email, phone or WhatsApp)."
           />
-          <div className="flex flex-col gap-1">
-            <label htmlFor="message" className="text-sm font-medium text-bark">
-              Message
-            </label>
-            <textarea
-              id="message"
-              name="message"
-              rows={5}
-              maxLength={3000}
-              required
-              className={inputClass}
-            />
-          </div>
-          <FormError message={error} />
-          <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
-            {busy ? 'Sending…' : 'Send message'}
-          </button>
-        </form>
-      </div>
+        </div>
+        <p className="-mt-2 text-sm text-muted">
+          Give at least one way for us to reply (email, phone or WhatsApp).
+        </p>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="message" className="text-sm font-medium text-bark">
+            Message
+          </label>
+          <textarea
+            id="message"
+            name="message"
+            rows={5}
+            maxLength={3000}
+            required
+            className={inputClass}
+          />
+        </div>
+        <FormError message={error} />
+        <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
+          {busy ? 'Sending…' : 'Send message'}
+        </button>
+      </form>
     </main>
   )
 }

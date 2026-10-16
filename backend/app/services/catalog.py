@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement, Select, and_, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, with_expression
+from sqlalchemy.orm import joinedload, selectinload, with_expression
 
 from app.models.catalog import Category, Product, ProductImage
 from app.models.enums import ACTIVE_ORDER_STATUSES, ProductAvailability
@@ -165,7 +165,7 @@ async def list_products(
         select(Product)
         .where(*conditions)
         .options(
-            selectinload(Product.category),
+            joinedload(Product.category),  # same query: one round trip fewer
             selectinload(Product.images),
             with_expression(Product.active_units, active_units_expr()),
         )
@@ -184,7 +184,7 @@ async def get_product(
         select(Product)
         .where(Product.product_id == product_id)
         .options(
-            selectinload(Product.category),
+            joinedload(Product.category),  # same query: one round trip fewer
             selectinload(Product.images),
             with_expression(Product.active_units, active_units_expr()),
         )

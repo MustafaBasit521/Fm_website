@@ -248,3 +248,22 @@ it('signed in: account and wishlist icons, and a menu with orders, notifications
   await userEvent.click(within(menu).getByRole('button', { name: 'Log out' }))
   expect(ctx.signOut).toHaveBeenCalled()
 })
+
+it('has a floating WhatsApp button that opens a chat with a ready-typed message', async () => {
+  renderLayout()
+  const chat = await screen.findByRole('link', { name: /Chat on WhatsApp/ })
+  expect(chat.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/923001234567\?text=Hi!/)
+  expect(chat).toHaveAttribute('target', '_blank')
+  expect(chat).toHaveAttribute('rel', 'noopener noreferrer')
+})
+
+it('has no WhatsApp button when the shop has not set a number', async () => {
+  getPublicSettings.mockResolvedValue({
+    business_name: 'Bundle of Loops',
+    whatsapp: null,
+    social_links: {},
+  })
+  renderLayout()
+  await screen.findByRole('link', { name: 'Bundle of Loops, home' })
+  expect(screen.queryByRole('link', { name: /WhatsApp/ })).not.toBeInTheDocument()
+})

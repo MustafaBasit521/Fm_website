@@ -351,6 +351,10 @@ export const getGallery = (type: GalleryImageType | '', page: number, signal?: A
     signal,
   )
 
+/** The photos the admin chose for the top of the home page (hero). */
+export const getHeroPhotos = (signal?: AbortSignal) =>
+  apiGet<Page<GalleryImage>>('/gallery?hero=true&page_size=2', signal)
+
 // ---- newsletter ---------------------------------------------------------------------------
 
 export const subscribeNewsletter = (email: string) =>
@@ -447,5 +451,18 @@ export interface BusinessSettings {
   social_links: Record<string, string>
 }
 
-export const getPublicSettings = (signal?: AbortSignal) =>
-  apiGet<BusinessSettings>('/settings', signal)
+// The shop details rarely change and are needed by the header, footer and several pages: fetch
+// them once per page load (and again after a minute) instead of on every page. The shared
+// request has no abort signal, so one page leaving cannot cancel it for the others.
+let settingsCache: { at: number; request: Promise<BusinessSettings> } | null = null
+export const getPublicSettings = (signal?: AbortSignal) => {
+  void signal // accepted so callers stay the same; see above
+  if (!settingsCache || Date.now() - settingsCache.at > 60_000) {
+    const request = apiGet<BusinessSettings>('/settings')
+    request.catch(() => {
+      settingsCache = null // never keep a failure
+    })
+    settingsCache = { at: Date.now(), request }
+  }
+  return settingsCache.request
+}

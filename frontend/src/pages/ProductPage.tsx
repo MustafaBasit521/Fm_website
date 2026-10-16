@@ -7,6 +7,8 @@ import { QuantityStepper } from './QuantityStepper'
 import { stockLabel } from './stock'
 import { ReviewsSection } from './ReviewsSection'
 import { WishlistButton } from './WishlistButton'
+import { WhatsAppButton } from '../shop/WhatsAppButton'
+import { secondaryButtonClass } from './ui'
 
 export default function ProductPage() {
   const { id = '' } = useParams()
@@ -155,6 +157,12 @@ function ProductDetailView({
           label={`Add to bag · ${formatPrice(total)}`}
         />
         <WishlistButton productId={product.product_id} />
+        <WhatsAppButton
+          className={`${secondaryButtonClass} w-full`}
+          message={`Hi! I'm interested in ${product.name} (${formatPrice(product.price_paisa)}): ${window.location.origin}/shop/${product.product_id}`}
+        >
+          Ask about this on WhatsApp
+        </WhatsAppButton>
         <p className="text-sm text-bark">
           Cash on Delivery or secure online payment · Delivered across Lahore
         </p>

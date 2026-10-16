@@ -29,8 +29,14 @@ class Settings(BaseSettings):
     # Where the browser returns after paying (the storefront origin).
     frontend_url: str = "http://localhost:5173"
     # "none" = emails are not sent. "console" only logs them (development; refused in production).
-    # A real email provider is added once one is chosen (CLAUDE.md §3).
+    # "resend" sends through Resend (https://resend.com): needs RESEND_API_KEY and EMAIL_FROM.
     email_provider: str = "none"
+    # Server-only secret. Never commit it and never send it to the browser.
+    resend_api_key: SecretStr | None = None
+    # The sender shown to customers, e.g. "Bundle of Loops <hello@yourdomain.com>". Resend only
+    # delivers to anyone once the domain is verified there (until then: "onboarding@resend.dev"
+    # may send only to the account owner's own address, which is enough for testing).
+    email_from: str | None = None
     # Behind a reverse proxy (Vercel, nginx, ...) the client IP is in X-Forwarded-For. Enable only
     # when the app is really behind such a proxy, otherwise clients could spoof their IP.
     trust_proxy_headers: bool = False
@@ -80,8 +86,10 @@ class Settings(BaseSettings):
             raise ValueError("LOG_LEVEL must be DEBUG, INFO, WARNING or ERROR")
         if self.is_production and not self.admin_require_mfa:
             raise ValueError("ADMIN_REQUIRE_MFA cannot be turned off in production")
-        if self.email_provider not in ("none", "console"):
-            raise ValueError("EMAIL_PROVIDER must be 'none' or 'console' until a provider is added")
+        if self.email_provider not in ("none", "console", "resend"):
+            raise ValueError("EMAIL_PROVIDER must be 'none', 'console' or 'resend'")
+        if self.email_provider == "resend" and not (self.resend_api_key and self.email_from):
+            raise ValueError("EMAIL_PROVIDER=resend requires RESEND_API_KEY and EMAIL_FROM")
         if self.email_provider == "console" and self.is_production:
             raise ValueError("The console email provider cannot be used in production")
         if self.online_payments_enabled and self.payment_provider == "none":

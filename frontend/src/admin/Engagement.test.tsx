@@ -64,6 +64,7 @@ const img = (over: Partial<AdminGalleryImage> = {}): AdminGalleryImage => ({
   description: null,
   image_type: 'SHOP',
   is_visible: false,
+  show_in_hero: false,
   created_at: '',
   ...over,
 })
@@ -83,6 +84,7 @@ it('uploads a gallery picture with its details', async () => {
   await userEvent.selectOptions(screen.getByLabelText('Type'), 'DESIGN')
   await userEvent.type(screen.getByLabelText('Title (optional)'), 'Bunny')
   await userEvent.click(screen.getByLabelText('Show in the public gallery'))
+  await userEvent.click(screen.getByLabelText('Show big at the top of the home page'))
   await userEvent.click(screen.getByRole('button', { name: 'Add picture' }))
   expect(uploadToSignedUrl).toHaveBeenCalledWith('gallery-images', 'gallery/abc.png', 't', file)
   expect(api.createGalleryImage).toHaveBeenCalledWith({
@@ -91,6 +93,7 @@ it('uploads a gallery picture with its details', async () => {
     description: null,
     image_type: 'DESIGN',
     is_visible: true,
+    show_in_hero: true,
   })
 })
 
@@ -115,6 +118,8 @@ it('shows, hides, re-types and deletes gallery pictures', async () => {
   render(<GalleryAdminPage />)
   await userEvent.click(await screen.findByLabelText('Show Sunny in the gallery'))
   expect(api.updateGalleryImage).toHaveBeenCalledWith('g1', { is_visible: true })
+  await userEvent.click(screen.getByLabelText('Show Sunny at the top of the home page'))
+  expect(api.updateGalleryImage).toHaveBeenCalledWith('g1', { show_in_hero: true })
   await userEvent.selectOptions(screen.getAllByLabelText('Type')[1], 'DESIGN')
   expect(api.updateGalleryImage).toHaveBeenCalledWith('g1', { image_type: 'DESIGN' })
   await userEvent.click(screen.getByRole('button', { name: 'Delete' }))

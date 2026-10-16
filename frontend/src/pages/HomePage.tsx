@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getGallery, getProducts, type GalleryImage, type ProductSummary } from '../lib/api'
+import {
+  getGallery,
+  getHeroPhotos,
+  getProducts,
+  type GalleryImage,
+  type ProductSummary,
+} from '../lib/api'
+import { formatPrice } from '../lib/money'
 import { ArrowIcon } from '../shop/icons'
 import { ProductCard } from './ProductCard'
 import { useWishlist } from '../wishlist/context'
@@ -11,6 +18,16 @@ const TRUST = [
   'Delivered across Lahore',
   'Cash on Delivery or secure online payment',
 ]
+
+/** One photo in the hero: chosen by the admin (gallery), or a featured piece as the fallback. */
+interface HeroShot {
+  key: string
+  url: string
+  alt: string
+  title: string | null
+  subtitle: string | null
+  href: string | null
+}
 
 type Featured = { items: ProductSummary[]; isFeatured: boolean }
 
@@ -25,10 +42,34 @@ async function loadFeatured(signal: AbortSignal): Promise<Featured> {
   return { items: newest.items, isFeatured: false }
 }
 
+function HeroImage({ shot, className }: { shot: HeroShot; className: string }) {
+  const img = (
+    <img src={shot.url} alt={shot.alt} className={`${className} bg-cream-200 object-cover`} />
+  )
+  if (!shot.href) return img
+  return (
+    <Link
+      to={shot.href}
+      className="contents focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
+    >
+      {img}
+    </Link>
+  )
+}
+
 export default function HomePage() {
   const [featured, setFeatured] = useState<Featured | null>(null)
   const [gallery, setGallery] = useState<GalleryImage[]>([])
+  const [chosen, setChosen] = useState<GalleryImage[]>([])
   const wl = useWishlist()
+
+  useEffect(() => {
+    const controller = new AbortController()
+    getHeroPhotos(controller.signal)
+      .then((page) => setChosen(page.items))
+      .catch(() => {}) // the hero falls back to the featured pieces
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -46,8 +87,29 @@ export default function HomePage() {
     return () => controller.abort()
   }, [])
 
-  // real photos of the featured pieces fill the hero; with no photos yet the text stands alone
-  const heroPictures = (featured?.items ?? []).filter((p) => p.image).slice(0, 3)
+  // The admin chooses the hero photos in the gallery. Until they do, photos of the featured
+  // pieces fill it; with no photos at all the text stands alone.
+  const heroShots: HeroShot[] =
+    chosen.length > 0
+      ? chosen.map((g) => ({
+          key: g.gallery_image_id,
+          url: g.url,
+          alt: g.title ?? 'Handmade crochet',
+          title: g.title,
+          subtitle: g.description,
+          href: null,
+        }))
+      : (featured?.items ?? [])
+          .filter((p) => p.image)
+          .slice(0, 2)
+          .map((p) => ({
+            key: p.product_id,
+            url: p.image!.url,
+            alt: p.image!.alt_text ?? p.name,
+            title: p.name,
+            subtitle: `${p.category.name} · ${formatPrice(p.price_paisa)}`,
+            href: `/shop/${p.product_id}`,
+          }))
 
   return (
     <main>
@@ -74,24 +136,29 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        {heroPictures.length > 0 && (
-          <ul aria-label="From the shop" className="grid grid-cols-2 gap-3">
-            {heroPictures.map((p, i) => (
-              <li key={p.product_id} className={i === 0 ? 'row-span-2' : ''}>
-                <Link
-                  to={`/shop/${p.product_id}`}
-                  aria-label={p.name}
-                  className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
-                >
-                  <img
-                    src={p.image!.url}
-                    alt={p.image!.alt_text ?? p.name}
-                    className={`w-full rounded-[18px] bg-cream-200 object-cover ${i === 0 ? 'h-full min-h-72' : 'aspect-square'}`}
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
+        {heroShots.length > 0 && (
+          <figure aria-label="From the studio" className="relative pb-6 md:pb-8">
+            <HeroImage shot={heroShots[0]} className="aspect-[4/5] w-full rounded-[28px]" />
+            {(heroShots[0].title || heroShots[0].subtitle) && (
+              <figcaption className="absolute right-4 top-4 max-w-[70%] rounded-[14px] bg-paper p-3 shadow">
+                <span className="block text-[11px] font-medium uppercase tracking-widest text-bark">
+                  In the photo
+                </span>
+                {heroShots[0].title && (
+                  <span className="block font-semibold">{heroShots[0].title}</span>
+                )}
+                {heroShots[0].subtitle && (
+                  <span className="block text-sm text-bark">{heroShots[0].subtitle}</span>
+                )}
+              </figcaption>
+            )}
+            {heroShots[1] && (
+              <HeroImage
+                shot={heroShots[1]}
+                className="absolute bottom-0 left-2 aspect-square w-2/5 rounded-[18px] border-4 border-cream-100 sm:-left-6"
+              />
+            )}
+          </figure>
         )}
       </section>
 

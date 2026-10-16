@@ -23,7 +23,11 @@ _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine, _sessionmaker
     if _engine is None:
-        _engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)
+        # No per-request liveness ping: against a database in another country it costs about
+        # 0.6 s on every request. Idle connections are recycled before the server drops them.
+        _engine = create_async_engine(
+            get_settings().database_url, pool_pre_ping=False, pool_recycle=240
+        )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine
 

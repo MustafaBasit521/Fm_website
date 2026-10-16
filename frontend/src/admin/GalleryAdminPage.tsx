@@ -53,6 +53,7 @@ export default function GalleryAdminPage() {
         description: text('description') || null,
         image_type: text('type') as GalleryImageType,
         is_visible: fd.get('visible') === 'on',
+        show_in_hero: fd.get('hero') === 'on',
       })
       form.reset()
       reload()
@@ -80,6 +81,12 @@ export default function GalleryAdminPage() {
   return (
     <>
       <h1 className="font-serif text-4xl">Gallery</h1>
+      <p className="mt-1 max-w-xl text-bark">
+        Pictures shown publicly fill the gallery on the home page. Tick &ldquo;Top of the home
+        page&rdquo; on up to two shown pictures to make them the big photos next to the headline
+        (the first is large, the second sits in front of it; the title and description become the
+        caption). With none ticked, photos of the featured pieces are used.
+      </p>
       <form
         onSubmit={onUpload}
         aria-label="Add a gallery picture"
@@ -107,6 +114,9 @@ export default function GalleryAdminPage() {
         <Field id="g-desc" name="description" label="Description (optional)" maxLength={2000} />
         <label className="flex items-center gap-2">
           <input type="checkbox" name="visible" /> Show in the public gallery
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="hero" /> Show big at the top of the home page
         </label>
         <FormError message={error} />
         <div>
@@ -147,6 +157,17 @@ export default function GalleryAdminPage() {
                         }
                       />
                       Shown publicly
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={img.show_in_hero}
+                        aria-label={`Show ${img.title ?? 'picture'} at the top of the home page`}
+                        onChange={(e) =>
+                          void change(img.gallery_image_id, { show_in_hero: e.target.checked })
+                        }
+                      />
+                      Top of the home page
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                       Type

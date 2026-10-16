@@ -1,10 +1,18 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, getCustomOrderUploadTarget, submitCustomOrder } from '../lib/api'
 import { parseRupeesToPaisa } from '../lib/money'
 import { supabase } from '../lib/supabase'
+import { useShopWhatsapp, waLink } from '../lib/whatsapp'
 import { PageHeader } from './PageHeader'
-import { buttonClass, Field, FormError, inputClass, primaryButtonClass } from './ui'
+import {
+  buttonClass,
+  Field,
+  FormError,
+  inputClass,
+  primaryButtonClass,
+  secondaryButtonClass,
+} from './ui'
 
 const STEPS: [string, string][] = [
   ['Share your idea', 'Fill in the form — a reference photo helps a lot.'],
@@ -20,7 +28,25 @@ export default function CustomOrderPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const whatsapp = useShopWhatsapp()
   const today = new Date().toISOString().slice(0, 10)
+
+  /** Opens WhatsApp with what has been typed so far; nothing is stored by the shop. */
+  function sendOnWhatsApp() {
+    if (!whatsapp || !formRef.current) return
+    const form = new FormData(formRef.current)
+    const text = (k: string) => String(form.get(k) ?? '').trim()
+    const lines = [
+      "Hi! I'd like a custom piece.",
+      text('kind') && `Type: ${text('kind')}`,
+      text('name') && `Name: ${text('name')}`,
+      text('description') && `Details: ${text('description')}`,
+      text('budget') && `Budget: Rs ${text('budget')}`,
+      text('required_date') && `Needed by: ${text('required_date')}`,
+    ].filter(Boolean)
+    window.open(waLink(whatsapp, lines.join('\n')), '_blank', 'noopener,noreferrer')
+  }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -98,43 +124,49 @@ export default function CustomOrderPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <PageHeader
-        eyebrow="Custom orders"
-        title={
-          <>
-            Don&apos;t see it? <em className="text-terracotta">Customize anything.</em>
-          </>
-        }
-      >
-        Your colours, your name, your idea — tell us and we&apos;ll stitch it.
-      </PageHeader>
-
-      <div className="grid items-start gap-8 md:grid-cols-[1fr_1.4fr]">
-        <ol aria-label="How it works" className="flex flex-col gap-4">
-          {STEPS.map(([title, text], i) => (
-            <li key={title} className="flex flex-nowrap gap-4">
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-tint font-semibold text-terracotta"
-              >
-                {i + 1}
-              </span>
-              <div>
-                <p className="font-semibold">{title}</p>
-                <p className="text-bark">{text}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+    <main className="mx-auto max-w-5xl px-4 py-10 md:py-14">
+      <div className="grid items-start gap-10 md:grid-cols-[1fr_1.15fr]">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-widest text-bark">Custom orders</p>
+          <h1 className="mt-2 font-serif text-5xl leading-none md:text-7xl">
+            Your idea,
+            <br />
+            <em className="text-terracotta">our crochet.</em>
+          </h1>
+          <p className="mt-5 max-w-md text-bark">
+            A keychain with a name, a bouquet in wedding colours, a jersey for a team — tell us what
+            you have in mind and we&apos;ll message you on WhatsApp with a price and date.
+          </p>
+          <ol
+            aria-label="How it works"
+            className="mt-8 flex flex-col divide-y divide-dashed divide-linen border-y border-dashed border-linen"
+          >
+            {STEPS.map(([title, text], i) => (
+              <li key={title} className="flex flex-nowrap gap-4 py-4">
+                <span
+                  aria-hidden="true"
+                  className="w-6 shrink-0 font-serif text-3xl text-terracotta"
+                >
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="font-semibold">{title}</p>
+                  <p className="text-bark">{text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         <form
+          ref={formRef}
           onSubmit={onSubmit}
           aria-label="Custom order request"
-          className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+          className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5 md:p-6"
         >
+          <h2 className="font-serif text-2xl">Tell us about it</h2>
           <fieldset>
-            <legend className="text-sm font-medium text-bark">What are you after?</legend>
+            <legend className="text-sm font-medium text-bark">What would you like?</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {KINDS.map((kind) => (
                 <label
@@ -197,6 +229,15 @@ export default function CustomOrderPage() {
           <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
             {busy ? 'Sending…' : 'Send request'}
           </button>
+          {whatsapp && (
+            <button
+              type="button"
+              className={`${secondaryButtonClass} w-full`}
+              onClick={sendOnWhatsApp}
+            >
+              Or send this on WhatsApp
+            </button>
+          )}
           <p className="text-sm text-bark">
             No payment now — we&apos;ll confirm the price with you first.
           </p>

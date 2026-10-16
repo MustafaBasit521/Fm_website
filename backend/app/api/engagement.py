@@ -130,11 +130,17 @@ async def list_gallery(
     session: Session,
     storage: Storage,
     type: GalleryImageType | None = None,
+    hero: bool = False,
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=50)] = 24,
 ):
     rows, total = await gallery_service.list_images(
-        session, visible_only=True, image_type=type, page=page, page_size=page_size
+        session,
+        visible_only=True,
+        image_type=type,
+        hero_only=hero,
+        page=page,
+        page_size=page_size,
     )
 
     def url_for(path: str) -> str:

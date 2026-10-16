@@ -34,6 +34,7 @@ def to_admin(image: GalleryImage, url_for) -> AdminGalleryImage:
     return AdminGalleryImage(
         **to_read(image, url_for).model_dump(),
         is_visible=image.is_visible,
+        show_in_hero=image.show_in_hero,
         created_at=image.created_at,
     )
 
@@ -43,12 +44,15 @@ async def list_images(
     *,
     visible_only: bool,
     image_type: GalleryImageType | None,
+    hero_only: bool = False,
     page: int,
     page_size: int,
 ) -> tuple[list[GalleryImage], int]:
     where = []
     if visible_only:
         where.append(GalleryImage.is_visible.is_(True))
+    if hero_only:
+        where.append(GalleryImage.show_in_hero.is_(True))
     if image_type:
         where.append(GalleryImage.image_type == image_type)
     total = await session.scalar(select(func.count()).select_from(GalleryImage).where(*where))
@@ -88,7 +92,7 @@ async def update_image(
     image = await _get(session, image_id)
     for field in data.model_fields_set:
         value = getattr(data, field)
-        if value is None and field in ("image_type", "is_visible"):
+        if value is None and field in ("image_type", "is_visible", "show_in_hero"):
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"{field} cannot be null")
         setattr(image, field, value)
     await session.commit()

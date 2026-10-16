@@ -128,11 +128,33 @@ fake gateway page choose **Pay successfully** or **Fail the payment**. After a f
 **Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
 afterwards (the fake gateway keeps its state in memory only).
 
-## Email (not connected yet)
+## Email (Resend)
 
-No email service is chosen yet, so by default no email is sent (`EMAIL_PROVIDER=none`). To see
-the emails the app would send, set `EMAIL_PROVIDER=console` in `backend/.env` and watch the
-server log (development only; the app refuses it in production). The shop alerts (new orders,
+By default no email is sent (`EMAIL_PROVIDER=none`). To see the emails the app would send, set
+`EMAIL_PROVIDER=console` in `backend/.env` and watch the server log (development only; the app
+refuses it in production).
+
+**To send real emails with [Resend](https://resend.com):**
+
+1. Create a Resend account and an API key (Resend dashboard -> API Keys).
+2. In `backend/.env` set (the file is git-ignored; never paste the key anywhere else):
+
+   ```text
+   EMAIL_PROVIDER=resend
+   RESEND_API_KEY=re_...
+   EMAIL_FROM=Bundle of Loops <hello@yourdomain.com>
+   ```
+
+3. **Testing:** with no domain yet, use `EMAIL_FROM=onboarding@resend.dev`. Resend then delivers
+   only to the address of your own Resend account, which is enough to try the welcome email.
+4. **Real customers:** add your own domain in Resend (Domains), add the DNS records it shows, wait
+   for "Verified", then use an address on that domain in `EMAIL_FROM`.
+5. In production set the same three variables in the host's environment settings. The app refuses
+   to start with `EMAIL_PROVIDER=resend` if the key or the sender is missing.
+
+Emails are sent after the database change is saved and never block or fail the request: if Resend
+refuses one (unverified domain, bad address) the reason is written to the server log. The shop
+alerts (new orders,
 custom orders, messages) go to the email address in the business settings:
 
 ```sql
@@ -165,7 +187,8 @@ depends on them.
 | `CORS_ORIGINS` | exactly your two site origins, e.g. `https://www.yourshop.com,https://admin.yourshop.com` |
 | `TRUST_PROXY_HEADERS` | `true` only if a trusted reverse proxy sets `X-Forwarded-For` (otherwise every visitor shares one rate-limit budget; the API logs a warning in production when this is off) |
 | `PAYMENT_PROVIDER`, `ONLINE_PAYMENTS_ENABLED` | `none` / `false` until a real gateway adapter exists (the fake gateway is refused in production) |
-| `EMAIL_PROVIDER` | `none` until a real provider adapter exists (`console` is refused in production) |
+| `EMAIL_PROVIDER` | `none` (default), `console` (development only, refused in production) or `resend` |
+| `RESEND_API_KEY`, `EMAIL_FROM` | required for `resend`; server-only secret and the sender address |
 | `GLOBAL_RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL` | defaults `600` and `INFO` are fine |
 
 **Supabase checklist:** the migrations applied (`make migrate`), Authentication → Multi-Factor →

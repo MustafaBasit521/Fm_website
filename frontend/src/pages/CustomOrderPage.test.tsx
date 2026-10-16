@@ -5,7 +5,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
 import CustomOrderPage from './CustomOrderPage'
 
-const api = { getCustomOrderUploadTarget: vi.fn(), submitCustomOrder: vi.fn() }
+const api = {
+  getCustomOrderUploadTarget: vi.fn(),
+  submitCustomOrder: vi.fn(),
+  getPublicSettings: vi.fn(),
+}
 const uploadToSignedUrl = vi.fn()
 vi.mock('../lib/supabase', () => ({
   supabase: {
@@ -20,6 +24,7 @@ vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   getCustomOrderUploadTarget: (...a: unknown[]) => api.getCustomOrderUploadTarget(...a),
   submitCustomOrder: (...a: unknown[]) => api.submitCustomOrder(...a),
+  getPublicSettings: (...a: unknown[]) => api.getPublicSettings(...a),
 }))
 
 const renderPage = () =>
@@ -39,6 +44,7 @@ beforeEach(() => {
   Object.values(api).forEach((m) => m.mockReset())
   uploadToSignedUrl.mockReset().mockResolvedValue({ error: null })
   api.submitCustomOrder.mockResolvedValue({})
+  api.getPublicSettings.mockRejectedValue(new Error('x'))
 })
 
 it('submits a request without a picture, converting the budget to paisa', async () => {
@@ -134,4 +140,27 @@ it.each([
   await fillBasics()
   await userEvent.click(screen.getByRole('button', { name: 'Send request' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(text)
+})
+
+it('can send the typed request on WhatsApp instead, without saving anything', async () => {
+  api.getPublicSettings.mockResolvedValue({ whatsapp: '+92 300 1234567' })
+  const open = vi.spyOn(window, 'open').mockReturnValue(null)
+  renderPage()
+  await fillBasics()
+  await userEvent.click(screen.getByLabelText('Keychain'))
+  await userEvent.click(await screen.findByRole('button', { name: 'Or send this on WhatsApp' }))
+  const [url, target] = open.mock.calls[0] as [string, string]
+  expect(url).toMatch(/^https:\/\/wa\.me\/923001234567\?text=/)
+  const text = decodeURIComponent(url.split('?text=')[1])
+  expect(text).toContain('Type: Keychain')
+  expect(text).toContain('Name: Sara')
+  expect(text).toContain('Details: A jersey with a name')
+  expect(target).toBe('_blank')
+  expect(api.submitCustomOrder).not.toHaveBeenCalled()
+  open.mockRestore()
+})
+
+it('shows no WhatsApp button without a shop number', () => {
+  renderPage()
+  expect(screen.queryByRole('button', { name: /WhatsApp/ })).not.toBeInTheDocument()
 })

@@ -5,13 +5,14 @@ import { useCart } from '../cart/context'
 import { getPublicSettings, type BusinessSettings } from '../lib/api'
 import { NotificationsLink } from '../pages/NotificationsLink'
 import { useWishlist } from '../wishlist/context'
+import { useShopWhatsapp, waDigits, waLink } from '../lib/whatsapp'
 import { BagDrawer } from './BagDrawer'
 import { Drawer } from './Drawer'
 import { NewsletterSignup } from './NewsletterSignup'
 import { SearchSheet } from './SearchSheet'
 import { WishlistDrawer } from './WishlistDrawer'
 import { ShopName } from './ShopName'
-import { BagIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from './icons'
+import { BagIcon, ChatIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from './icons'
 
 const NAV: [string, string][] = [
   ['/shop', 'Shop'],
@@ -184,7 +185,7 @@ function SiteHeader({ name }: { name: string }) {
 }
 
 function SiteFooter({ settings, name }: { settings: BusinessSettings | null; name: string }) {
-  const wa = settings?.whatsapp?.replace(/[^\d]/g, '')
+  const wa = waDigits(settings?.whatsapp)
   const social = Object.entries(settings?.social_links ?? {})
   const link =
     'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-linen'
@@ -198,6 +199,31 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
           <p className="mt-2 max-w-sm text-linen">
             Handmade crochet, made with care in Lahore. Your idea, our crochet.
           </p>
+          {(wa || social.length > 0) && (
+            <p className="mt-5 flex flex-wrap gap-2">
+              {wa && (
+                <a
+                  href={waLink(wa)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 items-center rounded-full bg-paper px-4 text-sm font-semibold text-ink hover:opacity-90"
+                >
+                  WhatsApp
+                </a>
+              )}
+              {social.map(([key, url]) => (
+                <a
+                  key={key}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-10 items-center rounded-full border border-linen px-4 text-sm font-semibold text-cream hover:bg-bark"
+                >
+                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                </a>
+              ))}
+            </p>
+          )}
         </div>
         <nav aria-label="Footer">
           <p className="font-semibold">Explore</p>
@@ -211,38 +237,38 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
             ))}
           </ul>
         </nav>
-        <div>
-          <p className="font-semibold">Get in touch</p>
-          <ul className="mt-3 flex flex-col gap-2 text-linen">
-            {wa && (
-              <li>
-                <a
-                  href={`https://wa.me/${wa}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={link}
-                >
-                  WhatsApp
-                </a>
-              </li>
-            )}
-            {settings?.phone && <li>{settings.phone}</li>}
-            {settings?.email && <li>{settings.email}</li>}
-            {settings?.address && <li>{settings.address}</li>}
-            {social.map(([key, url]) => (
-              <li key={key}>
-                <a href={url} target="_blank" rel="noopener noreferrer" className={link}>
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {(settings?.phone || settings?.email || settings?.address) && (
+          <div>
+            <p className="font-semibold">Get in touch</p>
+            <ul className="mt-3 flex flex-col gap-2 text-linen">
+              {settings?.phone && <li>{settings.phone}</li>}
+              {settings?.email && <li>{settings.email}</li>}
+              {settings?.address && <li>{settings.address}</li>}
+            </ul>
+          </div>
+        )}
       </div>
-      <p className="border-t border-bark py-4 text-center text-sm text-linen">
+      <p className="mx-auto max-w-6xl border-t border-dashed border-bark px-4 py-4 text-center text-sm text-linen">
         © {new Date().getFullYear()} {name}
       </p>
     </footer>
+  )
+}
+
+/** A round WhatsApp button fixed to the corner of every page (hidden until a number is set). */
+function FloatingWhatsApp() {
+  const digits = useShopWhatsapp()
+  if (!digits) return null
+  return (
+    <a
+      href={waLink(digits, 'Hi! I have a question about Bundle of Loops.')}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Chat on WhatsApp (opens in a new tab)"
+      className="fixed bottom-4 right-4 z-30 inline-flex h-14 w-14 items-center justify-center rounded-full bg-moss-dark text-white shadow-lg hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dashed focus-visible:outline-bark"
+    >
+      <ChatIcon width={26} height={26} />
+    </a>
   )
 }
 
@@ -269,6 +295,7 @@ export default function ShopLayout() {
       </div>
       <NewsletterSignup />
       <SiteFooter settings={settings} name={name} />
+      <FloatingWhatsApp />
     </div>
   )
 }
