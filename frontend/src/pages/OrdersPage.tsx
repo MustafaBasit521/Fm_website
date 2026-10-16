@@ -4,6 +4,7 @@ import { getOrders, type OrderSummary, type Page } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { StatusBadge } from './StatusBadge'
+import { PageHeader } from './PageHeader'
 
 export default function OrdersPage() {
   const [page, setPage] = useState(1)
@@ -30,7 +31,7 @@ export default function OrdersPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-5xl">My orders</h1>
+      <PageHeader eyebrow="My account" title="My orders" />
 
       {!current && (
         <p role="status" className="mt-6">

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/context'
+import { PageHeader } from './PageHeader'
 import { buttonClass, Field, FormError } from './ui'
 
 export default function LoginPage() {
@@ -30,9 +31,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="font-serif text-5xl">Log in</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-5 px-4 py-10">
+      <PageHeader eyebrow="Welcome back" title="Log in" />
+      <form
+        onSubmit={onSubmit}
+        aria-label="Log in"
+        className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-6"
+      >
         <Field id="email" name="email" label="Email" type="email" autoComplete="email" required />
         <Field
           id="password"
@@ -43,11 +48,11 @@ export default function LoginPage() {
           required
         />
         <FormError message={error} />
-        <button type="submit" className={buttonClass} disabled={busy}>
+        <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
           {busy ? 'Logging in…' : 'Log in'}
         </button>
       </form>
-      <p className="text-muted">
+      <p className="text-bark">
         New here?{' '}
         <Link to="/register" className="text-terracotta underline">
           Create an account

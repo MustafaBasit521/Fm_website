@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getWishlist, removeFromWishlist, type Page, type ProductSummary } from '../lib/api'
 import { AddToCartButton } from './AddToCartButton'
 import { ProductCard } from './ProductCard'
+import { PageHeader } from './PageHeader'
 
 export default function WishlistPage() {
   const [page, setPage] = useState(1)
@@ -52,7 +53,7 @@ export default function WishlistPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-5xl">My wishlist</h1>
+      <PageHeader eyebrow="My account" title="My wishlist" />
 
       {!current && (
         <p role="status" className="mt-6">

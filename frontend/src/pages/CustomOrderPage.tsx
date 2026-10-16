@@ -3,8 +3,14 @@ import { Link } from 'react-router-dom'
 import { ApiError, getCustomOrderUploadTarget, submitCustomOrder } from '../lib/api'
 import { parseRupeesToPaisa } from '../lib/money'
 import { supabase } from '../lib/supabase'
-import { buttonClass, Field, FormError } from './ui'
+import { PageHeader } from './PageHeader'
+import { buttonClass, Field, FormError, inputClass, primaryButtonClass } from './ui'
 
+const STEPS: [string, string][] = [
+  ['Share your idea', 'Fill in the form — a reference photo helps a lot.'],
+  ['We confirm on WhatsApp', 'We message you with the price, colours and delivery date.'],
+  ['Stitched & delivered', 'We make it by hand and deliver across Lahore.'],
+]
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BYTES = 5 * 1024 * 1024 // the bucket enforces its own limit too
 
@@ -73,73 +79,107 @@ export default function CustomOrderPage() {
 
   if (done) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-8">
-        <h1 className="font-serif text-5xl">Request sent</h1>
-        <p role="status" className="mt-4">
-          Thank you! We received your custom order request and will contact you on WhatsApp to
-          discuss the details and the price.
-        </p>
-        <p className="mt-4">
-          <Link to="/" className="text-terracotta underline">
-            Back to the home page
-          </Link>
-        </p>
+      <main className="mx-auto max-w-xl px-4 py-12">
+        <PageHeader eyebrow="Custom order" title="Request sent">
+          <p role="status">
+            Thank you! We received your custom order request and will message you on WhatsApp with a
+            price and delivery date.
+          </p>
+        </PageHeader>
+        <Link to="/" className={primaryButtonClass}>
+          Back to the home page
+        </Link>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-8">
-      <Link to="/" className="text-terracotta underline">
-        ← Home
-      </Link>
-      <h1 className="mt-2 font-serif text-5xl">Custom order</h1>
-      <p className="mt-2 text-muted">
-        Tell us what you would like us to make. We will contact you on WhatsApp to agree the
-        details.
-      </p>
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-        <Field id="name" name="name" label="Your name" maxLength={100} required />
-        <Field
-          id="whatsapp_number"
-          name="whatsapp_number"
-          label="WhatsApp number"
-          type="tel"
-          maxLength={20}
-          required
-        />
-        <div className="flex flex-col gap-1">
-          <label htmlFor="description" className="text-sm font-medium text-bark">
-            What should we make? (include sizes, colours and quantity)
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows={5}
-            maxLength={3000}
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <PageHeader
+        eyebrow="Custom orders"
+        title={
+          <>
+            Don&apos;t see it? <em className="text-terracotta">Customize anything.</em>
+          </>
+        }
+      >
+        Your colours, your name, your idea — tell us and we&apos;ll stitch it.
+      </PageHeader>
+
+      <div className="grid items-start gap-8 md:grid-cols-[1fr_1.4fr]">
+        <ol aria-label="How it works" className="flex flex-col gap-4">
+          {STEPS.map(([title, text], i) => (
+            <li key={title} className="flex flex-nowrap gap-4">
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-tint font-semibold text-terracotta"
+              >
+                {i + 1}
+              </span>
+              <div>
+                <p className="font-semibold">{title}</p>
+                <p className="text-bark">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        <form
+          onSubmit={onSubmit}
+          aria-label="Custom order request"
+          className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+        >
+          <Field id="name" name="name" label="Your name" maxLength={100} required />
+          <Field
+            id="whatsapp_number"
+            name="whatsapp_number"
+            label="WhatsApp number"
+            type="tel"
+            maxLength={20}
             required
-            className="rounded-[10px] border border-linen bg-paper px-4 py-3"
           />
-        </div>
-        <Field id="budget" name="budget" label="Budget in Rs (optional)" inputMode="decimal" />
-        <Field
-          id="required_date"
-          name="required_date"
-          label="Needed by (optional)"
-          type="date"
-          min={today}
-        />
-        <div className="flex flex-col gap-1">
-          <label htmlFor="reference" className="text-sm font-medium text-bark">
-            Reference picture (optional, JPG/PNG/WebP, under 5 MB)
-          </label>
-          <input id="reference" name="reference" type="file" accept={ALLOWED_TYPES.join(',')} />
-        </div>
-        <FormError message={error} />
-        <button type="submit" className={buttonClass} disabled={busy}>
-          {busy ? 'Sending…' : 'Send request'}
-        </button>
-      </form>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="description" className="text-sm font-medium text-bark">
+              What should we make? (include sizes, colours and quantity)
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows={5}
+              maxLength={3000}
+              required
+              className={inputClass}
+            />
+          </div>
+          <Field id="budget" name="budget" label="Budget in Rs (optional)" inputMode="decimal" />
+          <Field
+            id="required_date"
+            name="required_date"
+            label="Needed by (optional)"
+            type="date"
+            min={today}
+          />
+          <div className="flex flex-col gap-1">
+            <label htmlFor="reference" className="text-sm font-medium text-bark">
+              Reference picture (optional, JPG/PNG/WebP, under 5 MB)
+            </label>
+            <input
+              id="reference"
+              name="reference"
+              type="file"
+              accept={ALLOWED_TYPES.join(',')}
+              className="rounded-[10px] border border-dashed border-linen bg-cream-100 p-4"
+            />
+          </div>
+          <FormError message={error} />
+          <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
+            {busy ? 'Sending…' : 'Send request'}
+          </button>
+          <p className="text-sm text-bark">
+            No payment now — we&apos;ll confirm the price with you first.
+          </p>
+        </form>
+      </div>
     </main>
   )
 }

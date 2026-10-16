@@ -8,6 +8,7 @@ import {
   type Page,
 } from '../lib/api'
 import { formatDate } from '../lib/orderStatus'
+import { PageHeader } from './PageHeader'
 
 export default function NotificationsPage() {
   const [page, setPage] = useState(1)
@@ -58,7 +59,7 @@ export default function NotificationsPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-5xl">Notifications</h1>
+      <PageHeader eyebrow="My account" title="Notifications" />
 
       {!current && (
         <p role="status" className="mt-6">

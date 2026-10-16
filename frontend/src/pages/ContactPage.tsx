@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ApiError, getPublicSettings, sendContactMessage } from '../lib/api'
-import { buttonClass, Field, FormError } from './ui'
+import { PageHeader } from './PageHeader'
+import { buttonClass, Field, FormError, inputClass, primaryButtonClass } from './ui'
 
 function ShopDetails() {
   const [info, setInfo] = useState<Awaited<ReturnType<typeof getPublicSettings>> | null>(null)
@@ -17,16 +18,13 @@ function ShopDetails() {
   const links = Object.entries(info.social_links)
   if (!info.phone && !wa && !info.address && !info.email && links.length === 0) return null
   return (
-    <section
-      aria-label="Shop details"
-      className="mt-4 rounded-[18px] border border-sand bg-paper p-4"
-    >
-      <h2 className="text-xl font-semibold">{info.business_name ?? 'Our details'}</h2>
-      <ul className="mt-2 flex flex-col gap-1">
+    <section aria-label="Shop details" className="rounded-[18px] border border-sand bg-paper p-5">
+      <h2 className="font-serif text-2xl">{info.business_name ?? 'Our details'}</h2>
+      <ul className="mt-3 flex flex-col gap-2">
         {wa && (
           <li>
             <a
-              className="text-terracotta underline"
+              className={`${primaryButtonClass} w-full`}
               href={`https://wa.me/${wa}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -93,57 +91,66 @@ export default function ContactPage() {
 
   if (done) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-8">
-        <h1 className="font-serif text-5xl">Message sent</h1>
-        <p role="status" className="mt-4">
-          Thank you! We received your message and will reply soon.
-        </p>
-        <p className="mt-4">
-          <Link to="/" className="text-terracotta underline">
-            Back to the home page
-          </Link>
-        </p>
+      <main className="mx-auto max-w-xl px-4 py-12">
+        <PageHeader eyebrow="Contact" title="Message sent">
+          <p role="status">Thank you! We received your message and will reply soon.</p>
+        </PageHeader>
+        <Link to="/" className={primaryButtonClass}>
+          Back to the home page
+        </Link>
       </main>
     )
   }
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-8">
-      <Link to="/" className="text-terracotta underline">
-        ← Home
-      </Link>
-      <h1 className="mt-2 font-serif text-5xl">Contact us</h1>
-      <ShopDetails />
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-        <Field id="name" name="name" label="Your name" maxLength={100} required />
-        <Field id="email" name="email" label="Email" type="email" />
-        <Field id="phone" name="phone" label="Phone" type="tel" maxLength={20} />
-        <Field
-          id="whatsapp_number"
-          name="whatsapp_number"
-          label="WhatsApp number"
-          type="tel"
-          maxLength={20}
-        />
-        <p className="text-sm text-muted">Give at least one way for us to reply.</p>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="message" className="text-sm font-medium text-bark">
-            Message
-          </label>
-          <textarea
-            id="message"
-            name="message"
-            rows={5}
-            maxLength={3000}
-            required
-            className="rounded-[10px] border border-linen bg-paper px-4 py-3"
+    <main className="mx-auto max-w-5xl px-4 py-8">
+      <PageHeader
+        eyebrow="Contact"
+        title={
+          <>
+            Say <em className="text-terracotta">hello</em>
+          </>
+        }
+      >
+        Questions about a piece, an order or a custom idea? Write to us.
+      </PageHeader>
+      <div className="grid items-start gap-8 md:grid-cols-[1fr_1.6fr]">
+        <ShopDetails />
+        <form
+          onSubmit={onSubmit}
+          aria-label="Contact form"
+          className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+        >
+          <Field id="name" name="name" label="Your name" maxLength={100} required />
+          <Field id="email" name="email" label="Email" type="email" />
+          <Field id="phone" name="phone" label="Phone" type="tel" maxLength={20} />
+          <Field
+            id="whatsapp_number"
+            name="whatsapp_number"
+            label="WhatsApp number"
+            type="tel"
+            maxLength={20}
+            hint="Give at least one way for us to reply (email, phone or WhatsApp)."
           />
-        </div>
-        <FormError message={error} />
-        <button type="submit" className={buttonClass} disabled={busy}>
-          {busy ? 'Sending…' : 'Send message'}
-        </button>
-      </form>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="message" className="text-sm font-medium text-bark">
+              Message
+            </label>
+            <textarea
+              id="message"
+              name="message"
+              rows={5}
+              maxLength={3000}
+              required
+              className={inputClass}
+            />
+          </div>
+          <FormError message={error} />
+          <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
+            {busy ? 'Sending…' : 'Send message'}
+          </button>
+        </form>
+      </div>
     </main>
   )
 }

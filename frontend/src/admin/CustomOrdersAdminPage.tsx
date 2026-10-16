@@ -4,7 +4,9 @@ import { ApiError, type CustomOrderStatus } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
-import { Badge, Pager, State } from './ui'
+import { StatusBadge } from '../pages/StatusBadge'
+import { CUSTOM_ORDER_TONE } from '../pages/statusColors'
+import { Pager, State } from './ui'
 import { useLoad } from './useLoad'
 
 const LABELS: Record<CustomOrderStatus, string> = {
@@ -137,7 +139,10 @@ export default function CustomOrdersAdminPage() {
                           <strong>{c.name}</strong> · WhatsApp {c.whatsapp_number}
                         </span>
                         <span className="flex items-center gap-2">
-                          <Badge>{LABELS[c.status]}</Badge>
+                          <StatusBadge
+                            status={CUSTOM_ORDER_TONE[c.status]}
+                            label={LABELS[c.status]}
+                          />
                           <span className="text-sm text-muted">{formatDate(c.created_at)}</span>
                         </span>
                       </p>

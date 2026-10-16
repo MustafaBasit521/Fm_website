@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { PageHeader } from './PageHeader'
 import { getGallery, type GalleryImage, type GalleryImageType, type Page } from '../lib/api'
 
 const TYPES: [GalleryImageType | '', string][] = [
@@ -34,32 +34,40 @@ export default function GalleryPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.page_size)) : 1
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link to="/" className="text-terracotta underline">
-        ← Home
-      </Link>
-      <h1 className="mt-2 font-serif text-5xl">Gallery</h1>
+    <main className="mx-auto max-w-6xl px-4 py-8">
+      <PageHeader
+        eyebrow="Gallery"
+        title={
+          <>
+            From the <em>studio table</em>
+          </>
+        }
+      >
+        Pieces in the shop, designs, and the making of them.
+      </PageHeader>
 
-      <div className="mt-4 flex flex-col gap-1 sm:w-64">
-        <label htmlFor="gallery-type" className="text-sm font-medium text-bark">
-          Show
-        </label>
-        <select
-          id="gallery-type"
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value as GalleryImageType | '')
-            setPage(1)
-          }}
-          className="rounded-[10px] border border-linen bg-paper px-4 py-3"
-        >
+      <nav
+        aria-label="Gallery types"
+        className="-mx-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <ul className="flex gap-2">
           {TYPES.map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
+            <li key={value || 'all'}>
+              <button
+                type="button"
+                aria-pressed={type === value}
+                onClick={() => {
+                  setType(value)
+                  setPage(1)
+                }}
+                className={`whitespace-nowrap rounded-full border px-4 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-dashed focus-visible:outline-bark ${type === value ? 'border-ink bg-ink text-cream' : 'border-linen bg-paper hover:bg-cream-200'}`}
+              >
+                {label}
+              </button>
+            </li>
           ))}
-        </select>
-      </div>
+        </ul>
+      </nav>
 
       <section className="mt-6" aria-live="polite">
         {!current && <p role="status">Loading…</p>}
@@ -74,17 +82,17 @@ export default function GalleryPage() {
             <ul className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {data.items.map((img) => (
                 <li key={img.gallery_image_id}>
-                  <figure className="overflow-hidden rounded-[18px] border border-sand bg-paper">
+                  <figure>
                     <img
                       src={img.url}
                       alt={img.title ?? 'Gallery photo'}
                       loading="lazy"
-                      className="aspect-square w-full object-cover"
+                      className="aspect-square w-full rounded-[18px] bg-cream-200 object-cover"
                     />
                     {(img.title || img.description) && (
-                      <figcaption className="p-3">
+                      <figcaption className="mt-2">
                         {img.title && <p className="font-semibold">{img.title}</p>}
-                        {img.description && <p className="text-sm text-muted">{img.description}</p>}
+                        {img.description && <p className="text-sm text-bark">{img.description}</p>}
                       </figcaption>
                     )}
                   </figure>
@@ -92,7 +100,10 @@ export default function GalleryPage() {
               ))}
             </ul>
             {totalPages > 1 && (
-              <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center gap-4">
+              <nav
+                aria-label="Pagination"
+                className="mt-8 flex flex-wrap items-center justify-center gap-4"
+              >
                 <button
                   type="button"
                   disabled={page <= 1}

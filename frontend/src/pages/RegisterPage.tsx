@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/context'
+import { PageHeader } from './PageHeader'
 import { buttonClass, Field, FormError } from './ui'
 
 export default function RegisterPage() {
@@ -32,9 +33,9 @@ export default function RegisterPage() {
 
   if (confirmEmail) {
     return (
-      <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
-        <h1 className="font-serif text-5xl">Check your email</h1>
-        <p role="status" className="text-muted">
+      <main className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-4 px-4 py-10">
+        <PageHeader eyebrow="Almost there" title="Check your email" />
+        <p role="status" className="rounded-[18px] border border-sand bg-paper p-6 text-bark">
           We sent you a confirmation link. Open it, then{' '}
           <Link to="/login" className="text-terracotta underline">
             log in
@@ -46,9 +47,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="font-serif text-5xl">Create account</h1>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-5 px-4 py-10">
+      <PageHeader eyebrow="Join us" title="Create account" />
+      <form
+        onSubmit={onSubmit}
+        aria-label="Create account"
+        className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-6"
+      >
         <Field id="name" name="name" label="Name" autoComplete="name" maxLength={100} required />
         <Field id="email" name="email" label="Email" type="email" autoComplete="email" required />
         <Field
@@ -61,11 +66,11 @@ export default function RegisterPage() {
           required
         />
         <FormError message={error} />
-        <button type="submit" className={buttonClass} disabled={busy}>
+        <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
           {busy ? 'Creating…' : 'Create account'}
         </button>
       </form>
-      <p className="text-muted">
+      <p className="text-bark">
         Already registered?{' '}
         <Link to="/login" className="text-terracotta underline">
           Log in

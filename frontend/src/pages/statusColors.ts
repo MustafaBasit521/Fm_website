@@ -8,3 +8,15 @@ export const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   DELIVERED: { bg: '#dde8d6', fg: '#3f5233' },
   CANCELLED: { bg: '#f5d9d6', fg: '#8a2a24' },
 }
+
+/** Custom-order statuses reuse the order-status colours: new = pending, in discussion = processing,
+ *  accepted = confirmed, in progress = shipped, completed = delivered, declined/cancelled = red. */
+export const CUSTOM_ORDER_TONE: Record<string, string> = {
+  NEW: 'PENDING',
+  IN_DISCUSSION: 'PROCESSING',
+  ACCEPTED: 'CONFIRMED',
+  IN_PROGRESS: 'SHIPPED',
+  COMPLETED: 'DELIVERED',
+  DECLINED: 'CANCELLED',
+  CANCELLED: 'CANCELLED',
+}

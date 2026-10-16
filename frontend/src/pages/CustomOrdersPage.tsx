@@ -9,6 +9,9 @@ import {
 } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate } from '../lib/orderStatus'
+import { StatusBadge } from './StatusBadge'
+import { CUSTOM_ORDER_TONE } from './statusColors'
+import { PageHeader } from './PageHeader'
 
 const LABELS: Record<CustomOrderStatus, string> = {
   NEW: 'Received',
@@ -61,7 +64,7 @@ export default function CustomOrdersPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-5xl">My custom orders</h1>
+      <PageHeader eyebrow="My account" title="My custom orders" />
 
       {!current && (
         <p role="status" className="mt-6">
@@ -97,7 +100,7 @@ export default function CustomOrdersPage() {
                   className="rounded-[18px] border border-sand bg-paper p-4"
                 >
                   <p className="flex justify-between">
-                    <span className="font-semibold">{LABELS[c.status]}</span>
+                    <StatusBadge status={CUSTOM_ORDER_TONE[c.status]} label={LABELS[c.status]} />
                     <span className="text-sm text-muted">Sent {formatDate(c.created_at)}</span>
                   </p>
                   <p className="mt-1 whitespace-pre-line">{c.description}</p>

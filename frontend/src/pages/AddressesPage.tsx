@@ -8,6 +8,7 @@ import {
   type Address,
   type AddressInput,
 } from '../lib/api'
+import { PageHeader } from './PageHeader'
 import { buttonClass, Field, FormError } from './ui'
 
 type Editing = { mode: 'new' } | { mode: 'edit'; address: Address } | null
@@ -98,7 +99,7 @@ export default function AddressesPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-5xl">Saved addresses</h1>
+      <PageHeader eyebrow="My account" title="Saved addresses" />
       <p className="mt-1 text-muted">We currently deliver only within Lahore.</p>
 
       {addresses.length === 0 && !editing && (
