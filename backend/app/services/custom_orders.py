@@ -10,11 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser
 from app.core.storage import StorageNotConfiguredError, SupabaseStorage
-from app.models.engagement import CustomOrder
+from app.models.engagement import CustomOrder, CustomOrderMessage
+from app.models.enums import CustomOrderMessageSender
 from app.models.enums import CustomOrderStatus as S
 from app.schemas.engagement import (
     AdminCustomOrderRead,
     CustomOrderCreate,
+    CustomOrderMessageRead,
     CustomOrderRead,
 )
 from app.services import events
@@ -27,6 +29,9 @@ ADMIN_TRANSITIONS: dict[S, set[S]] = {
     S.ACCEPTED: {S.IN_PROGRESS, S.CANCELLED},
     S.IN_PROGRESS: {S.COMPLETED, S.CANCELLED},
 }
+# The discussion is open until the request is finished one way or another.
+DISCUSSION_OPEN = (S.NEW, S.IN_DISCUSSION, S.ACCEPTED, S.IN_PROGRESS)
+MAX_THREAD = 500  # messages returned for one request
 # A customer may withdraw only while nothing has been agreed yet.
 CUSTOMER_CANCELLABLE = (S.NEW, S.IN_DISCUSSION)
 
@@ -42,6 +47,7 @@ def to_read(co: CustomOrder) -> CustomOrderRead:
         whatsapp_number=co.whatsapp_number,
         description=co.description,
         budget_paisa=co.budget_paisa,
+        agreed_price_paisa=co.agreed_price_paisa,
         required_date=co.required_date,
         status=co.status,
         has_reference_image=co.reference_image_path is not None,
@@ -180,6 +186,12 @@ async def get_admin(session: AsyncSession, custom_order_id: uuid.UUID) -> Custom
 async def change_status(
     session: AsyncSession, custom_order_id: uuid.UUID, target: S
 ) -> CustomOrder:
+    if target == S.ACCEPTED:  # acceptance carries the agreed price: it has its own action
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "USE_ACCEPT",
+            "Accept a custom order together with the price agreed in the discussion",
+        )
     co = await _load(session, custom_order_id, lock=True)
     if target not in ADMIN_TRANSITIONS.get(co.status, set()):
         raise _problem(
@@ -191,3 +203,64 @@ async def change_status(
     await events.custom_order_status_changed(session, co)
     await session.commit()
     return await _load(session, custom_order_id, lock=False)
+
+
+async def accept_at_price(
+    session: AsyncSession, custom_order_id: uuid.UUID, agreed_price_paisa: int
+) -> CustomOrder:
+    """The admin accepts the request at the final price agreed in the discussion: the price is
+    saved together with the move to ACCEPTED, so an accepted request always carries its price."""
+    co = await _load(session, custom_order_id, lock=True)
+    if S.ACCEPTED not in ADMIN_TRANSITIONS.get(co.status, set()):
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "INVALID_TRANSITION",
+            "Only a request that is being discussed can be accepted",
+        )
+    co.agreed_price_paisa = agreed_price_paisa
+    co.status = S.ACCEPTED
+    await events.custom_order_accepted(session, co)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+# ---- the discussion (registered customers and the admin) -------------------------------------
+
+
+async def list_messages(
+    session: AsyncSession, custom_order_id: uuid.UUID
+) -> list[CustomOrderMessageRead]:
+    rows = await session.scalars(
+        select(CustomOrderMessage)
+        .where(CustomOrderMessage.custom_order_id == custom_order_id)
+        .order_by(CustomOrderMessage.created_at, CustomOrderMessage.message_id)
+        .limit(MAX_THREAD)
+    )
+    return [CustomOrderMessageRead.model_validate(m) for m in rows.all()]
+
+
+async def post_message(
+    session: AsyncSession,
+    custom_order_id: uuid.UUID,
+    sender: CustomOrderMessageSender,
+    body: str,
+) -> CustomOrderMessageRead:
+    co = await _load(session, custom_order_id, lock=True)  # a finished request cannot get new text
+    if co.customer_id is None:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "NO_DISCUSSION",
+            "This request came from a guest, so there is no discussion here. Use WhatsApp.",
+        )
+    if co.status not in DISCUSSION_OPEN:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "DISCUSSION_CLOSED",
+            "This request is finished, so the discussion is closed.",
+        )
+    message = CustomOrderMessage(custom_order_id=custom_order_id, sender=sender, body=body)
+    session.add(message)
+    await session.flush()
+    await events.custom_order_message(session, co, sender, body)
+    await session.commit()
+    return CustomOrderMessageRead.model_validate(message)

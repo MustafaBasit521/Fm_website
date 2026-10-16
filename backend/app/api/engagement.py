@@ -11,12 +11,14 @@ from app.core.auth import AuthUser, get_current_user, get_optional_user
 from app.core.db import get_session
 from app.core.rate_limit import rate_limit
 from app.core.storage import SupabaseStorage, get_storage, require_storage
-from app.models.enums import GalleryImageType
+from app.models.enums import CustomOrderMessageSender, GalleryImageType
 from app.schemas.catalog import Page
 from app.schemas.engagement import (
     IMAGE_TYPES,
     ContactCreate,
     CustomOrderCreate,
+    CustomOrderMessageCreate,
+    CustomOrderMessageRead,
     CustomOrderRead,
     GalleryImageRead,
     MyReviewState,
@@ -204,6 +206,30 @@ async def my_custom_order(custom_order_id: uuid.UUID, user: CurrentUser, session
 @custom_orders.post("/{custom_order_id}/cancel", response_model=CustomOrderRead)
 async def cancel_my_custom_order(custom_order_id: uuid.UUID, user: CurrentUser, session: Session):
     return custom_service.to_read(await custom_service.cancel_mine(session, user, custom_order_id))
+
+
+@custom_orders.get("/{custom_order_id}/messages", response_model=list[CustomOrderMessageRead])
+async def my_custom_order_messages(custom_order_id: uuid.UUID, user: CurrentUser, session: Session):
+    await custom_service.get_mine(session, user, custom_order_id)  # ownership check
+    return await custom_service.list_messages(session, custom_order_id)
+
+
+@custom_orders.post(
+    "/{custom_order_id}/messages",
+    response_model=CustomOrderMessageRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit("custom-order-message", 30, 3600))],
+)
+async def write_to_the_shop(
+    custom_order_id: uuid.UUID,
+    data: CustomOrderMessageCreate,
+    user: CurrentUser,
+    session: Session,
+):
+    await custom_service.get_mine(session, user, custom_order_id)
+    return await custom_service.post_message(
+        session, custom_order_id, CustomOrderMessageSender.CUSTOMER, data.body
+    )
 
 
 # ---- contact -------------------------------------------------------------------------------

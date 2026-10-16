@@ -22,6 +22,7 @@ from app.models.catalog import Product
 from app.models.customer import Customer
 from app.models.engagement import CustomOrder, Message, Notification
 from app.models.enums import (
+    CustomOrderMessageSender,
     CustomOrderStatus,
     NotificationStatus,
     NotificationType,
@@ -291,6 +292,66 @@ async def custom_order_status_changed(session: AsyncSession, custom_order: Custo
                 subject="Update on your custom order",
                 body=f"Hi {custom_order.name},\n\n{text}\n\n- {shop}",
             ),
+        )
+
+
+async def custom_order_accepted(session: AsyncSession, custom_order: CustomOrder) -> None:
+    shop = await _shop_name(session)
+    price = format_price(custom_order.agreed_price_paisa or 0)
+    text = f"Your custom order has been accepted at {price}."
+    _notify(
+        session,
+        custom_order.customer_id,
+        NotificationType.CUSTOM_ORDER_UPDATE,
+        "Custom order accepted",
+        text,
+    )
+    email = await _customer_email(session, custom_order)
+    if email:
+        queue_email(
+            session,
+            EmailMessage(
+                to=email,
+                subject="Your custom order was accepted",
+                body=f"Hi {custom_order.name},\n\n{text}\n\n- {shop}",
+            ),
+        )
+
+
+async def custom_order_message(
+    session: AsyncSession, custom_order: CustomOrder, sender, body: str
+) -> None:
+    """A new message in the discussion tells the other side: the customer gets an in-app
+    notification and an email, the shop gets an alert email."""
+    shop = await _shop_name(session)
+    preview = body if len(body) <= 120 else body[:117] + "..."
+    if sender == CustomOrderMessageSender.ADMIN:
+        _notify(
+            session,
+            custom_order.customer_id,
+            NotificationType.CUSTOM_ORDER_UPDATE,
+            "New message about your custom order",
+            preview,
+        )
+        email = await _customer_email(session, custom_order)
+        if email:
+            queue_email(
+                session,
+                EmailMessage(
+                    to=email,
+                    subject="New message about your custom order",
+                    body=(
+                        f"Hi {custom_order.name},\n\n{shop} wrote:\n\n{body}\n\n"
+                        f"Reply in your account under My custom orders: "
+                        f"{get_settings().frontend_url}/custom-orders/{custom_order.custom_order_id}"
+                    ),
+                ),
+            )
+    else:
+        await _alert_shop(
+            session,
+            "New message on a custom order",
+            f"{custom_order.name} wrote on their custom order:\n\n{body}",
         )
 
 

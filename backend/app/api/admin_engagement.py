@@ -10,13 +10,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_admin
 from app.core.db import get_session
 from app.core.storage import SupabaseStorage, get_storage, require_storage
-from app.models.enums import CustomOrderStatus, GalleryImageType, MessageStatus
+from app.models.enums import (
+    CustomOrderMessageSender,
+    CustomOrderStatus,
+    GalleryImageType,
+    MessageStatus,
+)
 from app.schemas.catalog import Page
 from app.schemas.engagement import (
     IMAGE_TYPES,
     AdminCustomOrderRead,
     AdminGalleryImage,
     AdminReviewRead,
+    CustomOrderAccept,
+    CustomOrderMessageCreate,
+    CustomOrderMessageRead,
     CustomOrderStatusChange,
     GalleryCreate,
     GalleryUpdate,
@@ -150,6 +158,34 @@ async def change_custom_order_status(
 ):
     co = await custom_service.change_status(session, custom_order_id, data.status)
     return await custom_service.to_admin_read(co, storage)
+
+
+@custom_orders.post("/{custom_order_id}/accept", response_model=AdminCustomOrderRead)
+async def accept_custom_order(
+    custom_order_id: uuid.UUID, data: CustomOrderAccept, session: Session, storage: Storage
+):
+    """Accept at the final price agreed in the discussion (moves IN_DISCUSSION to ACCEPTED)."""
+    co = await custom_service.accept_at_price(session, custom_order_id, data.agreed_price_paisa)
+    return await custom_service.to_admin_read(co, storage)
+
+
+@custom_orders.get("/{custom_order_id}/messages", response_model=list[CustomOrderMessageRead])
+async def custom_order_messages(custom_order_id: uuid.UUID, session: Session):
+    await custom_service.get_admin(session, custom_order_id)
+    return await custom_service.list_messages(session, custom_order_id)
+
+
+@custom_orders.post(
+    "/{custom_order_id}/messages",
+    response_model=CustomOrderMessageRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def reply_to_customer(
+    custom_order_id: uuid.UUID, data: CustomOrderMessageCreate, session: Session
+):
+    return await custom_service.post_message(
+        session, custom_order_id, CustomOrderMessageSender.ADMIN, data.body
+    )
 
 
 # ---- contact messages ----------------------------------------------------------------------

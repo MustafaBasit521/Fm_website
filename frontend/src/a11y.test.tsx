@@ -196,6 +196,33 @@ const ROUTES: [RegExp, unknown][] = [
   ],
   [/^\/api\/customers\/me\/notifications\/unread-count$/, { unread: 1 }],
   [/^\/api\/custom-orders$/, page([])],
+  [
+    /^\/api\/custom-orders\/c1$/,
+    {
+      custom_order_id: 'c1',
+      name: 'Sara',
+      whatsapp_number: '0300',
+      description: 'A jersey',
+      budget_paisa: 250000,
+      agreed_price_paisa: null,
+      required_date: null,
+      status: 'IN_DISCUSSION',
+      has_reference_image: false,
+      created_at: '2026-03-05T10:00:00Z',
+      updated_at: '',
+    },
+  ],
+  [
+    /^\/api\/custom-orders\/c1\/messages$/,
+    [
+      {
+        message_id: 'm1',
+        sender: 'ADMIN',
+        body: 'What colour?',
+        created_at: '2026-03-06T10:00:00Z',
+      },
+    ],
+  ],
   [/^\/api\/orders\/o1$/, order],
   [/^\/api\/orders$/, page([orderSummary])],
   // admin
@@ -251,6 +278,28 @@ const ROUTES: [RegExp, unknown][] = [
         created_at: '',
       },
     ]),
+  ],
+  [
+    /^\/api\/admin\/custom-orders\/c1$/,
+    {
+      custom_order_id: 'c1',
+      name: 'Sara',
+      whatsapp_number: '0300',
+      description: 'A jersey',
+      budget_paisa: 250000,
+      agreed_price_paisa: null,
+      required_date: null,
+      status: 'IN_DISCUSSION',
+      has_reference_image: false,
+      created_at: '2026-03-05T10:00:00Z',
+      updated_at: '',
+      customer_id: 'c9',
+      reference_image_url: null,
+    },
+  ],
+  [
+    /^\/api\/admin\/custom-orders\/c1\/messages$/,
+    [{ message_id: 'm1', sender: 'CUSTOMER', body: 'Blush?', created_at: '2026-03-06T10:00:00Z' }],
   ],
   [
     /^\/api\/admin\/custom-orders$/,
@@ -374,6 +423,7 @@ const SIGNED_IN = [
   '/orders/o1',
   '/notifications',
   '/custom-orders',
+  '/custom-orders/c1',
   '/checkout',
 ]
 const ADMIN = [
@@ -387,6 +437,7 @@ const ADMIN = [
   '/customers',
   '/gallery',
   '/custom-orders',
+  '/custom-orders/c1',
   '/messages',
   '/reviews',
   '/activity',

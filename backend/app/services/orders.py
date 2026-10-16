@@ -114,6 +114,8 @@ def _summary_fields(order: Order) -> dict[str, Any]:
         "item_count": sum(i.quantity for i in order.items),
         "payment_deadline_at": order.payment_deadline_at,
         "created_at": order.created_at,
+        # up to three small pictures for the list (only filled where the items were enriched)
+        "image_urls": [u for i in order.items if (u := getattr(i, "image_url", None))][:3],
     }
 
 
@@ -157,10 +159,10 @@ async def load_order(session: AsyncSession, order_id: uuid.UUID, *, lock: bool) 
     return order
 
 
-async def _attach_item_images(session: AsyncSession, order: Order) -> None:
-    """Give each item the picture of its product (one query for the whole order). The picture is
+async def _attach_item_images(session: AsyncSession, *orders: Order) -> None:
+    """Give each item the picture of its product (one query however many orders). The picture is
     looked up live, not stored in the order: the order keeps only the name and price paid."""
-    ids = [i.product_id for i in order.items if i.product_id]
+    ids = {i.product_id for o in orders for i in o.items if i.product_id}
     first: dict[uuid.UUID, str] = {}
     if ids:
         rows = await session.execute(
@@ -171,9 +173,10 @@ async def _attach_item_images(session: AsyncSession, order: Order) -> None:
         for product_id, path in rows.all():
             first.setdefault(product_id, path)
     storage = SupabaseStorage(get_settings())
-    for item in order.items:
-        path = first.get(item.product_id) if item.product_id else None
-        item.image_url = storage.public_url(path) if path else None  # type: ignore[attr-defined]
+    for order in orders:
+        for item in order.items:
+            path = first.get(item.product_id) if item.product_id else None
+            item.image_url = storage.public_url(path) if path else None  # type: ignore[attr-defined]
 
 
 def _own(order: Order, user: AuthUser) -> Order:
@@ -199,7 +202,9 @@ async def list_customer_orders(
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    return list((await session.scalars(stmt)).all()), total or 0
+    orders = list((await session.scalars(stmt)).all())
+    await _attach_item_images(session, *orders)  # for the small pictures in the list
+    return orders, total or 0
 
 
 async def get_customer_order(session: AsyncSession, user: AuthUser, order_id: uuid.UUID) -> Order:

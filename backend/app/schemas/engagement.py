@@ -13,6 +13,7 @@ from pydantic import (
 )
 
 from app.models.enums import (
+    CustomOrderMessageSender,
     CustomOrderStatus,
     GalleryImageType,
     MessageStatus,
@@ -223,6 +224,7 @@ class CustomOrderRead(BaseModel):
     whatsapp_number: str
     description: str
     budget_paisa: int | None
+    agreed_price_paisa: int | None
     required_date: date | None
     status: CustomOrderStatus
     has_reference_image: bool
@@ -234,6 +236,31 @@ class AdminCustomOrderRead(CustomOrderRead):
     customer_id: uuid.UUID | None
     # A short-lived signed link to the private reference image (None when there is none).
     reference_image_url: str | None
+
+
+class CustomOrderMessageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    body: str = Field(min_length=1, max_length=2000)
+
+    _body = field_validator("body")(_text)
+
+
+class CustomOrderMessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    message_id: uuid.UUID
+    sender: CustomOrderMessageSender
+    body: str
+    created_at: datetime
+
+
+class CustomOrderAccept(BaseModel):
+    """The admin accepts the request at a final price agreed in the discussion."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    agreed_price_paisa: int = Field(ge=0, le=MAX_BUDGET_PAISA)
 
 
 class CustomOrderStatusChange(BaseModel):

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type {
   AdminCustomOrder,
@@ -136,6 +137,7 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
   whatsapp_number: '0300 1234567',
   description: 'A jersey with a name',
   budget_paisa: 250000,
+  agreed_price_paisa: null,
   required_date: '2026-12-01',
   status: 'NEW',
   has_reference_image: true,
@@ -149,7 +151,11 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
 it('shows custom orders with the private picture link and moves them along', async () => {
   api.getAdminCustomOrders.mockResolvedValue(pageOf([co()]))
   api.setCustomOrderStatus.mockResolvedValue(co({ status: 'IN_DISCUSSION' }))
-  render(<CustomOrdersAdminPage />)
+  render(
+    <MemoryRouter>
+      <CustomOrdersAdminPage />
+    </MemoryRouter>,
+  )
   expect(await screen.findByText('A jersey with a name')).toBeInTheDocument()
   expect(screen.getByText(/Budget Rs 2,500/)).toBeInTheDocument()
   const link = screen.getByRole('link', { name: 'View reference picture' })
@@ -157,7 +163,11 @@ it('shows custom orders with the private picture link and moves them along', asy
   expect(link).toHaveAttribute('rel', 'noopener noreferrer')
   await userEvent.click(screen.getByRole('button', { name: 'Start discussion' }))
   expect(api.setCustomOrderStatus).toHaveBeenCalledWith('c1', 'IN_DISCUSSION')
-  expect(await screen.findByRole('button', { name: 'Accept' })).toBeInTheDocument()
+  expect(await screen.findByRole('link', { name: 'Discuss and accept' })).toHaveAttribute(
+    'href',
+    '/custom-orders/c1',
+  )
+  expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument() // accepting needs a price: it is done on the request's page
   expect(screen.queryByRole('button', { name: 'Start discussion' })).not.toBeInTheDocument()
 })
 
@@ -165,7 +175,11 @@ it('offers no actions for final statuses and filters by status', async () => {
   api.getAdminCustomOrders.mockResolvedValue(
     pageOf([co({ status: 'COMPLETED', reference_image_url: null })]),
   )
-  render(<CustomOrdersAdminPage />)
+  render(
+    <MemoryRouter>
+      <CustomOrdersAdminPage />
+    </MemoryRouter>,
+  )
   await screen.findByText('A jersey with a name')
   expect(screen.queryByRole('button', { name: /Cancel|Decline|Accept/ })).not.toBeInTheDocument()
   expect(screen.queryByRole('link', { name: 'View reference picture' })).not.toBeInTheDocument()
@@ -179,7 +193,11 @@ it('offers no actions for final statuses and filters by status', async () => {
 it('explains a refused custom-order change', async () => {
   api.getAdminCustomOrders.mockResolvedValue(pageOf([co()]))
   api.setCustomOrderStatus.mockRejectedValue(new ApiError(409, 'x', { code: 'INVALID_TRANSITION' }))
-  render(<CustomOrdersAdminPage />)
+  render(
+    <MemoryRouter>
+      <CustomOrdersAdminPage />
+    </MemoryRouter>,
+  )
   await userEvent.click(await screen.findByRole('button', { name: 'Decline' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('not allowed from the current status')
 })

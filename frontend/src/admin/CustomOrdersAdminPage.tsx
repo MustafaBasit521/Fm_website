@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { CUSTOM_ORDER_LABELS as LABELS, CUSTOM_ORDER_NEXT as NEXT } from './customOrderStatus'
 import { getAdminCustomOrders, setCustomOrderStatus, type AdminCustomOrder } from '../lib/adminApi'
 import { ApiError, type CustomOrderStatus } from '../lib/api'
 import { formatPrice } from '../lib/money'
@@ -8,37 +10,6 @@ import { StatusBadge } from '../pages/StatusBadge'
 import { CUSTOM_ORDER_TONE } from '../pages/statusColors'
 import { Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
-
-const LABELS: Record<CustomOrderStatus, string> = {
-  NEW: 'New',
-  IN_DISCUSSION: 'In discussion',
-  ACCEPTED: 'Accepted',
-  IN_PROGRESS: 'In progress',
-  COMPLETED: 'Completed',
-  DECLINED: 'Declined',
-  CANCELLED: 'Cancelled',
-}
-// What the admin may do next (the server enforces the same rules).
-const NEXT: Record<string, [CustomOrderStatus, string][]> = {
-  NEW: [
-    ['IN_DISCUSSION', 'Start discussion'],
-    ['DECLINED', 'Decline'],
-    ['CANCELLED', 'Cancel'],
-  ],
-  IN_DISCUSSION: [
-    ['ACCEPTED', 'Accept'],
-    ['DECLINED', 'Decline'],
-    ['CANCELLED', 'Cancel'],
-  ],
-  ACCEPTED: [
-    ['IN_PROGRESS', 'Start making'],
-    ['CANCELLED', 'Cancel'],
-  ],
-  IN_PROGRESS: [
-    ['COMPLETED', 'Mark completed'],
-    ['CANCELLED', 'Cancel'],
-  ],
-}
 
 export default function CustomOrdersAdminPage() {
   const [status, setStatus] = useState('')
@@ -148,6 +119,9 @@ export default function CustomOrdersAdminPage() {
                       </p>
                       <p className="mt-2 whitespace-pre-line">{c.description}</p>
                       <p className="mt-1 text-sm text-muted">
+                        {c.agreed_price_paisa !== null && (
+                          <>Agreed {formatPrice(c.agreed_price_paisa)} · </>
+                        )}
                         {c.budget_paisa !== null && <>Budget {formatPrice(c.budget_paisa)} · </>}
                         {c.required_date && <>Needed by {formatDate(c.required_date)} · </>}
                         {c.customer_id ? 'Registered customer' : 'Guest'}
@@ -165,6 +139,14 @@ export default function CustomOrdersAdminPage() {
                           <span className="text-sm text-muted">(link expires after an hour)</span>
                         </p>
                       )}
+                      <p className="mt-3">
+                        <Link
+                          to={`/custom-orders/${c.custom_order_id}`}
+                          className="font-semibold text-terracotta underline underline-offset-4"
+                        >
+                          {c.status === 'IN_DISCUSSION' ? 'Discuss and accept' : 'Open request'}
+                        </Link>
+                      </p>
                       {NEXT[c.status] && (
                         <p className="mt-3 flex flex-wrap gap-3">
                           {NEXT[c.status].map(([target, label]) => (

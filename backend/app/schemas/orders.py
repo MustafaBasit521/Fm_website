@@ -16,6 +16,7 @@ class OrderSummary(BaseModel):
     item_count: int  # total units
     payment_deadline_at: datetime | None
     created_at: datetime
+    image_urls: list[str] = []  # first pictures of the ordered products (customer list)
 
 
 class AdminOrderSummary(OrderSummary):

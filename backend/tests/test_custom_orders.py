@@ -35,6 +35,10 @@ async def submit(client, headers=None, **over):
 
 
 async def move(client, admin_h, cid, status):
+    if status == "ACCEPTED":  # acceptance carries the agreed price, so it has its own route
+        return await client.post(
+            f"{ADMIN}/{cid}/accept", headers=admin_h, json={"agreed_price_paisa": 100000}
+        )
     return await client.post(f"{ADMIN}/{cid}/status", headers=admin_h, json={"status": status})
 
 
@@ -202,6 +206,9 @@ async def test_deleting_a_customer_keeps_their_custom_orders(client, alice, db_e
         ("GET", ADMIN),
         ("GET", f"{ADMIN}/{uuid.uuid4()}"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/status"),
+        ("POST", f"{ADMIN}/{uuid.uuid4()}/accept"),
+        ("GET", f"{ADMIN}/{uuid.uuid4()}/messages"),
+        ("POST", f"{ADMIN}/{uuid.uuid4()}/messages"),
     ],
 )
 async def test_admin_routes_need_the_admin_role(client, customer_h, method, url):
@@ -282,7 +289,7 @@ async def test_events_notify_the_customer_and_alert_the_shop(
     notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
     assert [n["type"] for n in notes] == ["CUSTOM_ORDER_UPDATE"] * 3
     assert "accepted" in notes[0]["message"]
-    assert emails.to("alice@example.com")[-1].subject == "Update on your custom order"
+    assert emails.to("alice@example.com")[-1].subject == "Your custom order was accepted"
 
 
 async def test_guests_get_no_customer_email_because_none_is_collected(
@@ -317,3 +324,128 @@ async def test_admin_list_signs_pictures_concurrently_not_one_by_one(client, adm
     assert r.status_code == 200 and all(i["reference_image_url"] for i in r.json()["items"])
     assert active["peak"] > 1  # overlapped
     assert elapsed < 0.2 * 6  # six sequential calls would take 1.2 s
+
+
+# ---- the discussion and the agreed price ----------------------------------------------------
+
+
+async def talk(client, headers, cid, body, *, admin=False):
+    url = f"{ADMIN}/{cid}/messages" if admin else f"{URL}/{cid}/messages"
+    return await client.post(url, headers=headers, json={"body": body})
+
+
+async def test_customer_and_admin_talk_in_a_thread_that_only_they_can_see(
+    client, admin_h, alice, bob
+):
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    first = await talk(client, alice, cid, "  I would like it in blush pink  ")
+    assert first.status_code == 201
+    assert (
+        first.json()["sender"] == "CUSTOMER"
+        and first.json()["body"] == "I would like it in blush pink"
+    )
+    reply = await talk(client, admin_h, cid, "Sure! Rs 2,000 works for us.", admin=True)
+    assert reply.status_code == 201 and reply.json()["sender"] == "ADMIN"
+
+    mine = (await client.get(f"{URL}/{cid}/messages", headers=alice)).json()
+    assert [(m["sender"], m["body"]) for m in mine] == [
+        ("CUSTOMER", "I would like it in blush pink"),
+        ("ADMIN", "Sure! Rs 2,000 works for us."),
+    ]
+    seen = (await client.get(f"{ADMIN}/{cid}/messages", headers=admin_h)).json()
+    assert seen == mine
+    # nobody else can read or write
+    assert (await client.get(f"{URL}/{cid}/messages", headers=bob)).status_code == 404
+    assert (await talk(client, bob, cid, "hi")).status_code == 404
+    assert (await client.get(f"{URL}/{cid}/messages")).status_code == 401
+    assert (await talk(client, None, cid, "hi")).status_code == 401
+
+
+@pytest.mark.parametrize("body", ["", "   ", "x" * 2001])
+async def test_messages_must_have_sensible_text(client, alice, body):
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    assert (await talk(client, alice, cid, body)).status_code == 422
+
+
+async def test_a_guest_request_has_no_discussion(client, admin_h):
+    cid = (await submit(client))["custom_order_id"]  # guests have no account to answer in
+    r = await talk(client, admin_h, cid, "Hello", admin=True)
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "NO_DISCUSSION"
+    assert (await client.get(f"{ADMIN}/{cid}/messages", headers=admin_h)).json() == []
+
+
+async def test_the_discussion_closes_when_the_request_is_finished(client, admin_h, alice):
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    for status in ("IN_DISCUSSION", "ACCEPTED", "IN_PROGRESS"):
+        await move(client, admin_h, cid, status)
+        assert (await talk(client, alice, cid, f"still open in {status}")).status_code == 201
+    await move(client, admin_h, cid, "COMPLETED")
+    for headers, admin in ((alice, False), (admin_h, True)):
+        r = await talk(client, headers, cid, "too late", admin=admin)
+        assert r.status_code == 409 and r.json()["detail"]["code"] == "DISCUSSION_CLOSED"
+    # what was said stays readable
+    assert len((await client.get(f"{URL}/{cid}/messages", headers=alice)).json()) == 3
+
+
+async def test_the_admin_accepts_at_the_price_agreed_in_the_discussion(
+    client, admin_h, alice, emails
+):
+    cid = (await submit(client, headers=alice, budget_paisa=150000))["custom_order_id"]
+    url = f"{ADMIN}/{cid}/accept"
+    # a new request must be discussed first
+    early = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    assert early.status_code == 409 and early.json()["detail"]["code"] == "INVALID_TRANSITION"
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    assert (
+        await client.post(url, headers=admin_h, json={"agreed_price_paisa": -1})
+    ).status_code == 422
+    r = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    assert r.status_code == 200
+    assert (r.json()["status"], r.json()["agreed_price_paisa"], r.json()["budget_paisa"]) == (
+        "ACCEPTED",
+        200000,
+        150000,  # what the customer offered is kept as it was
+    )
+    mine = (await client.get(f"{URL}/{cid}", headers=alice)).json()
+    assert mine["agreed_price_paisa"] == 200000 and mine["status"] == "ACCEPTED"
+    notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
+    assert "Rs 2,000" in notes[0]["message"]
+    assert "Rs 2,000" in emails.to("alice@example.com")[-1].body
+    again = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 300000})
+    assert again.status_code == 409  # the price is final once accepted
+
+
+async def test_a_new_message_tells_the_other_side(client, admin_h, alice, emails, db_engine):
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET email = 'shop@example.com'"))
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    emails.sent.clear()
+    await talk(client, alice, cid, "Can it be ready by Friday?")
+    alert = emails.to("shop@example.com")
+    assert len(alert) == 1 and "Friday" in alert[0].body
+
+    emails.sent.clear()
+    await talk(client, admin_h, cid, "Yes, Friday is fine.", admin=True)
+    note = emails.to("alice@example.com")
+    assert len(note) == 1 and "Friday is fine" in note[0].body
+    assert f"/custom-orders/{cid}" in note[0].body
+    notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
+    assert notes[0]["title"] == "New message about your custom order"
+    assert emails.to("shop@example.com") == []  # the shop is not alerted about its own reply
+
+
+async def test_writing_to_the_shop_is_rate_limited(client, alice):
+    from app.core.rate_limit import limiter
+
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    limiter.enabled = True
+    for i in range(30):
+        assert (await talk(client, alice, cid, f"message {i}")).status_code == 201
+    assert (await talk(client, alice, cid, "one too many")).status_code == 429
+
+
+async def test_the_plain_status_route_cannot_accept_without_a_price(client, admin_h):
+    cid = (await submit(client))["custom_order_id"]
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    r = await client.post(f"{ADMIN}/{cid}/status", headers=admin_h, json={"status": "ACCEPTED"})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "USE_ACCEPT"

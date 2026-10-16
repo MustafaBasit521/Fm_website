@@ -69,6 +69,29 @@ async def test_history_lists_only_my_orders_newest_first(client, make_product, a
     assert (await client.get(URL, headers=alice, params={"page_size": 51})).status_code == 422
 
 
+async def test_history_shows_small_pictures_of_what_was_ordered(
+    client, admin_h, make_product, alice
+):
+    a = await make_product(name="A", stock_quantity=20)
+    plain = await make_product(name="Plain", stock_quantity=20)
+    pid = a["product_id"]
+    r = await client.post(
+        f"/api/admin/products/{pid}/images",
+        headers=admin_h,
+        json={"storage_path": f"products/{pid}/{'b' * 32}.webp"},
+    )
+    assert r.status_code == 201, r.text
+    await my_order(client, alice, plain["product_id"])
+    await my_order(client, alice, a["product_id"])
+    items = (await client.get(URL, headers=alice)).json()["items"]
+    with_picture, without = items[0], items[1]
+    assert len(with_picture["image_urls"]) == 1
+    assert with_picture["image_urls"][0].endswith(
+        f"/product-images/products/{a['product_id']}/{'b' * 32}.webp"
+    )
+    assert without["image_urls"] == []
+
+
 async def test_order_detail_is_private(client, make_product, alice, bob):
     a = await make_product(name="Sunflower", stock_quantity=5, price_paisa=1000)
     o = await my_order(client, alice, a["product_id"])

@@ -439,3 +439,13 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Not done / asked back to the owner:** custom-order negotiation (seller sets a price, customer and admin talk in the system) is proposed, not built; the sentence about the delivery address form was cut off in the message.
 
+## Custom-order discussion, agreed price and order-list pictures
+
+**Owner's decisions:** the discussion is a good idea; the customer and the admin settle the price in messages; at the end the admin accepts at the final price (the customer has no accept button). Pictures on the My orders list: yes.
+
+**Built:** migration (`agreed_price_paisa`, `custom_order_messages`, enum), service functions (`accept_at_price`, `list_messages`, `post_message`), customer and admin routes, events (accepted, new message each way), `/status` refuses ACCEPTED (409 `USE_ACCEPT`) so an accepted request always has a price; `image_urls` on customer order summaries (one extra query per list page); shared `Discussion` component; customer page, admin page, list links.
+
+**Verified:** backend tests for the thread (visibility, validation, guests, closing, rate limit, notifications), accepting at a price, the refused plain-status route and the list pictures; frontend tests for both pages and the list; axe on both new pages; Chrome screenshots of both at desktop and phone width.
+
+**Not built (kept simple):** live updating of the thread (there is a "Check for new messages" button), unread markers, editing or deleting messages, attachments, a guest discussion.
+

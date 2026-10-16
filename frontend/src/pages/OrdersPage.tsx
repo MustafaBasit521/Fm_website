@@ -57,18 +57,32 @@ export default function OrdersPage() {
               <li key={o.order_id} className="rounded-[18px] border border-sand bg-paper p-4">
                 <Link
                   to={`/orders/${o.order_id}`}
-                  className="flex flex-col gap-1 focus-visible:outline-2 focus-visible:outline-terracotta"
+                  className="flex flex-nowrap items-center gap-3 focus-visible:outline-2 focus-visible:outline-terracotta"
                 >
-                  <span className="flex justify-between">
-                    <span className="font-semibold">Order placed {formatDate(o.created_at)}</span>
-                    <span>{formatPrice(o.total_amount_paisa)}</span>
-                  </span>
-                  <span className="text-sm text-muted">
-                    {o.item_count} {o.item_count === 1 ? 'item' : 'items'} ·{' '}
-                    <StatusBadge status={o.status} /> · ·{' '}
-                    {o.payment_method === 'COD'
-                      ? 'Cash on delivery'
-                      : paymentStatusLabel(o.payment_status)}
+                  {o.image_urls && o.image_urls.length > 0 && (
+                    <span aria-hidden="true" className="flex shrink-0 flex-nowrap -space-x-3">
+                      {o.image_urls.map((url) => (
+                        <img
+                          key={url}
+                          src={url}
+                          alt=""
+                          className="h-14 w-12 rounded-[10px] border-2 border-paper bg-cream-200 object-cover"
+                        />
+                      ))}
+                    </span>
+                  )}
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="flex justify-between">
+                      <span className="font-semibold">Order placed {formatDate(o.created_at)}</span>
+                      <span>{formatPrice(o.total_amount_paisa)}</span>
+                    </span>
+                    <span className="text-sm text-muted">
+                      {o.item_count} {o.item_count === 1 ? 'item' : 'items'} ·{' '}
+                      <StatusBadge status={o.status} /> · ·{' '}
+                      {o.payment_method === 'COD'
+                        ? 'Cash on delivery'
+                        : paymentStatusLabel(o.payment_status)}
+                    </span>
                   </span>
                 </Link>
               </li>

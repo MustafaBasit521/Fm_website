@@ -4,7 +4,14 @@ from app.models.business_settings import BusinessSettings
 from app.models.catalog import Category, Product, ProductImage
 from app.models.customer import Customer
 from app.models.customer_data import Address, WishlistItem
-from app.models.engagement import CustomOrder, GalleryImage, Message, Notification, Review
+from app.models.engagement import (
+    CustomOrder,
+    CustomOrderMessage,
+    GalleryImage,
+    Message,
+    Notification,
+    Review,
+)
 from app.models.newsletter import NewsletterSubscriber
 from app.models.orders import Order, OrderItem, Payment
 
@@ -15,6 +22,7 @@ __all__ = [
     "Category",
     "Customer",
     "CustomOrder",
+    "CustomOrderMessage",
     "GalleryImage",
     "Message",
     "NewsletterSubscriber",

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 from app.models.enums import (
+    CustomOrderMessageSender,
     CustomOrderStatus,
     GalleryImageType,
     MessageStatus,
@@ -82,6 +83,9 @@ class CustomOrder(Base):
         CheckConstraint(
             "budget_paisa IS NULL OR budget_paisa >= 0", name="ck_custom_orders_budget"
         ),
+        CheckConstraint(
+            "agreed_price_paisa IS NULL OR agreed_price_paisa >= 0", name="ck_custom_orders_agreed"
+        ),
         Index("ix_custom_orders_customer_id", "customer_id"),
         Index("ix_custom_orders_status", "status"),
         Index("ix_custom_orders_created_at", "created_at"),
@@ -94,7 +98,9 @@ class CustomOrder(Base):
     name: Mapped[str] = mapped_column(Text)
     whatsapp_number: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
-    budget_paisa: Mapped[int | None] = mapped_column(BigInteger)
+    budget_paisa: Mapped[int | None] = mapped_column(BigInteger)  # what the customer offered
+    # The price the admin accepted after the discussion (set together with ACCEPTED).
+    agreed_price_paisa: Mapped[int | None] = mapped_column(BigInteger)
     required_date: Mapped[date | None] = mapped_column(Date)
     # Private bucket path (custom-order-references). Admin reads it through a signed URL.
     reference_image_path: Mapped[str | None] = mapped_column(Text)
@@ -104,6 +110,29 @@ class CustomOrder(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class CustomOrderMessage(Base):
+    """database.md §15: one message in the discussion between a registered customer and the admin
+    about a custom order."""
+
+    __tablename__ = "custom_order_messages"
+    __table_args__ = (
+        CheckConstraint("char_length(body) BETWEEN 1 AND 2000", name="ck_com_body_length"),
+        Index("ix_com_custom_order_created", "custom_order_id", "created_at"),
+    )
+
+    message_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    custom_order_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("custom_orders.custom_order_id", ondelete="CASCADE")
+    )
+    sender: Mapped[CustomOrderMessageSender] = mapped_column(
+        Enum(CustomOrderMessageSender, name="custom_order_message_sender")
+    )
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
     )
 
 

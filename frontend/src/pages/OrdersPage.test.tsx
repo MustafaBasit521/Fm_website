@@ -57,6 +57,22 @@ it('lists orders with status in words and links to the detail page', async () =>
   )
 })
 
+it('shows small pictures of what was ordered, and nothing for orders without any', async () => {
+  getOrders.mockResolvedValue(
+    page([
+      summary({ image_urls: ['https://img/1.jpg', 'https://img/2.jpg'] }),
+      summary({ order_id: 'o2', image_urls: [] }),
+    ]),
+  )
+  const { container } = renderPage()
+  await screen.findAllByText(/Order placed/)
+  const pictures = container.querySelectorAll('img')
+  expect(pictures).toHaveLength(2)
+  expect(pictures[0]).toHaveAttribute('src', 'https://img/1.jpg')
+  // the pictures are decoration: the link is still named by the order text
+  expect(screen.getAllByRole('link', { name: /Order placed/ })).toHaveLength(2)
+})
+
 it('shows an empty state, an error state, and paginates', async () => {
   getOrders.mockResolvedValue(page([]))
   const { unmount } = renderPage()

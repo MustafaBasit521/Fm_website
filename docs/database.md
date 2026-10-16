@@ -564,6 +564,20 @@ Customer deletion does not destroy the custom-order record (`ON DELETE SET NULL`
 
 The exact status enum will be finalized during custom-order implementation.
 
+`agreed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_agreed`) is the price the admin accepted; it is set together with the status `ACCEPTED` (`budget_paisa` stays what the customer offered). Migration `custom order discussion` (revision `d194a654f642`).
+
+```text
+custom_order_messages
+-----------
+message_id UUID PK
+custom_order_id UUID NOT NULL FK → custom_orders ON DELETE CASCADE
+sender custom_order_message_sender NOT NULL   -- CUSTOMER | ADMIN
+body TEXT NOT NULL  (1 to 2000 characters, ck_com_body_length)
+created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+```
+
+Index `(custom_order_id, created_at)`. Only requests that belong to a registered customer get messages. Messages are append-only (no edit, no delete route).
+
 Decided: see `custom_order_status` in §3. `status` is set to `NEW` by the API. `budget_paisa` has `CHECK (budget_paisa IS NULL OR budget_paisa >= 0)` (`ck_custom_orders_budget`). `reference_image_path` is a path in the **private** `custom-order-references` bucket, `custom-orders/{uuid}.{jpg|png|webp}`; it is read only through short-lived signed URLs. Indexes: `customer_id`, `status`, `created_at`.
 
 ---

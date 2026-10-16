@@ -218,7 +218,7 @@ async def client(db_engine, storage, emails):
     async with db_engine.begin() as conn:
         await conn.execute(
             text(
-                "TRUNCATE newsletter_subscribers, admin_audit_log, notifications, reviews, gallery_images, custom_orders, messages, payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
+                "TRUNCATE newsletter_subscribers, admin_audit_log, notifications, reviews, gallery_images, custom_order_messages, custom_orders, messages, payments, order_items, orders, business_settings, wishlist_items, addresses, product_images, products, categories, customers CASCADE"
             )
         )
     async with db_engine.begin() as conn:

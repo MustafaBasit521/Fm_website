@@ -71,6 +71,13 @@ class CustomOrderStatus(enum.StrEnum):
     CANCELLED = "CANCELLED"
 
 
+class CustomOrderMessageSender(enum.StrEnum):
+    """PostgreSQL enum `custom_order_message_sender`: who wrote a message in the discussion."""
+
+    CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
+
+
 class NotificationType(enum.StrEnum):
     """PostgreSQL enum `notification_type` (database.md §17). NEW_PRODUCT arrives in Phase 9."""
 

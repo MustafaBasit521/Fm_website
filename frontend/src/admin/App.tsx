@@ -6,6 +6,7 @@ import AdminLoginPage from './AdminLoginPage'
 import { AdminRoute } from './AdminRoute'
 import CategoriesAdminPage from './CategoriesAdminPage'
 import { CustomerAdminPage, CustomersAdminPage } from './CustomersAdminPage'
+import CustomOrderAdminPage from './CustomOrderAdminPage'
 import CustomOrdersAdminPage from './CustomOrdersAdminPage'
 import DashboardPage from './DashboardPage'
 import GalleryAdminPage from './GalleryAdminPage'
@@ -35,6 +36,7 @@ export default function AdminApp() {
           <Route path="/customers/:id" element={<CustomerAdminPage />} />
           <Route path="/gallery" element={<GalleryAdminPage />} />
           <Route path="/custom-orders" element={<CustomOrdersAdminPage />} />
+          <Route path="/custom-orders/:id" element={<CustomOrderAdminPage />} />
           <Route path="/messages" element={<MessagesAdminPage />} />
           <Route path="/reviews" element={<ReviewsAdminPage />} />
           <Route path="/activity" element={<ActivityLogPage />} />

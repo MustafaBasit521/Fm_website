@@ -255,6 +255,8 @@ export interface OrderSummary {
   item_count: number
   payment_deadline_at: string | null
   created_at: string
+  /** Up to three pictures of the ordered products. */
+  image_urls?: string[]
 }
 
 export const getOrders = (page: number, signal?: AbortSignal) =>
@@ -375,6 +377,8 @@ export interface CustomOrder {
   whatsapp_number: string
   description: string
   budget_paisa: number | null
+  /** The price the shop accepted after the discussion (set together with ACCEPTED). */
+  agreed_price_paisa: number | null
   required_date: string | null
   status: CustomOrderStatus
   has_reference_image: boolean
@@ -404,6 +408,19 @@ export const submitCustomOrder = (data: CustomOrderRequest) =>
   apiPost<CustomOrder>('/custom-orders', data)
 export const getCustomOrders = (page: number, signal?: AbortSignal) =>
   apiGet<Page<CustomOrder>>(`/custom-orders?page=${page}&page_size=10`, signal)
+export const getCustomOrder = (id: string, signal?: AbortSignal) =>
+  apiGet<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}`, signal)
+
+export interface CustomOrderMessage {
+  message_id: string
+  sender: 'CUSTOMER' | 'ADMIN'
+  body: string
+  created_at: string
+}
+export const getCustomOrderMessages = (id: string, signal?: AbortSignal) =>
+  apiGet<CustomOrderMessage[]>(`/custom-orders/${encodeURIComponent(id)}/messages`, signal)
+export const sendCustomOrderMessage = (id: string, body: string) =>
+  apiPost<CustomOrderMessage>(`/custom-orders/${encodeURIComponent(id)}/messages`, { body })
 export const cancelCustomOrder = (id: string) =>
   apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/cancel`, {})
 

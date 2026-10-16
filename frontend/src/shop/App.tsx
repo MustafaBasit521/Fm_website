@@ -8,6 +8,7 @@ import CartPage from '../pages/CartPage'
 import CheckoutPage from '../pages/CheckoutPage'
 import ContactPage from '../pages/ContactPage'
 import CustomOrderPage from '../pages/CustomOrderPage'
+import CustomOrderDetailPage from '../pages/CustomOrderDetailPage'
 import CustomOrdersPage from '../pages/CustomOrdersPage'
 import GalleryPage from '../pages/GalleryPage'
 import HomePage from '../pages/HomePage'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/custom-orders" element={<CustomOrdersPage />} />
+          <Route path="/custom-orders/:id" element={<CustomOrderDetailPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />
         </Route>

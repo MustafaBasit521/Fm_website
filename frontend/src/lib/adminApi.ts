@@ -9,6 +9,7 @@ import {
   type BusinessSettings,
   type Customer,
   type CustomOrder,
+  type CustomOrderMessage,
   type GalleryImageType,
   type CustomOrderStatus,
   type Order,
@@ -237,6 +238,16 @@ export const getAdminCustomOrders = (
   signal?: AbortSignal,
 ) =>
   apiGet<Page<AdminCustomOrder>>(`/admin/custom-orders${qs({ ...filters, page_size: 20 })}`, signal)
+export const getAdminCustomOrder = (customOrderId: string, signal?: AbortSignal) =>
+  apiGet<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}`, signal)
+export const acceptCustomOrder = (customOrderId: string, agreedPricePaisa: number) =>
+  apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/accept`, {
+    agreed_price_paisa: agreedPricePaisa,
+  })
+export const getAdminCustomOrderMessages = (customOrderId: string, signal?: AbortSignal) =>
+  apiGet<CustomOrderMessage[]>(`/admin/custom-orders/${id(customOrderId)}/messages`, signal)
+export const sendAdminCustomOrderMessage = (customOrderId: string, body: string) =>
+  apiPost<CustomOrderMessage>(`/admin/custom-orders/${id(customOrderId)}/messages`, { body })
 export const setCustomOrderStatus = (customOrderId: string, status: CustomOrderStatus) =>
   apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/status`, { status })
 

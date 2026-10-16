@@ -104,9 +104,22 @@ export default function CustomOrdersPage() {
                   </p>
                   <p className="mt-1 whitespace-pre-line">{c.description}</p>
                   <p className="mt-1 text-sm text-muted">
+                    {c.agreed_price_paisa !== null && (
+                      <>Agreed {formatPrice(c.agreed_price_paisa)} · </>
+                    )}
                     {c.budget_paisa !== null && <>Budget {formatPrice(c.budget_paisa)} · </>}
                     {c.required_date && <>Needed by {formatDate(c.required_date)} · </>}
                     {c.has_reference_image ? 'Picture attached' : 'No picture'}
+                  </p>
+                  <p className="mt-3">
+                    <Link
+                      to={`/custom-orders/${c.custom_order_id}`}
+                      className="font-semibold text-terracotta underline underline-offset-4"
+                    >
+                      {['COMPLETED', 'DECLINED', 'CANCELLED'].includes(c.status)
+                        ? 'View messages'
+                        : 'Open discussion'}
+                    </Link>
                   </p>
                   {CANCELLABLE.includes(c.status) &&
                     (confirming === c.custom_order_id ? (

@@ -1,0 +1,240 @@
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useParams } from 'react-router-dom'
+import {
+  acceptCustomOrder,
+  getAdminCustomOrder,
+  getAdminCustomOrderMessages,
+  sendAdminCustomOrderMessage,
+  setCustomOrderStatus,
+  type AdminCustomOrder,
+} from '../lib/adminApi'
+import { ApiError, type CustomOrderMessage, type CustomOrderStatus } from '../lib/api'
+import { formatPrice, paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
+import { formatDate } from '../lib/orderStatus'
+import { Discussion } from '../pages/Discussion'
+import { StatusBadge } from '../pages/StatusBadge'
+import { CUSTOM_ORDER_TONE } from '../pages/statusColors'
+import { BackLink, buttonClass, FormError, inputClass } from '../pages/ui'
+import { useToast } from '../toast/context'
+import { CUSTOM_ORDER_LABELS, CUSTOM_ORDER_NEXT, DISCUSSION_OPEN } from './customOrderStatus'
+import { PageTitle, State, cardClass } from './ui'
+
+/** One custom order: the request, the status actions, accepting at the agreed price and the
+ *  discussion with the customer. */
+export default function CustomOrderAdminPage() {
+  const { id = '' } = useParams()
+  const toast = useToast()
+  const [state, setState] = useState<{
+    id: string
+    order: AdminCustomOrder | null
+    messages: CustomOrderMessage[]
+  } | null>(null)
+  const [version, setVersion] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.all([
+      getAdminCustomOrder(id, controller.signal),
+      getAdminCustomOrderMessages(id, controller.signal),
+    ])
+      .then(([order, messages]) => setState({ id, order, messages }))
+      .catch((e: unknown) => {
+        if (!(e instanceof DOMException && e.name === 'AbortError'))
+          setState({ id, order: null, messages: [] })
+      })
+    return () => controller.abort()
+  }, [id, version])
+
+  const refresh = useCallback(() => setVersion((v) => v + 1), [])
+  const current = state?.id === id ? state : null
+  const order = current?.order ?? null
+
+  function explain(e: unknown): string {
+    if (e instanceof ApiError && e.code === 'INVALID_TRANSITION')
+      return 'That change is not allowed from the current status. Reload the page.'
+    return 'That did not work. Please try again.'
+  }
+
+  async function move(target: CustomOrderStatus) {
+    setBusy(true)
+    setError(null)
+    try {
+      const updated = await setCustomOrderStatus(id, target)
+      setState((s) => (s ? { ...s, order: updated } : s))
+    } catch (e) {
+      setError(explain(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onAccept(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const price = parseRupeesToPaisa(String(new FormData(e.currentTarget).get('price') ?? ''))
+    if (price === null) return setError('Enter the agreed price in Rs, like 2500 or 2500.50.')
+    setBusy(true)
+    setError(null)
+    try {
+      const updated = await acceptCustomOrder(id, price)
+      setState((s) => (s ? { ...s, order: updated } : s))
+      toast.show(`Accepted at ${formatPrice(price)}`)
+    } catch (err) {
+      setError(explain(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function send(body: string) {
+    const created = await sendAdminCustomOrderMessage(id, body)
+    setState((s) => (s ? { ...s, messages: [...s.messages, created] } : s))
+  }
+
+  return (
+    <>
+      <BackLink to="/custom-orders">All custom orders</BackLink>
+      <State loading={!current} failed={!!current && !order}>
+        {order && current && (
+          <div className="mt-3 flex flex-col gap-6">
+            <PageTitle
+              eyebrow={`Sent ${formatDate(order.created_at)}`}
+              title={order.name}
+              actions={
+                <StatusBadge
+                  status={CUSTOM_ORDER_TONE[order.status]}
+                  label={CUSTOM_ORDER_LABELS[order.status]}
+                />
+              }
+            />
+            <FormError message={error} />
+
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+              <div className="flex flex-col gap-6">
+                <section aria-label="Request" className={`${cardClass} p-4 md:p-5`}>
+                  <h2 className="font-serif text-2xl">Request</h2>
+                  <p className="mt-2 whitespace-pre-line">{order.description}</p>
+                  <p className="mt-3 text-sm text-bark">
+                    WhatsApp {order.whatsapp_number} ·{' '}
+                    {order.customer_id ? 'Registered customer' : 'Guest'}
+                    {order.required_date && <> · Needed by {formatDate(order.required_date)}</>}
+                  </p>
+                  {order.reference_image_url && (
+                    <p className="mt-2">
+                      <a
+                        href={order.reference_image_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-4"
+                      >
+                        View reference picture
+                      </a>{' '}
+                      <span className="text-sm text-muted">(link expires after an hour)</span>
+                    </p>
+                  )}
+                </section>
+
+                {order.customer_id ? (
+                  <Discussion
+                    messages={current.messages}
+                    me="ADMIN"
+                    otherName={order.name}
+                    canWrite={DISCUSSION_OPEN.includes(order.status)}
+                    closedText="This request is finished, so the discussion is closed."
+                    onSend={send}
+                    onRefresh={refresh}
+                  />
+                ) : (
+                  <section aria-label="Discussion" className={`${cardClass} p-4 md:p-5`}>
+                    <h2 className="font-serif text-2xl">Discussion</h2>
+                    <p className="mt-2 text-bark">
+                      This request came from a guest, so there is no discussion in the system. Talk
+                      to them on WhatsApp ({order.whatsapp_number}).
+                    </p>
+                  </section>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-6">
+                <section aria-label="Price" className={`${cardClass} p-4 md:p-5`}>
+                  <h2 className="font-serif text-2xl">Price</h2>
+                  <dl className="mt-2 flex flex-col gap-1">
+                    <div className="flex flex-nowrap justify-between gap-4">
+                      <dt className="text-bark">Customer&apos;s budget</dt>
+                      <dd>
+                        {order.budget_paisa !== null
+                          ? formatPrice(order.budget_paisa)
+                          : 'Not given'}
+                      </dd>
+                    </div>
+                    <div className="flex flex-nowrap justify-between gap-4">
+                      <dt className="text-bark">Agreed price</dt>
+                      <dd className="font-semibold">
+                        {order.agreed_price_paisa !== null
+                          ? formatPrice(order.agreed_price_paisa)
+                          : 'Not accepted yet'}
+                      </dd>
+                    </div>
+                  </dl>
+                  {order.status === 'IN_DISCUSSION' && (
+                    <form
+                      onSubmit={onAccept}
+                      aria-label="Accept at a price"
+                      className="mt-4 flex flex-col gap-2"
+                    >
+                      <label htmlFor="agreed-price" className="text-sm font-medium text-bark">
+                        Agreed price in Rs
+                      </label>
+                      <input
+                        id="agreed-price"
+                        name="price"
+                        inputMode="decimal"
+                        defaultValue={
+                          order.budget_paisa !== null ? paisaToRupeesInput(order.budget_paisa) : ''
+                        }
+                        className={inputClass}
+                      />
+                      <p className="text-sm text-bark">
+                        Accept once you and the customer agree. The customer is told the price.
+                      </p>
+                      <div>
+                        <button type="submit" className={buttonClass} disabled={busy}>
+                          Accept at this price
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                  {order.status === 'NEW' && order.customer_id && (
+                    <p className="mt-3 text-sm text-bark">
+                      Start the discussion first, then accept at the price you agree.
+                    </p>
+                  )}
+                </section>
+
+                {CUSTOM_ORDER_NEXT[order.status] && (
+                  <section aria-label="Actions" className={`${cardClass} p-4 md:p-5`}>
+                    <h2 className="font-serif text-2xl">Actions</h2>
+                    <p className="mt-3 flex flex-wrap gap-3">
+                      {CUSTOM_ORDER_NEXT[order.status].map(([target, label]) => (
+                        <button
+                          key={target}
+                          type="button"
+                          disabled={busy}
+                          className="min-h-11 rounded-full border border-terracotta px-4 py-1 text-terracotta hover:bg-cream-200 disabled:opacity-50"
+                          onClick={() => void move(target)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </p>
+                  </section>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </State>
+    </>
+  )
+}

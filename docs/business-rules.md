@@ -704,6 +704,13 @@ The exact custom-order statuses will be finalized when this feature is implement
 
 Statuses (decided): NEW → IN_DISCUSSION → ACCEPTED → IN_PROGRESS → COMPLETED, plus DECLINED (the shop cannot do it) and CANCELLED. The admin moves a request only along these steps: NEW to IN_DISCUSSION, DECLINED or CANCELLED; IN_DISCUSSION to ACCEPTED, DECLINED or CANCELLED; ACCEPTED to IN_PROGRESS or CANCELLED; IN_PROGRESS to COMPLETED or CANCELLED. COMPLETED, DECLINED and CANCELLED are final. A registered customer may cancel their own request only while it is NEW or IN_DISCUSSION; later they contact the shop.
 
+## Discussion and the agreed price (decided by the owner, UI polish phase)
+
+* The customer's `budget` is what they *offer*. The final price is decided **in a discussion** between the customer and the admin, written as messages inside the system (a "Discussion" on the request's page, for the customer under My custom orders and for the admin under Custom orders). When they agree, **the admin accepts the request at that price**: the price is saved together with the move IN_DISCUSSION to ACCEPTED (`agreed_price_paisa`) and the customer is notified (in the app and by email). The customer does not have a separate accept button, and setting the price never moves the status by itself.
+* A request cannot be accepted without a price, only a request that is IN_DISCUSSION can be accepted, and the price cannot be changed afterwards.
+* Only **registered customers** have a discussion (a guest has no account to answer in; the admin talks to guests on WhatsApp). Messages are plain text, 1 to 2,000 characters, shown oldest first, and cannot be edited or deleted. The discussion is open while the request is NEW, IN_DISCUSSION, ACCEPTED or IN_PROGRESS and closed (still readable) once it is COMPLETED, DECLINED or CANCELLED.
+* A new message from the admin gives the customer an in-app notification and an email (with a link to the request); a new message from the customer sends an alert email to the shop's address. Customers may write 30 messages per hour. Emails are delivered once Resend is configured.
+
 A guest needs no account. The reference image goes into the **private** `custom-order-references` bucket by signed URL and is shown to the admin only through a short-lived signed link. Submissions and image uploads are rate limited per client (5 requests and 10 uploads per hour). The required date cannot be in the past and the budget is optional. Custom orders store no email address: guests are reached on WhatsApp, and registered customers are also notified in the app and by email at their account address.
 
 ---
