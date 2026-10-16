@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.auth import AuthUser
+from app.core.config import get_settings
+from app.core.storage import SupabaseStorage
+from app.models.catalog import ProductImage
 from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.models.orders import Order, Payment
 from app.schemas.checkout import Delivery, OrderItemRead, OrderRead
@@ -150,7 +153,27 @@ async def load_order(session: AsyncSession, order_id: uuid.UUID, *, lock: bool) 
     order = (await session.scalars(stmt)).one_or_none()
     if order is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+    await _attach_item_images(session, order)
     return order
+
+
+async def _attach_item_images(session: AsyncSession, order: Order) -> None:
+    """Give each item the picture of its product (one query for the whole order). The picture is
+    looked up live, not stored in the order: the order keeps only the name and price paid."""
+    ids = [i.product_id for i in order.items if i.product_id]
+    first: dict[uuid.UUID, str] = {}
+    if ids:
+        rows = await session.execute(
+            select(ProductImage.product_id, ProductImage.storage_path)
+            .where(ProductImage.product_id.in_(ids))
+            .order_by(ProductImage.sort_order, ProductImage.image_id)
+        )
+        for product_id, path in rows.all():
+            first.setdefault(product_id, path)
+    storage = SupabaseStorage(get_settings())
+    for item in order.items:
+        path = first.get(item.product_id) if item.product_id else None
+        item.image_url = storage.public_url(path) if path else None  # type: ignore[attr-defined]
 
 
 def _own(order: Order, user: AuthUser) -> Order:

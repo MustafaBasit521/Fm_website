@@ -2,12 +2,14 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { ApiError, getMe, updateMe, type Customer } from '../lib/api'
+import { useToast } from '../toast/context'
 import { buttonClass, Field, FormError, secondaryButtonClass } from './ui'
 
 export default function AccountPage() {
   const { signOut } = useAuth()
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const toast = useToast()
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -35,6 +37,7 @@ export default function AccountPage() {
         }),
       )
       setSaveState('saved')
+      toast.show('Your details are saved')
     } catch (err) {
       setSaveState('idle')
       setError(
@@ -119,7 +122,6 @@ export default function AccountPage() {
           Send me shop updates
         </label>
         <FormError message={error} />
-        {saveState === 'saved' && <p role="status">Saved.</p>}
         <div>
           <button type="submit" className={buttonClass} disabled={saveState === 'saving'}>
             {saveState === 'saving' ? 'Saving…' : 'Save changes'}

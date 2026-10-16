@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 import { CartProvider } from '../cart/CartProvider'
+import { ToastProvider } from '../toast/ToastProvider'
 import { WishlistProvider } from '../wishlist/WishlistProvider'
 import { AuthContext, type AuthContextValue } from '../auth/context'
 
@@ -23,9 +24,11 @@ export function makeAuth(overrides: Partial<AuthContextValue> = {}): {
   const wrap = (node: ReactNode, path = '/') => (
     <AuthContext.Provider value={ctx}>
       <CartProvider>
-        <WishlistProvider>
-          <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>
-        </WishlistProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <ToastProvider>
+            <WishlistProvider>{node}</WishlistProvider>
+          </ToastProvider>
+        </MemoryRouter>
       </CartProvider>
     </AuthContext.Provider>
   )

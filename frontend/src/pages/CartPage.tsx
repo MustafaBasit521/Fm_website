@@ -49,7 +49,7 @@ export default function CartPage() {
       )}
 
       {quote && (
-        <div className="mt-6 grid items-start gap-8 md:grid-cols-[1fr_20rem]">
+        <div className="mt-6 grid items-start gap-8 md:grid-cols-[minmax(0,1fr)_20rem]">
           <ul className="flex flex-col gap-4">
             {quote.lines.map((line) => {
               const problem = issueText(line)

@@ -5,6 +5,7 @@ import { paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { State, PageTitle, cardClass } from './ui'
+import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
 
 const SOCIAL: [string, string][] = [
@@ -18,7 +19,7 @@ export default function SettingsAdminPage() {
   const { data, loading, failed } = useLoad((s) => getAdminSettings(s), [])
   const [saved, setSaved] = useState<typeof data>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
   const settings = saved ?? data
 
@@ -33,7 +34,6 @@ export default function SettingsAdminPage() {
     for (const [key] of SOCIAL) if (text(`social_${key}`)) links[key] = text(`social_${key}`)
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       setSaved(
         await updateAdminSettings({
@@ -47,7 +47,7 @@ export default function SettingsAdminPage() {
           social_links: links,
         }),
       )
-      setNotice('Settings saved.')
+      toast.show('Settings saved')
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 422
@@ -155,7 +155,6 @@ export default function SettingsAdminPage() {
                 </div>
               </fieldset>
               <FormError message={error} />
-              {notice && <p role="status">{notice}</p>}
               <div>
                 <button type="submit" className={buttonClass} disabled={busy}>
                   {busy ? 'Saving…' : 'Save changes'}

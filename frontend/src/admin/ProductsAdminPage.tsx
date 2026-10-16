@@ -1,19 +1,21 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { getAdminCategories, getAdminProducts, updateProduct } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
 import { buttonClass } from '../pages/ui'
 import { inputClass } from './styles'
 import { PlusIcon } from './icons'
 import { Badge, PageTitle, Pager, State, Switch, cardClass } from './ui'
+import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
 
 export default function ProductsAdminPage() {
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState(useSearchParams()[0].get('category') ?? '')
   const [page, setPage] = useState(1)
   const categories = useLoad((s) => getAdminCategories(s), [])
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   const { data, loading, failed, reload } = useLoad(
     (s) => getAdminProducts({ search, category_id: category, page }, s),
     [search, category, page],
@@ -142,6 +144,11 @@ export default function ProductsAdminPage() {
                             setError(null)
                             try {
                               await updateProduct(p.product_id, { is_visible: next })
+                              toast.show(
+                                next
+                                  ? `${p.name} is now in the shop`
+                                  : `${p.name} is hidden from the shop`,
+                              )
                               reload()
                             } catch {
                               setError('Could not change that product. Please try again.')

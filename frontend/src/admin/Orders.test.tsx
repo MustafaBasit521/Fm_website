@@ -14,7 +14,6 @@ const api = {
   cancelAdminOrder: vi.fn(),
   refundOrder: vi.fn(),
   confirmCodPayment: vi.fn(),
-  changeAdminOrderAddress: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/adminApi', () => ({
@@ -24,7 +23,6 @@ vi.mock('../lib/adminApi', () => ({
   cancelAdminOrder: (...a: unknown[]) => api.cancelAdminOrder(...a),
   refundOrder: (...a: unknown[]) => api.refundOrder(...a),
   confirmCodPayment: (...a: unknown[]) => api.confirmCodPayment(...a),
-  changeAdminOrderAddress: (...a: unknown[]) => api.changeAdminOrderAddress(...a),
 }))
 
 const summary = (over: Partial<AdminOrderSummary> = {}): AdminOrderSummary => ({
@@ -308,34 +306,11 @@ it('confirms cash received only for delivered cash-on-delivery orders', async ()
 
 // ---- detail: address -----------------------------------------------------------------------
 
-it('changes the delivery address while pending or confirmed', async () => {
+it('shows the delivery address but offers no way to change it (the shop does not edit addresses)', async () => {
   api.getAdminOrder.mockResolvedValue(order())
-  api.changeAdminOrderAddress.mockResolvedValue(order({ delivery_house_no: '99' }))
   renderDetail()
-  await userEvent.click(await screen.findByRole('button', { name: 'Change address' }))
-  const house = screen.getByLabelText('House number')
-  await userEvent.clear(house)
-  await userEvent.type(house, '99')
-  await userEvent.click(screen.getByRole('button', { name: 'Save address' }))
-  expect(api.changeAdminOrderAddress.mock.calls[0][1].address).toMatchObject({
-    house_no: '99',
-    city: 'Lahore',
-  })
-  expect(await screen.findByText(/Ayesha Khan, 99, Lahore/)).toBeInTheDocument()
-})
-
-it('hides address changes later on and shows the Lahore-only message when refused', async () => {
-  api.getAdminOrder.mockResolvedValue(order({ status: 'SHIPPED' }))
-  const a = renderDetail()
-  await screen.findByText('2 × Sunflower')
-  expect(screen.queryByRole('button', { name: 'Change address' })).not.toBeInTheDocument()
-  a.unmount()
-  api.getAdminOrder.mockResolvedValue(order())
-  api.changeAdminOrderAddress.mockRejectedValue(new ApiError(422, 'x', { code: 'NOT_DELIVERABLE' }))
-  renderDetail()
-  await userEvent.click(await screen.findByRole('button', { name: 'Change address' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Save address' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('only within Lahore')
+  expect(await screen.findByText(/Ayesha Khan, 12-B, .*Lahore/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /address/i })).not.toBeInTheDocument()
 })
 
 it('lists payment attempts and links registered customers', async () => {

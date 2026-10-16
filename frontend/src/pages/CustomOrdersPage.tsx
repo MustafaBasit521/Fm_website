@@ -1,3 +1,4 @@
+import { BackLink } from './ui'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -61,9 +62,7 @@ export default function CustomOrdersPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <Link to="/account" className="text-terracotta underline">
-        ← My account
-      </Link>
+      <BackLink to="/account">My account</BackLink>
       <PageHeader eyebrow="My account" title="My custom orders" />
 
       {!current && (

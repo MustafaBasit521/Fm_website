@@ -1,3 +1,4 @@
+import { BackLink } from '../pages/ui'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAdminCustomer, getAdminCustomers } from '../lib/adminApi'
@@ -81,9 +82,7 @@ export function CustomerAdminPage() {
   const { data, loading, failed } = useLoad((s) => getAdminCustomer(id, s), [id])
   return (
     <>
-      <Link to="/customers" className="text-terracotta underline">
-        ← All customers
-      </Link>
+      <BackLink to="/customers">All customers</BackLink>
       <div className="mt-2">
         <State loading={loading} failed={failed}>
           {data && (

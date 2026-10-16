@@ -10,7 +10,6 @@ from app.core.payments.base import PaymentProvider
 from app.core.payments.registry import get_payment_provider
 from app.models.enums import OrderStatus, PaymentMethod
 from app.schemas.catalog import Page
-from app.schemas.checkout import Delivery
 from app.schemas.orders import (
     AdminCancel,
     AdminOrderRead,
@@ -65,13 +64,6 @@ async def change_status(order_id: uuid.UUID, data: StatusChange, session: Sessio
 async def cancel_order(order_id: uuid.UUID, data: AdminCancel, session: Session):
     """Cancel from Pending/Confirmed/Processing (Processing may carry the 50% charge)."""
     order = await service.cancel_order(session, order_id, user=None, waive=data.waive_charge)
-    return service.to_admin_read(order)
-
-
-@router.patch("/{order_id}/address", response_model=AdminOrderRead)
-async def change_address(order_id: uuid.UUID, data: Delivery, session: Session):
-    """For guests who contacted the shop (business-rules §16): same status rules as customers."""
-    order = await service.change_address(session, order_id, data, user=None)
     return service.to_admin_read(order)
 
 

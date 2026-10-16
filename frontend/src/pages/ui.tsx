@@ -1,4 +1,12 @@
-import type { InputHTMLAttributes } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from 'react'
+import { Link } from 'react-router-dom'
 
 // Shapes and colours follow the design system in the project mockup:
 // pill buttons (48 px tall), 10 px inputs with a dashed "stitched" focus ring, 18 px cards.
@@ -52,5 +60,113 @@ export function FormError({ message }: { message: string | null }) {
       </span>
       {message}
     </p>
+  )
+}
+
+/** "Back to ..." link at the top of a page: a small pill with an arrow icon. */
+export function BackLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className={`inline-flex min-h-9 items-center gap-2 rounded-full border border-linen bg-paper px-3.5 py-1 text-sm text-ink hover:bg-cream-200 ${focusRing}`}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M19 12H5M11 6l-6 6 6 6" />
+      </svg>
+      {children}
+    </Link>
+  )
+}
+
+/** A file chooser with a proper button instead of the browser's plain "Choose File". The real
+ *  <input type="file"> stays in the page (visually hidden, keyboard and screen-reader friendly),
+ *  so forms and tests that read it keep working. */
+export function FilePicker({
+  id,
+  name,
+  label,
+  accept,
+  multiple,
+  disabled,
+  buttonText = 'Choose file',
+  showNames = true,
+  onChange,
+  onFiles,
+}: {
+  id: string
+  name?: string
+  label: string
+  accept?: string
+  multiple?: boolean
+  disabled?: boolean
+  buttonText?: string
+  /** Show the chosen file names next to the button (turn off when the page lists them itself). */
+  showNames?: boolean
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void
+  onFiles?: (files: File[]) => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  const [names, setNames] = useState<string[]>([])
+
+  // a form reset (after a successful upload) also clears the shown names
+  useEffect(() => {
+    const form = input.current?.form
+    const clear = () => setNames([])
+    form?.addEventListener('reset', clear)
+    return () => form?.removeEventListener('reset', clear)
+  }, [])
+
+  function handle(e: ChangeEvent<HTMLInputElement>) {
+    const files = [...(e.target.files ?? [])]
+    setNames(files.map((f) => f.name))
+    onChange?.(e)
+    if (onFiles) {
+      onFiles(files)
+      if (!showNames) e.target.value = '' // the page keeps the files; allow choosing the same one again
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-sm font-medium text-bark">
+        {label}
+      </label>
+      <div className="relative flex flex-wrap items-center gap-3 rounded-[10px] border-2 border-dashed border-linen bg-cream-100 p-4">
+        <input
+          ref={input}
+          id={id}
+          name={name}
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          disabled={disabled}
+          onChange={handle}
+          className="peer sr-only"
+        />
+        <label
+          htmlFor={id}
+          aria-hidden="true"
+          className={`${pill} cursor-pointer border border-ink bg-paper text-ink hover:bg-cream-200 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-dashed peer-focus-visible:outline-bark peer-disabled:cursor-not-allowed peer-disabled:opacity-50`}
+        >
+          {buttonText}
+        </label>
+        {showNames && (
+          <span className="min-w-0 break-words text-sm text-bark">
+            {names.length > 0 ? names.join(', ') : 'No file chosen'}
+          </span>
+        )}
+      </div>
+    </div>
   )
 }

@@ -14,7 +14,7 @@ import {
 } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { saveLastOrder } from '../lib/lastOrder'
-import { buttonClass, Field, FormError } from './ui'
+import { buttonClass, Field, FormError, BackLink } from './ui'
 
 const NEW_ADDRESS = 'new'
 
@@ -145,9 +145,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link to="/cart" className="text-terracotta underline">
-        ← Back to bag
-      </Link>
+      <BackLink to="/cart">Back to bag</BackLink>
       <h1 className="mt-2 font-serif text-5xl">Checkout</h1>
 
       {!current && (
@@ -174,7 +172,7 @@ export default function CheckoutPage() {
         <form
           key={profile ? 'with-profile' : 'no-profile'}
           onSubmit={onSubmit}
-          className="mt-6 grid items-start gap-8 md:grid-cols-[1fr_20rem]"
+          className="mt-6 grid items-start gap-8 md:grid-cols-[minmax(0,1fr)_20rem]"
         >
           <div className="flex flex-col gap-6">
             <fieldset className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5">

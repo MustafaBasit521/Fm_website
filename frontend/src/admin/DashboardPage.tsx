@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 </ul>
               </section>
 
-              <div className="grid items-start gap-6 lg:grid-cols-[1.7fr_1fr]">
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
                 <section aria-label="Recent orders" className={cardClass}>
                   <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
                     <h2 className="font-serif text-2xl">Recent orders</h2>

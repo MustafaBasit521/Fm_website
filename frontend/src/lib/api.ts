@@ -233,6 +233,8 @@ export interface Order {
     product_name_snapshot: string
     quantity: number
     unit_price_at_purchase_paisa: number
+    /** The product's picture now (absent when it was deleted or has none). */
+    image_url?: string | null
   }[]
   subtotal_paisa: number
   delivery_fee_paisa: number

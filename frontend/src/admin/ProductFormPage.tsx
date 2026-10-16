@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createProduct,
@@ -16,9 +16,17 @@ import {
 import { ApiError } from '../lib/api'
 import { formatPrice, paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
 import { supabase } from '../lib/supabase'
-import { buttonClass, Field, FormError, secondaryButtonClass } from '../pages/ui'
+import {
+  BackLink,
+  buttonClass,
+  Field,
+  FilePicker,
+  FormError,
+  secondaryButtonClass,
+} from '../pages/ui'
 import { inputClass } from './styles'
 import { ConfirmButton, PageTitle, State, cardClass } from './ui'
+import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -38,8 +46,12 @@ export default function ProductFormPage() {
   const [override, setOverride] = useState<AdminProduct | null>(null)
   const [type, setType] = useState<'READY_TO_SHIP' | 'MADE_TO_ORDER' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
+  // pictures chosen while creating a new product; they are uploaded right after it is saved
+  const [pending, setPending] = useState<File[]>([])
+  const previews = useMemo(() => pending.map((f) => URL.createObjectURL(f)), [pending])
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews])
 
   const current = override?.product_id === id ? override : product.data
   const effectiveType = type ?? current?.availability_type ?? 'READY_TO_SHIP'
@@ -50,6 +62,33 @@ export default function ProductFormPage() {
       return 'The availability type cannot change while orders containing this product are still active.'
     if (e instanceof ApiError && e.status === 422) return 'Please check the fields and try again.'
     return 'That did not work. Please try again.'
+  }
+
+  /** Checks a chosen picture; returns the reason it cannot be used, or null. */
+  function pictureProblem(file: File): string | null {
+    if (!IMAGE_TYPES.includes(file.type)) return 'Pictures must be JPG, PNG or WebP.'
+    if (file.size > MAX_BYTES) return 'Pictures must be under 5 MB.'
+    return null
+  }
+
+  async function uploadPicture(productId: string, file: File, sortOrder: number) {
+    const target = await getProductImageUpload(productId, file.type)
+    const { error: uploadError } = await supabase.storage
+      .from(target.bucket)
+      .uploadToSignedUrl(target.storage_path, target.token, file)
+    if (uploadError) throw new Error('upload failed')
+    await registerProductImage(productId, {
+      storage_path: target.storage_path,
+      alt_text: null,
+      sort_order: sortOrder,
+    })
+  }
+
+  function choosePictures(files: File[]) {
+    const bad = files.map(pictureProblem).find(Boolean)
+    if (bad) setError(bad)
+    else setError(null)
+    setPending((list) => [...list, ...files.filter((f) => !pictureProblem(f))])
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -75,14 +114,26 @@ export default function ProductFormPage() {
     }
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       if (isNew) {
         const created = await createProduct(body)
+        let failed = 0
+        for (const [i, file] of pending.entries()) {
+          try {
+            await uploadPicture(created.product_id, file, i)
+          } catch {
+            failed += 1
+          }
+        }
+        toast.show(
+          failed === 0
+            ? 'Product created'
+            : `Product created, but ${failed} ${failed === 1 ? 'picture' : 'pictures'} could not be uploaded. Add them here.`,
+        )
         navigate(`/products/${created.product_id}`, { replace: true })
       } else {
         setOverride(await updateProduct(id, body))
-        setNotice('Saved.')
+        toast.show('Product saved')
       }
     } catch (err) {
       setError(explain(err))
@@ -101,26 +152,17 @@ export default function ProductFormPage() {
     }
   }
 
-  async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file || isNew) return
-    if (!IMAGE_TYPES.includes(file.type)) return setError('Pictures must be JPG, PNG or WebP.')
-    if (file.size > MAX_BYTES) return setError('Pictures must be under 5 MB.')
+  async function addPictures(files: File[]) {
+    if (isNew || files.length === 0) return
+    const bad = files.map(pictureProblem).find(Boolean)
+    if (bad) return setError(bad)
     setBusy(true)
     setError(null)
     try {
-      const target = await getProductImageUpload(id, file.type)
-      const { error: uploadError } = await supabase.storage
-        .from(target.bucket)
-        .uploadToSignedUrl(target.storage_path, target.token, file)
-      if (uploadError) throw new Error('upload failed')
-      await registerProductImage(id, {
-        storage_path: target.storage_path,
-        alt_text: null,
-        sort_order: current?.images.length ?? 0,
-      })
+      let count = current?.images.length ?? 0
+      for (const file of files) await uploadPicture(id, file, count++)
       setOverride(await getAdminProduct(id))
+      toast.show(files.length === 1 ? 'Picture added' : `${files.length} pictures added`)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 503
@@ -144,7 +186,7 @@ export default function ProductFormPage() {
   async function onAlt(imageId: string, alt: string) {
     try {
       await updateProductImage(id!, imageId, { alt_text: alt.trim() || null })
-      setNotice('Picture description saved.')
+      toast.show('Picture description saved')
     } catch {
       setError('Could not save the picture description.')
     }
@@ -152,12 +194,7 @@ export default function ProductFormPage() {
 
   return (
     <>
-      <Link
-        to="/products"
-        className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-      >
-        <span aria-hidden="true">←</span> All products
-      </Link>
+      <BackLink to="/products">All products</BackLink>
       <div className="mt-3">
         <PageTitle
           eyebrow={
@@ -168,7 +205,7 @@ export default function ProductFormPage() {
       </div>
       <div className="mt-6">
         <State loading={!ready} failed={categories.failed || (!isNew && product.failed)}>
-          <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <form
               id="product-form"
               key={current?.product_id ?? 'new'}
@@ -305,25 +342,61 @@ export default function ProductFormPage() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-3 flex flex-col gap-1">
-                    <label htmlFor="add-photo" className="text-sm font-medium text-bark">
-                      Add a picture (JPG, PNG or WebP, under 5 MB)
-                    </label>
-                    <input
+                  <div className="mt-3">
+                    <FilePicker
                       id="add-photo"
-                      type="file"
+                      label="Add pictures (JPG, PNG or WebP, under 5 MB each)"
                       accept={IMAGE_TYPES.join(',')}
+                      multiple
                       disabled={busy}
-                      onChange={(e) => void onUpload(e)}
-                      className="rounded-[10px] border-2 border-dashed border-linen bg-cream-100 p-3 text-sm text-bark"
+                      buttonText="Choose pictures"
+                      showNames={false}
+                      onFiles={(files) => void addPictures(files)}
                     />
                   </div>
                 </section>
               )}
               {isNew && (
-                <p className={`${cardClass} p-4 text-bark`}>
-                  You can add pictures after the product is created.
-                </p>
+                <section aria-label="Pictures" className={`${cardClass} p-4 md:p-5`}>
+                  <h2 className="font-serif text-2xl">Pictures</h2>
+                  <p className="text-sm text-muted">
+                    The first picture is the main one. They are uploaded when you create the
+                    product.
+                  </p>
+                  {pending.length > 0 && (
+                    <ul className="mt-3 grid grid-cols-3 gap-2">
+                      {pending.map((file, i) => (
+                        <li key={`${file.name}-${i}`} className="relative">
+                          <img
+                            src={previews[i]}
+                            alt={`Chosen picture ${i + 1}: ${file.name}`}
+                            className="aspect-square w-full rounded-lg bg-cream-200 object-cover"
+                          />
+                          <button
+                            type="button"
+                            aria-label={`Remove ${file.name}`}
+                            onClick={() => setPending((list) => list.filter((_, j) => j !== i))}
+                            className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-ink text-cream"
+                          >
+                            <span aria-hidden="true">×</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-3">
+                    <FilePicker
+                      id="new-photos"
+                      label="Add pictures (JPG, PNG or WebP, under 5 MB each)"
+                      accept={IMAGE_TYPES.join(',')}
+                      multiple
+                      disabled={busy}
+                      buttonText="Choose pictures"
+                      showNames={false}
+                      onFiles={choosePictures}
+                    />
+                  </div>
+                </section>
               )}
 
               <section aria-label="Visibility" className={`${cardClass} divide-y divide-sand px-4`}>
@@ -363,7 +436,6 @@ export default function ProductFormPage() {
 
               <div className="flex flex-col gap-3">
                 <FormError message={error} />
-                {notice && <p role="status">{notice}</p>}
                 <button
                   type="submit"
                   form="product-form"

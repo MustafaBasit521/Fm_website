@@ -104,7 +104,7 @@ export default function ContactPage() {
   }
 
   return (
-    <main className="mx-auto grid max-w-5xl items-start gap-10 px-4 py-10 md:grid-cols-[1fr_1.15fr] md:py-14">
+    <main className="mx-auto grid max-w-5xl items-start gap-10 px-4 py-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:py-14">
       <div className="flex flex-col gap-6">
         <PageHeader
           eyebrow="Contact"

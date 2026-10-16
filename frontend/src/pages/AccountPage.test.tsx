@@ -45,7 +45,7 @@ it('shows the profile and saves edits through the API', async () => {
     phone: '03001234567',
     subscribed_to_updates: true,
   })
-  expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  expect(await screen.findByText('Your details are saved')).toBeInTheDocument()
 })
 
 it('shows a validation message on 422', async () => {

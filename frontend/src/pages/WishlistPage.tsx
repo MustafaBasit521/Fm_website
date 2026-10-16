@@ -1,3 +1,4 @@
+import { BackLink } from './ui'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getWishlist, removeFromWishlist, type Page, type ProductSummary } from '../lib/api'
@@ -50,9 +51,7 @@ export default function WishlistPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
-      <Link to="/account" className="text-terracotta underline">
-        ← My account
-      </Link>
+      <BackLink to="/account">My account</BackLink>
       <PageHeader eyebrow="My account" title="My wishlist" />
 
       {!current && (

@@ -384,7 +384,7 @@ Guest customers do **not** cancel orders through the website.
 
 They must contact the business through the available WhatsApp/contact channel.
 
-The admin can process an eligible request after verification, applying the same status rules.
+The admin can process an eligible request after verification, applying the same status rules. **(Changed: see the decision above, the admin can no longer change addresses.)**
 
 ---
 
@@ -409,7 +409,7 @@ No address changes are allowed once the order is:
 
 Guest customers do **not** modify addresses through the website.
 
-They must contact the business through the available WhatsApp/contact channel. The admin can process an eligible request after verification, applying the same status rules.
+They must contact the business through the available WhatsApp/contact channel. The admin can process an eligible request after verification, applying the same status rules. **(Changed: see the decision above, the admin can no longer change addresses.)**
 
 The admin changes a guest's address with the same status rules (Pending/Confirmed only) and the same Lahore-only validation. When no new recipient name is given, the existing one is kept.
 

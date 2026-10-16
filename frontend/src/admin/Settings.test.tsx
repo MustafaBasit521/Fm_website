@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ApiError } from '../lib/api'
+import { ToastProvider } from '../toast/ToastProvider'
 import SettingsAdminPage from './SettingsAdminPage'
 
 const api = { getAdminSettings: vi.fn(), updateAdminSettings: vi.fn() }
@@ -30,7 +31,11 @@ beforeEach(() => {
 
 it('shows the current settings, with the fee in rupees', async () => {
   api.getAdminSettings.mockResolvedValue(settings())
-  render(<SettingsAdminPage />)
+  render(
+    <ToastProvider>
+      <SettingsAdminPage />
+    </ToastProvider>,
+  )
   expect(await screen.findByDisplayValue('Bundle of Loops')).toBeInTheDocument()
   expect(screen.getByLabelText('Delivery fee (Rs)')).toHaveValue('200')
   expect(screen.getByLabelText('Instagram link')).toHaveValue('https://instagram.com/bol')
@@ -43,7 +48,11 @@ it('saves changes, converting the fee to paisa and dropping empty links', async 
   api.updateAdminSettings.mockResolvedValue(
     settings({ delivery_fee_paisa: 25050, updated_at: 'later' }),
   )
-  render(<SettingsAdminPage />)
+  render(
+    <ToastProvider>
+      <SettingsAdminPage />
+    </ToastProvider>,
+  )
   const fee = await screen.findByLabelText('Delivery fee (Rs)')
   await userEvent.clear(fee)
   await userEvent.type(fee, '250.50')
@@ -54,13 +63,17 @@ it('saves changes, converting the fee to paisa and dropping empty links', async 
   expect(sent.social_links).toEqual({})
   expect(sent.business_name).toBe('Bundle of Loops')
   expect(sent.phone).toBeNull()
-  expect(await screen.findByText('Settings saved.')).toBeInTheDocument()
+  expect(await screen.findByText('Settings saved')).toBeInTheDocument()
 })
 
 it('rejects a bad fee locally and explains server validation errors', async () => {
   api.getAdminSettings.mockResolvedValue(settings())
   api.updateAdminSettings.mockRejectedValue(new ApiError(422, 'x'))
-  render(<SettingsAdminPage />)
+  render(
+    <ToastProvider>
+      <SettingsAdminPage />
+    </ToastProvider>,
+  )
   const fee = await screen.findByLabelText('Delivery fee (Rs)')
   await userEvent.clear(fee)
   await userEvent.type(fee, 'free')
@@ -75,6 +88,10 @@ it('rejects a bad fee locally and explains server validation errors', async () =
 
 it('shows a load error', async () => {
   api.getAdminSettings.mockRejectedValue(new Error('x'))
-  render(<SettingsAdminPage />)
+  render(
+    <ToastProvider>
+      <SettingsAdminPage />
+    </ToastProvider>,
+  )
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
 })

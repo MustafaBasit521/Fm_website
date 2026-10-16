@@ -97,7 +97,7 @@ it('lets the shopper pick a quantity, shows the total on the button and adds tha
   expect(JSON.parse(window.localStorage.getItem('crochet-cart-v1')!)).toEqual([
     { product_id: 'p1', quantity: 3 },
   ])
-  expect(await screen.findByText(/Added to your bag/)).toBeInTheDocument()
+  expect(await screen.findByText(/Sunflower added to your bag/)).toBeInTheDocument()
 })
 
 it('offers no quantity or add button for an unavailable product', async () => {

@@ -427,3 +427,15 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Not done:** custom orders, customers, categories and reviews keep their previous inner layouts (only the page title changed).
 
+## UI polish — increment 8 (owner's list: pictures, toasts, categories, back links)
+
+**Requests:** different back-arrow icons; categories that open to show their products; choose product pictures while creating the product; a proper button instead of the browser's file chooser; pop-up messages instead of inline text; order item pictures; remove the admin's change-address option; plus a layout bug (add-product page cut off on the right).
+
+**Built:** `BackLink`, `FilePicker` (hidden real input + styled label, resets with its form), `ToastProvider`/`useToast` (polite live region without `role=status`, so page-level status messages stay unique; at most three, auto-dismiss), accordion categories (products loaded only when opened), create-with-pictures flow, order item `image_url` (one extra query per order load, `SupabaseStorage.public_url`, no stored copy), removal of the admin address route.
+
+**Decision recorded:** admins no longer change addresses (business-rules §16). Consequence for guests is written there.
+
+**Verified:** 354 frontend and the backend suite; new tests for toasts, the file flow, categories, item pictures and the removed route; Chrome screenshots of add-product and categories. Two mistakes of mine were caught by tests: the toast container first had `role=status`, which collided with the loading messages of other pages (removed), and the picture preview needs `URL.createObjectURL`, which jsdom lacks (stubbed in tests).
+
+**Not done / asked back to the owner:** custom-order negotiation (seller sets a price, customer and admin talk in the system) is proposed, not built; the sentence about the delivery address form was cut off in the message.
+

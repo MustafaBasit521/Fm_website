@@ -8,9 +8,10 @@ import {
 } from '../lib/adminApi'
 import { ApiError, type GalleryImageType } from '../lib/api'
 import { supabase } from '../lib/supabase'
-import { buttonClass, Field, FormError } from '../pages/ui'
+import { buttonClass, Field, FilePicker, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { ConfirmButton, Pager, State, PageTitle, Switch, cardClass } from './ui'
+import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
 
 const TYPES: [GalleryImageType, string][] = [
@@ -28,6 +29,7 @@ export default function GalleryAdminPage() {
   const { data, loading, failed, reload } = useLoad((s) => getAdminGallery(page, s), [page])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   async function onUpload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -56,6 +58,7 @@ export default function GalleryAdminPage() {
         show_in_hero: fd.get('hero') === 'on',
       })
       form.reset()
+      toast.show('Picture added')
       reload()
     } catch (err) {
       setError(
@@ -72,6 +75,7 @@ export default function GalleryAdminPage() {
     setError(null)
     try {
       await updateGalleryImage(id, patch)
+      toast.show('Saved')
       reload()
     } catch {
       setError('Could not save that change.')
@@ -95,12 +99,13 @@ export default function GalleryAdminPage() {
         aria-label="Add a gallery picture"
         className={`${cardClass} mt-5 flex max-w-xl flex-col gap-3 p-4 md:p-5`}
       >
-        <div className="flex flex-col gap-1">
-          <label htmlFor="g-file" className="text-sm font-medium text-bark">
-            Picture (JPG, PNG or WebP, under 5 MB)
-          </label>
-          <input id="g-file" name="file" type="file" accept={IMAGE_TYPES.join(',')} />
-        </div>
+        <FilePicker
+          id="g-file"
+          name="file"
+          label="Picture (JPG, PNG or WebP, under 5 MB)"
+          accept={IMAGE_TYPES.join(',')}
+          buttonText="Choose picture"
+        />
         <div className="flex flex-col gap-1">
           <label htmlFor="g-type" className="text-sm font-medium text-bark">
             Type

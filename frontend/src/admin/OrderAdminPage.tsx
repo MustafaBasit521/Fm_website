@@ -1,8 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   cancelAdminOrder,
-  changeAdminOrderAddress,
   confirmCodPayment,
   getAdminOrder,
   refundOrder,
@@ -12,7 +11,7 @@ import {
 import { ApiError } from '../lib/api'
 import { formatPrice, parseRupeesToPaisa } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
-import { buttonClass, Field, FormError } from '../pages/ui'
+import { BackLink, buttonClass, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { Badge, ConfirmButton, PageTitle, State, cardClass } from './ui'
 import { useLoad } from './useLoad'
@@ -49,7 +48,6 @@ export default function OrderAdminPage() {
   const [busy, setBusy] = useState(false)
   const [waive, setWaive] = useState(false)
   const [refundAmount, setRefundAmount] = useState('')
-  const [editingAddress, setEditingAddress] = useState(false)
 
   const order = override?.order_id === id ? override : data
 
@@ -81,35 +79,9 @@ export default function OrderAdminPage() {
     setRefundAmount('')
   }
 
-  async function onAddress(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = new FormData(e.currentTarget)
-    const text = (k: string) => String(form.get(k) ?? '').trim()
-    const optional = (k: string) => text(k) || null
-    const ok = await act(() =>
-      changeAdminOrderAddress(id, {
-        recipient_name: optional('recipient_name'),
-        address: {
-          house_no: text('house_no'),
-          street_number: optional('street_number'),
-          city: text('city'),
-          province: optional('province'),
-          postal_code: text('postal_code'),
-          country: text('country'),
-        },
-      }),
-    )
-    if (ok) setEditingAddress(false)
-  }
-
   return (
     <>
-      <Link
-        to="/orders"
-        className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-      >
-        <span aria-hidden="true">←</span> All orders
-      </Link>
+      <BackLink to="/orders">All orders</BackLink>
       <State loading={loading && !order} failed={failed && !order}>
         {order && (
           <div className="mt-3 flex flex-col gap-6">
@@ -162,7 +134,7 @@ export default function OrderAdminPage() {
               )}
             </section>
 
-            <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               <div className="flex flex-col gap-6">
                 <section aria-label="Items" className={`${cardClass} p-4 md:p-5`}>
                   <h2 className="font-serif text-2xl">Items</h2>
@@ -170,9 +142,21 @@ export default function OrderAdminPage() {
                     {order.items.map((i) => (
                       <li
                         key={`${i.product_name_snapshot}-${i.unit_price_at_purchase_paisa}`}
-                        className="flex flex-nowrap justify-between gap-4 py-3"
+                        className="flex flex-nowrap items-center gap-3 py-3"
                       >
-                        <span>
+                        {i.image_url ? (
+                          <img
+                            src={i.image_url}
+                            alt=""
+                            className="h-14 w-12 shrink-0 rounded-[10px] bg-cream-200 object-cover"
+                          />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="h-14 w-12 shrink-0 rounded-[10px] bg-cream-200"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1">
                           {i.quantity} × {i.product_name_snapshot}
                         </span>
                         <span className="whitespace-nowrap font-semibold">
@@ -338,92 +322,11 @@ export default function OrderAdminPage() {
 
                 <section aria-label="Delivery" className={`${cardClass} p-4 md:p-5`}>
                   <h2 className="font-serif text-2xl">Delivery</h2>
-                  {!editingAddress ? (
-                    <>
-                      <p className="mt-2">
-                        {order.delivery_name}, {order.delivery_house_no}
-                        {order.delivery_street_number
-                          ? `, ${order.delivery_street_number}`
-                          : ''}, {order.delivery_city}, {order.delivery_postal_code},{' '}
-                        {order.delivery_country}
-                      </p>
-                      {['PENDING', 'CONFIRMED'].includes(order.status) && (
-                        <button
-                          type="button"
-                          className="mt-2 text-terracotta underline"
-                          onClick={() => setEditingAddress(true)}
-                        >
-                          Change address
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <form
-                      onSubmit={onAddress}
-                      aria-label="Change delivery address"
-                      className="mt-2 flex flex-col gap-3 rounded-[10px] bg-cream-100 p-3"
-                    >
-                      <Field
-                        id="recipient_name"
-                        name="recipient_name"
-                        label="Recipient name"
-                        defaultValue={order.delivery_name}
-                        maxLength={100}
-                      />
-                      <Field
-                        id="house_no"
-                        name="house_no"
-                        label="House number"
-                        defaultValue={order.delivery_house_no}
-                        required
-                      />
-                      <Field
-                        id="street_number"
-                        name="street_number"
-                        label="Street number"
-                        defaultValue={order.delivery_street_number ?? ''}
-                      />
-                      <Field
-                        id="city"
-                        name="city"
-                        label="City"
-                        defaultValue={order.delivery_city}
-                        required
-                      />
-                      <Field
-                        id="province"
-                        name="province"
-                        label="Province"
-                        defaultValue={order.delivery_province ?? ''}
-                      />
-                      <Field
-                        id="postal_code"
-                        name="postal_code"
-                        label="Postal code"
-                        defaultValue={order.delivery_postal_code}
-                        required
-                      />
-                      <Field
-                        id="country"
-                        name="country"
-                        label="Country"
-                        defaultValue={order.delivery_country}
-                        required
-                      />
-                      <div className="flex flex-wrap gap-3">
-                        <button type="submit" className={buttonClass} disabled={busy}>
-                          Save address
-                        </button>
-                        <button
-                          type="button"
-                          className="underline"
-                          onClick={() => setEditingAddress(false)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  )}
+                  <p className="mt-2">
+                    {order.delivery_name}, {order.delivery_house_no}
+                    {order.delivery_street_number ? `, ${order.delivery_street_number}` : ''},{' '}
+                    {order.delivery_city}, {order.delivery_postal_code}, {order.delivery_country}
+                  </p>
                 </section>
               </div>
             </div>

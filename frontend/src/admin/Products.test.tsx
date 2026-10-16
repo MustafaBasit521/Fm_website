@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ToastProvider } from '../toast/ToastProvider'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { AdminProduct } from '../lib/adminApi'
 import { ApiError, type Page } from '../lib/api'
@@ -73,17 +74,21 @@ const page = (items: AdminProduct[], total = items.length): Page<AdminProduct> =
 const renderList = () =>
   render(
     <MemoryRouter>
-      <ProductsAdminPage />
+      <ToastProvider>
+        <ProductsAdminPage />
+      </ToastProvider>
     </MemoryRouter>,
   )
 const renderForm = (path: string) =>
   render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/products/new" element={<ProductFormPage />} />
-        <Route path="/products/:id" element={<ProductFormPage />} />
-        <Route path="/products" element={<p>products list</p>} />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route path="/products/new" element={<ProductFormPage />} />
+          <Route path="/products/:id" element={<ProductFormPage />} />
+          <Route path="/products" element={<p>products list</p>} />
+        </Routes>
+      </ToastProvider>
     </MemoryRouter>,
   )
 
@@ -178,6 +183,80 @@ it('creates a product, converting the price to paisa, and opens it for pictures'
   expect(await screen.findByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
 })
 
+it('lets the admin choose pictures while creating, and uploads them right after the product is saved', async () => {
+  const createObjectURL = vi.fn(() => 'blob:preview')
+  vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+  api.createProduct.mockResolvedValue(product())
+  api.getAdminProduct.mockResolvedValue(product())
+  api.getProductImageUpload.mockResolvedValue({
+    storage_path: 'products/p1/abc.png',
+    upload_url: 'u',
+    token: 't',
+    bucket: 'product-images',
+  })
+  api.registerProductImage.mockResolvedValue({ image_id: 'i1' })
+  renderForm('/products/new')
+  await userEvent.type(await screen.findByLabelText('Product name'), 'Sunflower')
+  await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1')
+  await userEvent.type(screen.getByLabelText('Price (Rs)'), '100')
+  const a = new File(['a'], 'a.png', { type: 'image/png' })
+  const b = new File(['b'], 'b.png', { type: 'image/png' })
+  await userEvent.upload(screen.getByLabelText(/Add pictures/), [a, b])
+  expect(screen.getAllByRole('img', { name: /Chosen picture/ })).toHaveLength(2)
+  await userEvent.click(screen.getByRole('button', { name: 'Remove b.png' }))
+  expect(screen.getAllByRole('img', { name: /Chosen picture/ })).toHaveLength(1)
+  expect(api.createProduct).not.toHaveBeenCalled() // nothing is sent before Create
+  await userEvent.click(screen.getByRole('button', { name: 'Create product' }))
+  expect(await screen.findByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
+  expect(api.getProductImageUpload).toHaveBeenCalledTimes(1)
+  expect(uploadToSignedUrl).toHaveBeenCalledWith('product-images', 'products/p1/abc.png', 't', a)
+  expect(api.registerProductImage).toHaveBeenCalledWith('p1', {
+    storage_path: 'products/p1/abc.png',
+    alt_text: null,
+    sort_order: 0,
+  })
+  vi.unstubAllGlobals()
+})
+
+it('still creates the product when a picture cannot be uploaded, and says so', async () => {
+  vi.stubGlobal(
+    'URL',
+    Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: vi.fn() }),
+  )
+  api.createProduct.mockResolvedValue(product())
+  api.getAdminProduct.mockResolvedValue(product())
+  api.getProductImageUpload.mockRejectedValue(new ApiError(503, 'x'))
+  renderForm('/products/new')
+  await userEvent.type(await screen.findByLabelText('Product name'), 'Sunflower')
+  await userEvent.selectOptions(screen.getByLabelText('Category'), 'c1')
+  await userEvent.type(screen.getByLabelText('Price (Rs)'), '100')
+  await userEvent.upload(
+    screen.getByLabelText(/Add pictures/),
+    new File(['a'], 'a.png', { type: 'image/png' }),
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Create product' }))
+  expect(await screen.findByRole('heading', { name: 'Edit product' })).toBeInTheDocument()
+  expect(await screen.findByText(/1 picture could not be uploaded/)).toBeInTheDocument()
+  vi.unstubAllGlobals()
+})
+
+it('refuses a picture of the wrong type before creating anything', async () => {
+  vi.stubGlobal(
+    'URL',
+    Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: vi.fn() }),
+  )
+  renderForm('/products/new')
+  await screen.findByLabelText('Product name')
+  await userEvent.upload(
+    screen.getByLabelText(/Add pictures/),
+    new File(['x'], 'doc.pdf', { type: 'application/pdf' }),
+    { applyAccept: false },
+  )
+  expect(await screen.findByRole('alert')).toHaveTextContent('JPG, PNG or WebP')
+  expect(screen.queryByRole('img', { name: /Chosen picture/ })).not.toBeInTheDocument()
+  vi.unstubAllGlobals()
+})
+
 it('shows capacity (not stock) for made-to-order products', async () => {
   renderForm('/products/new')
   await screen.findByLabelText('Product name')
@@ -215,7 +294,7 @@ it('loads a product, saves changes and deletes it after confirmation', async () 
     price_paisa: 99900,
     name: 'Sunflower',
   })
-  expect(await screen.findByText('Saved.')).toBeInTheDocument()
+  expect(await screen.findByText('Product saved')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Delete product' }))
   expect(api.deleteProduct).not.toHaveBeenCalled()
   await userEvent.click(screen.getByRole('button', { name: 'Yes, delete this product' }))
@@ -249,7 +328,7 @@ it('uploads a picture straight to storage and registers it', async () => {
   api.registerProductImage.mockResolvedValue({ image_id: 'i1' })
   renderForm('/products/p1')
   const file = new File(['x'], 'a.png', { type: 'image/png' })
-  await userEvent.upload(await screen.findByLabelText(/Add a picture/), file)
+  await userEvent.upload(await screen.findByLabelText(/Add pictures/), file)
   expect(api.getProductImageUpload).toHaveBeenCalledWith('p1', 'image/png')
   expect(uploadToSignedUrl).toHaveBeenCalledWith('product-images', 'products/p1/abc.png', 't', file)
   expect(api.registerProductImage).toHaveBeenCalledWith('p1', {
@@ -263,7 +342,7 @@ it('uploads a picture straight to storage and registers it', async () => {
 it('refuses wrong picture types, and explains a missing storage key', async () => {
   api.getAdminProduct.mockResolvedValue(product())
   renderForm('/products/p1')
-  const input = await screen.findByLabelText(/Add a picture/)
+  const input = await screen.findByLabelText(/Add pictures/)
   await userEvent.upload(input, new File(['x'], 'a.pdf', { type: 'application/pdf' }), {
     applyAccept: false,
   })

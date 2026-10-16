@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { ApiError, getProduct, type ProductDetail } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { AddToCartButton } from './AddToCartButton'
@@ -8,7 +8,7 @@ import { stockLabel } from './stock'
 import { ReviewsSection } from './ReviewsSection'
 import { WishlistButton } from './WishlistButton'
 import { WhatsAppButton } from '../shop/WhatsAppButton'
-import { secondaryButtonClass } from './ui'
+import { secondaryButtonClass, BackLink } from './ui'
 
 export default function ProductPage() {
   const { id = '' } = useParams()
@@ -39,9 +39,7 @@ export default function ProductPage() {
 
   const back = (
     <span className="flex justify-between">
-      <Link to="/shop" className="text-terracotta underline">
-        ← Back to shop
-      </Link>
+      <BackLink to="/shop">Back to shop</BackLink>
     </span>
   )
 

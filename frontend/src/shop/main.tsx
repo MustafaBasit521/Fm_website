@@ -5,18 +5,21 @@ import App from './App.tsx'
 import { AuthProvider } from '../auth/AuthProvider.tsx'
 import { CartProvider } from '../cart/CartProvider.tsx'
 import { WishlistProvider } from '../wishlist/WishlistProvider.tsx'
+import { ToastProvider } from '../toast/ToastProvider.tsx'
 import '../index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <WishlistProvider>
-            <App />
-          </WishlistProvider>
-        </CartProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <CartProvider>
+            <WishlistProvider>
+              <App />
+            </WishlistProvider>
+          </CartProvider>
+        </AuthProvider>
+      </ToastProvider>
     </BrowserRouter>
   </StrictMode>,
 )

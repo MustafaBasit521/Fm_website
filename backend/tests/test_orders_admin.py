@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 
 from tests.conftest import auth
-from tests.test_checkout import LAHORE, place, stock_of
+from tests.test_checkout import place, stock_of
 from tests.test_orders_customer import set_status
 
 ADMIN = "/api/admin/orders"
@@ -35,7 +35,6 @@ async def post_status(client, admin_h, order_id, status):
         ("GET", f"{ADMIN}/{uuid.uuid4()}"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/status"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/cancel"),
-        ("PATCH", f"{ADMIN}/{uuid.uuid4()}/address"),
     ],
 )
 async def test_admin_order_routes_reject_anonymous_and_customers(client, customer_h, method, url):
@@ -261,22 +260,30 @@ async def test_cancelled_order_stock_and_snapshots_survive_product_deletion(
     assert r.json()["items"][0]["product_name_snapshot"] == "Sunflower"
 
 
-# ---- admin address change (guests who contacted the shop) ----------------------------------
+# ---- pictures of the ordered items ---------------------------------------------------------
 
 
-async def test_admin_changes_a_guest_address_under_the_same_rules(
-    client, admin_h, make_product, db_engine
+async def test_order_items_carry_the_product_picture_while_the_product_exists(
+    client, admin_h, make_product
 ):
-    a = await make_product(stock_quantity=5)
-    o = await guest_order(client, a["product_id"])
-    url = f"{ADMIN}/{o['order_id']}/address"
-    new = LAHORE | {"house_no": "55"}
-    ok = await client.patch(url, headers=admin_h, json={"address": new})
-    assert ok.status_code == 200 and ok.json()["delivery_house_no"] == "55"
-    karachi = await client.patch(url, headers=admin_h, json={"address": new | {"city": "Karachi"}})
-    assert karachi.status_code == 422
-    saved_id = await client.patch(url, headers=admin_h, json={"address_id": str(uuid.uuid4())})
-    assert saved_id.status_code == 422  # saved addresses belong to customers
-    await set_status(db_engine, o["order_id"], "SHIPPED")
-    locked = await client.patch(url, headers=admin_h, json={"address": new})
-    assert locked.status_code == 409 and locked.json()["detail"]["code"] == "ADDRESS_LOCKED"
+    p = await make_product(stock_quantity=5)
+    pid = p["product_id"]
+    path = f"products/{pid}/{'a' * 32}.webp"
+    r = await client.post(
+        f"/api/admin/products/{pid}/images", headers=admin_h, json={"storage_path": path}
+    )
+    assert r.status_code == 201, r.text
+    plain = await make_product(name="No photo", stock_quantity=5)
+
+    o = await guest_order(client, pid)
+    assert o["items"][0]["image_url"].endswith(f"/product-images/{path}")
+    seen = (await client.get(f"{ADMIN}/{o['order_id']}", headers=admin_h)).json()
+    assert seen["items"][0]["image_url"] == o["items"][0]["image_url"]
+
+    o2 = await guest_order(client, plain["product_id"])
+    assert o2["items"][0]["image_url"] is None  # nothing to show
+
+    await client.delete(f"/api/admin/products/{pid}", headers=admin_h)  # the product is gone
+    gone = (await client.get(f"{ADMIN}/{o['order_id']}", headers=admin_h)).json()
+    assert gone["items"][0]["image_url"] is None
+    assert gone["items"][0]["product_name_snapshot"] == "Sunflower"

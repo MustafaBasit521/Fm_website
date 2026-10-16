@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { Order } from '../lib/api'
 import { formatPrice } from '../lib/money'
 
@@ -9,20 +10,38 @@ export function OrderBreakdown({
 }) {
   return (
     <section aria-label="Order items" className="rounded-[18px] border border-sand bg-paper p-5">
-      <ul className="flex flex-col gap-2">
-        {order.items.map((i) => (
-          <li
-            key={`${i.product_name_snapshot}-${i.unit_price_at_purchase_paisa}`}
-            className="flex flex-nowrap justify-between gap-4"
-          >
-            <span>
-              {i.quantity} × {i.product_name_snapshot}
-            </span>
-            <span className="whitespace-nowrap">
-              {formatPrice(i.quantity * i.unit_price_at_purchase_paisa)}
-            </span>
-          </li>
-        ))}
+      <ul className="flex flex-col gap-3">
+        {order.items.map((i) => {
+          const picture = i.image_url ? (
+            <img
+              src={i.image_url}
+              alt=""
+              className="h-16 w-14 shrink-0 rounded-[10px] bg-cream-200 object-cover"
+            />
+          ) : (
+            <span aria-hidden="true" className="h-16 w-14 shrink-0 rounded-[10px] bg-cream-200" />
+          )
+          return (
+            <li
+              key={`${i.product_name_snapshot}-${i.unit_price_at_purchase_paisa}`}
+              className="flex flex-nowrap items-center gap-3"
+            >
+              {i.product_id ? (
+                <Link to={`/shop/${i.product_id}`} tabIndex={-1} aria-hidden="true">
+                  {picture}
+                </Link>
+              ) : (
+                picture
+              )}
+              <span className="min-w-0 flex-1">
+                {i.quantity} × {i.product_name_snapshot}
+              </span>
+              <span className="whitespace-nowrap">
+                {formatPrice(i.quantity * i.unit_price_at_purchase_paisa)}
+              </span>
+            </li>
+          )
+        })}
       </ul>
       <dl className="mt-4 flex flex-col gap-2 border-t border-sand pt-4">
         <div className="flex flex-nowrap justify-between gap-4">

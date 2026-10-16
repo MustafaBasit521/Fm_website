@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/context'
 import { addToWishlist, ApiError, getWishlistIds, removeFromWishlist } from '../lib/api'
+import { useToast } from '../toast/context'
 import { WishlistContext } from './context'
 
 /** Which products the signed-in shopper has saved, shared by every heart, the header badge and
  *  the wishlist panel. Signed out: nothing is requested. */
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
+  const toast = useToast()
   const signedIn = session !== null
   const [ids, setIds] = useState<Set<string> | null>(null)
   const [failed, setFailed] = useState(false)
@@ -39,11 +41,14 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
           else next.add(productId)
           return next
         })
+        toast.show(saved ? 'Removed from your wishlist' : 'Saved to your wishlist', {
+          action: saved ? undefined : { label: 'View', to: '/wishlist' },
+        })
       } catch {
         setFailed(true)
       }
     },
-    [ids],
+    [ids, toast],
   )
 
   const value = useMemo(

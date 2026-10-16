@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { ApiError, cancelOrder, changeOrderAddress, getOrder, type Order } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { PayNowButton } from './PayNowButton'
-import { buttonClass, Field, FormError } from './ui'
+import { buttonClass, Field, FormError, BackLink } from './ui'
 import { OrderBreakdown } from './OrderBreakdown'
 import { StatusBadge } from './StatusBadge'
 
@@ -40,11 +40,7 @@ export default function OrderDetailPage() {
   const current = loaded?.id === id ? loaded : null
   const order = override?.order_id === id ? override : (current?.order ?? null)
 
-  const back = (
-    <Link to="/orders" className="text-terracotta underline">
-      ← My orders
-    </Link>
-  )
+  const back = <BackLink to="/orders">My orders</BackLink>
 
   if (!current)
     return (

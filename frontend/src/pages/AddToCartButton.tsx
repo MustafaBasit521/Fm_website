@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useCart } from '../cart/context'
+import { useToast } from '../toast/context'
 import { buttonClass } from './ui'
 
 /** Adds a product to the bag. `quantity` (default 1) lets the product page add several at once;
@@ -21,7 +20,7 @@ export function AddToCartButton({
   label?: string
 }) {
   const { add } = useCart()
-  const [added, setAdded] = useState(false)
+  const toast = useToast()
 
   return (
     <div className="flex flex-col gap-1">
@@ -36,19 +35,13 @@ export function AddToCartButton({
         }
         onClick={() => {
           add(productId, quantity)
-          setAdded(true)
+          toast.show(`${productName} added to your bag`, {
+            action: { label: 'View bag', to: '/cart' },
+          })
         }}
       >
         {disabled ? 'Unavailable' : (label ?? (compact ? 'Add to bag' : 'Add to bag'))}
       </button>
-      {added && (
-        <p role="status" className="text-sm text-moss-dark">
-          Added to your bag.{' '}
-          <Link to="/cart" className="underline">
-            View bag
-          </Link>
-        </p>
-      )}
     </div>
   )
 }

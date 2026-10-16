@@ -19,3 +19,13 @@ it('cannot be used for unavailable products', () => {
   render(wrap(<AddToCartButton productId="p1" productName="Sunflower" disabled />))
   expect(screen.getByRole('button', { name: 'Unavailable' })).toBeDisabled()
 })
+
+it('confirms with a pop-up that links to the bag, instead of text under the button', async () => {
+  const { wrap } = makeAuth()
+  render(wrap(<AddToCartButton productId="p1" productName="Sunflower" />))
+  await userEvent.click(screen.getByRole('button', { name: 'Add to bag' }))
+  expect(await screen.findByText('Sunflower added to your bag')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'View bag' })).toHaveAttribute('href', '/cart')
+  await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+  expect(screen.queryByText('Sunflower added to your bag')).not.toBeInTheDocument()
+})

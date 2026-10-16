@@ -8,6 +8,7 @@ import { PageHeader } from './PageHeader'
 import {
   buttonClass,
   Field,
+  FilePicker,
   FormError,
   inputClass,
   primaryButtonClass,
@@ -125,7 +126,7 @@ export default function CustomOrderPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 md:py-14">
-      <div className="grid items-start gap-10 md:grid-cols-[1fr_1.15fr]">
+      <div className="grid items-start gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
         <div>
           <p className="text-sm font-medium uppercase tracking-widest text-bark">Custom orders</p>
           <h1 className="mt-2 font-serif text-5xl leading-none md:text-7xl">
@@ -213,18 +214,13 @@ export default function CustomOrderPage() {
               min={today}
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="reference" className="text-sm font-medium text-bark">
-              Reference picture (optional, JPG/PNG/WebP, under 5 MB)
-            </label>
-            <input
-              id="reference"
-              name="reference"
-              type="file"
-              accept={ALLOWED_TYPES.join(',')}
-              className="rounded-[10px] border-2 border-dashed border-linen bg-cream-100 p-6 text-bark file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:font-semibold file:text-cream"
-            />
-          </div>
+          <FilePicker
+            id="reference"
+            name="reference"
+            label="Reference picture (optional, JPG/PNG/WebP, under 5 MB)"
+            accept={ALLOWED_TYPES.join(',')}
+            buttonText="Choose picture"
+          />
           <FormError message={error} />
           <button type="submit" className={`${buttonClass} w-full`} disabled={busy}>
             {busy ? 'Sending…' : 'Send request'}

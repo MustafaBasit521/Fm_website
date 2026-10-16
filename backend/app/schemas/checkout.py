@@ -112,6 +112,8 @@ class OrderItemRead(BaseModel):
     product_name_snapshot: str
     quantity: int
     unit_price_at_purchase_paisa: int
+    # The product's first picture as it is now (None if the product was deleted or has none).
+    image_url: str | None = None
 
 
 class OrderRead(BaseModel):

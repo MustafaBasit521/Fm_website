@@ -113,7 +113,7 @@ export default function HomePage() {
 
   return (
     <main>
-      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-10 pt-12 md:grid-cols-[1.1fr_1fr] md:pt-20">
+      <section className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-10 pt-12 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:pt-20">
         <div>
           <p className="text-sm font-medium uppercase tracking-widest text-bark">
             Handmade crochet studio · Lahore

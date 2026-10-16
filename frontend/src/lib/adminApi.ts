@@ -7,7 +7,6 @@ import {
   apiPost,
   type Address,
   type BusinessSettings,
-  type CheckoutAddress,
   type Customer,
   type CustomOrder,
   type GalleryImageType,
@@ -111,11 +110,6 @@ export const refundOrder = (orderId: string, amountPaisa: number | null) =>
   )
 export const confirmCodPayment = (orderId: string) =>
   apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/confirm-cod-payment`, {})
-export const changeAdminOrderAddress = (
-  orderId: string,
-  delivery: { recipient_name?: string | null; address: CheckoutAddress },
-) => apiPatch<AdminOrder>(`/admin/orders/${id(orderId)}/address`, delivery)
-
 // ---- products and categories --------------------------------------------------------------
 
 export interface AdminProduct extends ProductDetail {
