@@ -4,7 +4,7 @@ import { ApiError } from '../lib/api'
 import { paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { State, PageTitle } from './ui'
+import { State, PageTitle, cardClass } from './ui'
 import { useLoad } from './useLoad'
 
 const SOCIAL: [string, string][] = [
@@ -61,7 +61,7 @@ export default function SettingsAdminPage() {
 
   return (
     <>
-      <PageTitle title="Settings" />
+      <PageTitle eyebrow="Shop details, delivery and links" title="Settings" />
       <div className="mt-4">
         <State loading={loading && !settings} failed={failed && !settings}>
           {settings && (
@@ -69,78 +69,90 @@ export default function SettingsAdminPage() {
               key={settings.updated_at}
               onSubmit={onSubmit}
               aria-label="Business settings"
-              className="flex max-w-xl flex-col gap-4"
+              className="flex max-w-3xl flex-col gap-6"
             >
-              <Field
-                id="business_name"
-                name="business_name"
-                label="Business name"
-                defaultValue={settings.business_name ?? ''}
-                maxLength={100}
-              />
-              <Field
-                id="email"
-                name="email"
-                label="Email (shop alerts are sent here)"
-                type="email"
-                defaultValue={settings.email ?? ''}
-              />
-              <Field
-                id="phone"
-                name="phone"
-                label="Phone"
-                type="tel"
-                defaultValue={settings.phone ?? ''}
-                maxLength={20}
-              />
-              <Field
-                id="whatsapp"
-                name="whatsapp"
-                label="WhatsApp number"
-                type="tel"
-                defaultValue={settings.whatsapp ?? ''}
-                maxLength={20}
-              />
-              <Field
-                id="address"
-                name="address"
-                label="Address"
-                defaultValue={settings.address ?? ''}
-                maxLength={300}
-              />
-              <div className="flex flex-col gap-1">
-                <label htmlFor="delivery_information" className="text-sm font-medium text-bark">
-                  Delivery information
-                </label>
-                <textarea
-                  id="delivery_information"
-                  name="delivery_information"
-                  rows={3}
-                  maxLength={2000}
-                  className={inputClass}
-                  defaultValue={settings.delivery_information ?? ''}
-                />
-              </div>
-              <Field
-                id="fee"
-                name="fee"
-                label="Delivery fee (Rs)"
-                inputMode="decimal"
-                defaultValue={paisaToRupeesInput(settings.delivery_fee_paisa)}
-                required
-              />
-              <fieldset className="flex flex-col gap-3">
-                <legend className="mb-1 font-medium text-bark">Social links (https:// only)</legend>
-                {SOCIAL.map(([key, label]) => (
+              <section aria-label="Shop details" className={`${cardClass} p-4 md:p-6`}>
+                <h2 className="font-serif text-2xl">Shop details</h2>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Field
-                    key={key}
-                    id={`social_${key}`}
-                    name={`social_${key}`}
-                    label={label}
-                    type="url"
-                    defaultValue={settings.social_links[key] ?? ''}
+                    id="business_name"
+                    name="business_name"
+                    label="Business name"
+                    defaultValue={settings.business_name ?? ''}
+                    maxLength={100}
                   />
-                ))}
+                  <Field
+                    id="email"
+                    name="email"
+                    label="Email (shop alerts are sent here)"
+                    type="email"
+                    defaultValue={settings.email ?? ''}
+                  />
+                  <Field
+                    id="phone"
+                    name="phone"
+                    label="Phone"
+                    type="tel"
+                    defaultValue={settings.phone ?? ''}
+                    maxLength={20}
+                  />
+                  <Field
+                    id="whatsapp"
+                    name="whatsapp"
+                    label="WhatsApp number"
+                    type="tel"
+                    defaultValue={settings.whatsapp ?? ''}
+                    maxLength={20}
+                  />
+                  <Field
+                    id="address"
+                    name="address"
+                    label="Address"
+                    defaultValue={settings.address ?? ''}
+                    maxLength={300}
+                  />
+                </div>
+              </section>
+              <section aria-label="Delivery" className={`${cardClass} p-4 md:p-6`}>
+                <h2 className="font-serif text-2xl">Delivery</h2>
+                <div className="mt-4 flex flex-col gap-4">
+                  <Field
+                    id="fee"
+                    name="fee"
+                    label="Delivery fee (Rs)"
+                    inputMode="decimal"
+                    defaultValue={paisaToRupeesInput(settings.delivery_fee_paisa)}
+                    required
+                  />
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="delivery_information" className="text-sm font-medium text-bark">
+                      Delivery information
+                    </label>
+                    <textarea
+                      id="delivery_information"
+                      name="delivery_information"
+                      rows={3}
+                      maxLength={2000}
+                      className={inputClass}
+                      defaultValue={settings.delivery_information ?? ''}
+                    />
+                  </div>
+                </div>
+              </section>
+              <fieldset className={`${cardClass} p-4 md:p-6`}>
+                <legend className="px-1 font-serif text-2xl">Social links (https:// only)</legend>
+                <div className="mt-2 grid gap-4 sm:grid-cols-2">
+                  {SOCIAL.map(([key, label]) => (
+                    <Field
+                      key={key}
+                      id={`social_${key}`}
+                      name={`social_${key}`}
+                      label={label}
+                      type="url"
+                      defaultValue={settings.social_links[key] ?? ''}
+                    />
+                  ))}
+                </div>
               </fieldset>
               <FormError message={error} />
               {notice && <p role="status">{notice}</p>}

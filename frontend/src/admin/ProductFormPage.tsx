@@ -16,9 +16,9 @@ import {
 import { ApiError } from '../lib/api'
 import { formatPrice, paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
 import { supabase } from '../lib/supabase'
-import { buttonClass, Field, FormError } from '../pages/ui'
+import { buttonClass, Field, FormError, secondaryButtonClass } from '../pages/ui'
 import { inputClass } from './styles'
-import { ConfirmButton, State } from './ui'
+import { ConfirmButton, PageTitle, State, cardClass } from './ui'
 import { useLoad } from './useLoad'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -152,182 +152,241 @@ export default function ProductFormPage() {
 
   return (
     <>
-      <Link to="/products" className="text-terracotta underline">
-        ← All products
+      <Link
+        to="/products"
+        className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
+      >
+        <span aria-hidden="true">←</span> All products
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">{isNew ? 'Add product' : 'Edit product'}</h1>
-      <div className="mt-4">
+      <div className="mt-3">
+        <PageTitle
+          eyebrow={
+            current ? `${current.category.name} · ${formatPrice(current.price_paisa)}` : undefined
+          }
+          title={isNew ? 'Add product' : 'Edit product'}
+        />
+      </div>
+      <div className="mt-6">
         <State loading={!ready} failed={categories.failed || (!isNew && product.failed)}>
-          <form
-            key={current?.product_id ?? 'new'}
-            onSubmit={onSubmit}
-            aria-label="Product"
-            className="flex max-w-xl flex-col gap-4"
-          >
-            <Field
-              id="name"
-              name="name"
-              label="Product name"
-              defaultValue={current?.name ?? ''}
-              maxLength={200}
-              required
-            />
-            <div className="flex flex-col gap-1">
-              <label htmlFor="category" className="text-sm font-medium text-bark">
-                Category
-              </label>
-              <select
-                id="category"
-                name="category"
-                className={inputClass}
-                defaultValue={current?.category_id ?? ''}
-                required
-              >
-                <option value="" disabled>
-                  Choose a category
-                </option>
-                {categories.data?.map((c) => (
-                  <option key={c.category_id} value={c.category_id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="description" className="text-sm font-medium text-bark">
-                Description
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                rows={4}
-                maxLength={5000}
-                className={inputClass}
-                defaultValue={current?.description ?? ''}
-              />
-            </div>
-            <Field
-              id="price"
-              name="price"
-              label="Price (Rs)"
-              inputMode="decimal"
-              defaultValue={current ? paisaToRupeesInput(current.price_paisa) : ''}
-              required
-            />
-            <div className="flex flex-col gap-1">
-              <label htmlFor="type" className="text-sm font-medium text-bark">
-                Availability
-              </label>
-              <select
-                id="type"
-                className={inputClass}
-                value={effectiveType}
-                onChange={(e) => setType(e.target.value as 'READY_TO_SHIP' | 'MADE_TO_ORDER')}
-              >
-                <option value="READY_TO_SHIP">Ready to ship (tracked stock)</option>
-                <option value="MADE_TO_ORDER">Made to order (limited capacity)</option>
-              </select>
-            </div>
-            {effectiveType === 'READY_TO_SHIP' ? (
+          <div className="grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <form
+              id="product-form"
+              key={current?.product_id ?? 'new'}
+              onSubmit={onSubmit}
+              aria-label="Product"
+              className={`${cardClass} flex flex-col gap-4 p-4 md:p-6`}
+            >
               <Field
-                id="stock"
-                name="stock"
-                label="Pieces in stock"
-                inputMode="numeric"
-                defaultValue={String(current?.stock_quantity ?? 0)}
+                id="name"
+                name="name"
+                label="Product name"
+                defaultValue={current?.name ?? ''}
+                maxLength={200}
                 required
               />
-            ) : (
-              <Field
-                id="capacity"
-                name="capacity"
-                label="Most units in progress at once"
-                inputMode="numeric"
-                defaultValue={String(current?.max_active_units ?? 0)}
-                required
-              />
-            )}
-            <label className="flex items-center gap-2">
-              <input type="checkbox" name="visible" defaultChecked={current?.is_visible ?? false} />{' '}
-              Show in shop
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="featured"
-                defaultChecked={current?.is_featured ?? false}
-              />{' '}
-              Feature on the home page
-            </label>
-            <FormError message={error} />
-            {notice && <p role="status">{notice}</p>}
-            <div className="flex flex-wrap items-center gap-4">
-              <button type="submit" className={buttonClass} disabled={busy}>
-                {isNew ? 'Create product' : 'Save changes'}
-              </button>
-              {!isNew && (
-                <ConfirmButton
-                  label="Delete product"
-                  confirmLabel="Yes, delete this product"
-                  onConfirm={() => void onDelete()}
-                />
-              )}
-            </div>
-          </form>
-
-          {!isNew && current && (
-            <section aria-label="Pictures" className="mt-10 max-w-xl">
-              <h2 className="text-xl font-semibold">Pictures</h2>
-              <p className="text-sm text-muted">
-                Current price {formatPrice(current.price_paisa)}. Pictures are stored securely and
-                shown in this order.
-              </p>
-              {current.images.length === 0 && <p className="mt-2">No pictures yet.</p>}
-              <ul className="mt-3 flex flex-col gap-3">
-                {current.images.map((img) => (
-                  <li
-                    key={img.image_id}
-                    className="flex flex-wrap items-center gap-3 rounded-[18px] border border-sand bg-paper p-3"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="category" className="text-sm font-medium text-bark">
+                    Category
+                  </label>
+                  <select
+                    id="category"
+                    name="category"
+                    className={inputClass}
+                    defaultValue={current?.category_id ?? ''}
+                    required
                   >
-                    <img
-                      src={img.url}
-                      alt={img.alt_text ?? current.name}
-                      className="h-16 w-16 rounded-lg object-cover"
-                    />
-                    <label className="flex flex-col gap-1 text-sm">
-                      Description (for screen readers)
-                      <input
-                        className={inputClass}
-                        defaultValue={img.alt_text ?? ''}
-                        maxLength={200}
-                        onBlur={(e) => {
-                          if (e.target.value.trim() !== (img.alt_text ?? ''))
-                            void onAlt(img.image_id, e.target.value)
-                        }}
-                      />
-                    </label>
-                    <ConfirmButton
-                      label="Remove"
-                      confirmLabel="Yes, remove"
-                      onConfirm={() => void onDeleteImage(img.image_id)}
-                    />
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 flex flex-col gap-1">
-                <label htmlFor="add-photo" className="text-sm font-medium text-bark">
-                  Add a picture (JPG, PNG or WebP, under 5 MB)
-                </label>
-                <input
-                  id="add-photo"
-                  type="file"
-                  accept={IMAGE_TYPES.join(',')}
-                  disabled={busy}
-                  onChange={(e) => void onUpload(e)}
+                    <option value="" disabled>
+                      Choose a category
+                    </option>
+                    {categories.data?.map((c) => (
+                      <option key={c.category_id} value={c.category_id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Field
+                  id="price"
+                  name="price"
+                  label="Price (Rs)"
+                  inputMode="decimal"
+                  defaultValue={current ? paisaToRupeesInput(current.price_paisa) : ''}
+                  required
                 />
               </div>
-            </section>
-          )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="type" className="text-sm font-medium text-bark">
+                    Availability
+                  </label>
+                  <select
+                    id="type"
+                    className={inputClass}
+                    value={effectiveType}
+                    onChange={(e) => setType(e.target.value as 'READY_TO_SHIP' | 'MADE_TO_ORDER')}
+                  >
+                    <option value="READY_TO_SHIP">Ready to ship (tracked stock)</option>
+                    <option value="MADE_TO_ORDER">Made to order (limited capacity)</option>
+                  </select>
+                </div>
+                {effectiveType === 'READY_TO_SHIP' ? (
+                  <Field
+                    id="stock"
+                    name="stock"
+                    label="Pieces in stock"
+                    inputMode="numeric"
+                    defaultValue={String(current?.stock_quantity ?? 0)}
+                    required
+                  />
+                ) : (
+                  <Field
+                    id="capacity"
+                    name="capacity"
+                    label="Most units in progress at once"
+                    inputMode="numeric"
+                    defaultValue={String(current?.max_active_units ?? 0)}
+                    required
+                  />
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="description" className="text-sm font-medium text-bark">
+                  Description
+                </label>
+                <textarea
+                  id="description"
+                  name="description"
+                  rows={6}
+                  maxLength={5000}
+                  className={inputClass}
+                  defaultValue={current?.description ?? ''}
+                />
+              </div>
+            </form>
+
+            <div className="flex flex-col gap-6">
+              {!isNew && current && (
+                <section aria-label="Pictures" className={`${cardClass} p-4 md:p-5`}>
+                  <h2 className="font-serif text-2xl">Pictures</h2>
+                  <p className="text-sm text-muted">
+                    Current price {formatPrice(current.price_paisa)}. Pictures are stored securely
+                    and shown in this order.
+                  </p>
+                  {current.images.length === 0 && <p className="mt-2">No pictures yet.</p>}
+                  <ul className="mt-3 flex flex-col gap-3">
+                    {current.images.map((img, i) => (
+                      <li
+                        key={img.image_id}
+                        className="flex flex-col gap-2 rounded-[10px] border border-sand p-2"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.alt_text ?? current.name}
+                          className={`w-full rounded-lg bg-cream-200 object-cover ${i === 0 ? 'aspect-[4/3]' : 'h-24'}`}
+                        />
+                        <label className="flex flex-col gap-1 text-sm">
+                          Description (for screen readers)
+                          <input
+                            className={inputClass}
+                            defaultValue={img.alt_text ?? ''}
+                            maxLength={200}
+                            onBlur={(e) => {
+                              if (e.target.value.trim() !== (img.alt_text ?? ''))
+                                void onAlt(img.image_id, e.target.value)
+                            }}
+                          />
+                        </label>
+                        <ConfirmButton
+                          label="Remove"
+                          confirmLabel="Yes, remove"
+                          onConfirm={() => void onDeleteImage(img.image_id)}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-3 flex flex-col gap-1">
+                    <label htmlFor="add-photo" className="text-sm font-medium text-bark">
+                      Add a picture (JPG, PNG or WebP, under 5 MB)
+                    </label>
+                    <input
+                      id="add-photo"
+                      type="file"
+                      accept={IMAGE_TYPES.join(',')}
+                      disabled={busy}
+                      onChange={(e) => void onUpload(e)}
+                      className="rounded-[10px] border-2 border-dashed border-linen bg-cream-100 p-3 text-sm text-bark"
+                    />
+                  </div>
+                </section>
+              )}
+              {isNew && (
+                <p className={`${cardClass} p-4 text-bark`}>
+                  You can add pictures after the product is created.
+                </p>
+              )}
+
+              <section aria-label="Visibility" className={`${cardClass} divide-y divide-sand px-4`}>
+                <label className="flex flex-nowrap items-center justify-between gap-3 py-3">
+                  <span>
+                    Show in shop
+                    <span className="block text-sm text-bark">Customers can see and buy it</span>
+                  </span>
+                  <input
+                    form="product-form"
+                    type="checkbox"
+                    name="visible"
+                    aria-label="Show in shop"
+                    defaultChecked={current?.is_visible ?? false}
+                    key={`v-${current?.product_id ?? 'new'}`}
+                    className="h-5 w-5 shrink-0"
+                  />
+                </label>
+                <label className="flex flex-nowrap items-center justify-between gap-3 py-3">
+                  <span>
+                    Feature on the home page
+                    <span className="block text-sm text-bark">
+                      Appears in &ldquo;Fresh off the hook&rdquo;
+                    </span>
+                  </span>
+                  <input
+                    form="product-form"
+                    type="checkbox"
+                    name="featured"
+                    aria-label="Feature on the home page"
+                    defaultChecked={current?.is_featured ?? false}
+                    key={`f-${current?.product_id ?? 'new'}`}
+                    className="h-5 w-5 shrink-0"
+                  />
+                </label>
+              </section>
+
+              <div className="flex flex-col gap-3">
+                <FormError message={error} />
+                {notice && <p role="status">{notice}</p>}
+                <button
+                  type="submit"
+                  form="product-form"
+                  className={`${buttonClass} w-full`}
+                  disabled={busy}
+                >
+                  {isNew ? 'Create product' : 'Save changes'}
+                </button>
+                <Link to="/products" className={`${secondaryButtonClass} w-full`}>
+                  Cancel
+                </Link>
+                {!isNew && (
+                  <p className="text-center">
+                    <ConfirmButton
+                      label="Delete product"
+                      confirmLabel="Yes, delete this product"
+                      onConfirm={() => void onDelete()}
+                    />
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </State>
       </div>
     </>

@@ -417,3 +417,13 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Not done:** order detail, product edit form, settings, messages, custom orders and gallery keep their previous inner layouts; the deck's activity feed is not built (there is no such data source); the greeting says "welcome back" because the admin's name is not stored anywhere.
 
+## UI polish — increment 7 (admin inner layouts)
+
+**Owner's request:** redo the inner layouts of the admin pages.
+
+**Built:** order detail (progress steps, two-column cards), product form (two columns; the visibility switches and Save button sit in the right column and belong to the form through the HTML `form` attribute, so the picture controls are not inside the form and pressing Enter in a picture description cannot submit it), settings cards, message cards, gallery switches. Existing tests were kept: three labels were given an explicit `aria-label` where the visible text grew a sub-line.
+
+**Verified:** 345 frontend tests (all admin tests unchanged apart from the earlier orders-table one), axe on every admin page, builds, Chrome screenshots of order, product, settings, messages and gallery at 1440 px and of order/product/messages at 390 px (no horizontal overflow). A sticky Save bar on the settings page overlapped the form in full-page screenshots, so it was made a normal button.
+
+**Not done:** custom orders, customers, categories and reviews keep their previous inner layouts (only the page title changed).
+

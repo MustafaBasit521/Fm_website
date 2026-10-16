@@ -7,7 +7,8 @@ import {
 } from '../lib/adminApi'
 import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
-import { Badge, Pager, State, PageTitle } from './ui'
+import { Badge, Pager, State, PageTitle, cardClass } from './ui'
+import { waDigits, waLink } from '../lib/whatsapp'
 import { useLoad } from './useLoad'
 
 const LABELS: Record<MessageStatus, string> = {
@@ -40,7 +41,10 @@ export default function MessagesAdminPage() {
 
   return (
     <>
-      <PageTitle title="Messages" />
+      <PageTitle
+        eyebrow={data ? `${data.total} ${data.total === 1 ? 'message' : 'messages'}` : undefined}
+        title="Messages"
+      />
       <form
         role="search"
         className="mt-4 grid gap-3 sm:grid-cols-2"
@@ -102,59 +106,72 @@ export default function MessagesAdminPage() {
               <ul className="flex flex-col gap-3">
                 {data.items.map((original) => {
                   const m = override[original.message_id] ?? original
-                  const wa = m.whatsapp_number?.replace(/[^\d]/g, '')
+                  const wa = waDigits(m.whatsapp_number)
                   return (
                     <li
                       key={m.message_id}
-                      className="rounded-[18px] border border-sand bg-paper p-4"
+                      className={`${cardClass} flex flex-nowrap gap-3 p-4 ${m.status === 'NEW' ? 'border-linen' : ''}`}
                     >
-                      <p className="flex flex-wrap items-center justify-between gap-2">
-                        <strong>{m.name}</strong>
-                        <span className="flex items-center gap-2">
-                          <Badge>{LABELS[m.status]}</Badge>
-                          <span className="text-sm text-muted">{formatDate(m.created_at)}</span>
-                        </span>
-                      </p>
-                      <p className="mt-1 text-sm text-muted">
-                        {[m.email, m.phone, m.whatsapp_number && `WhatsApp ${m.whatsapp_number}`]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </p>
-                      <p className="mt-2 whitespace-pre-line">{m.message}</p>
-                      <p className="mt-3 flex flex-wrap items-center gap-3">
-                        {m.email && (
-                          <a className="text-terracotta underline" href={`mailto:${m.email}`}>
-                            Reply by email
-                          </a>
-                        )}
-                        {wa && (
-                          <a
-                            className="text-terracotta underline"
-                            href={`https://wa.me/${wa}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            Reply on WhatsApp
-                          </a>
-                        )}
-                        <label className="flex items-center gap-2 text-sm">
-                          Status
-                          <select
-                            className={inputClass}
-                            value={m.status}
-                            aria-label={`Status of the message from ${m.name}`}
-                            onChange={(e) =>
-                              void change(m.message_id, e.target.value as MessageStatus)
-                            }
-                          >
-                            {Object.entries(LABELS).map(([v, l]) => (
-                              <option key={v} value={v}>
-                                {l}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      </p>
+                      <span
+                        aria-hidden="true"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linen font-serif text-xl"
+                      >
+                        {m.name.trim().charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center justify-between gap-2">
+                          <strong>{m.name}</strong>
+                          <span className="flex items-center gap-2">
+                            <Badge>{LABELS[m.status]}</Badge>
+                            <span className="text-sm text-muted">{formatDate(m.created_at)}</span>
+                          </span>
+                        </p>
+                        <p className="mt-1 break-words text-sm text-muted">
+                          {[m.email, m.phone, m.whatsapp_number && `WhatsApp ${m.whatsapp_number}`]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                        <p className="mt-3 whitespace-pre-line rounded-[14px] bg-cream-200 px-4 py-3">
+                          {m.message}
+                        </p>
+                        <p className="mt-3 flex flex-wrap items-center gap-3">
+                          {m.email && (
+                            <a
+                              className="rounded-full border border-linen px-4 py-1.5 text-sm hover:bg-cream-100"
+                              href={`mailto:${m.email}`}
+                            >
+                              Reply by email
+                            </a>
+                          )}
+                          {wa && (
+                            <a
+                              className="rounded-full bg-ink px-4 py-1.5 text-sm font-semibold text-cream hover:opacity-90"
+                              href={waLink(wa)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Reply on WhatsApp
+                            </a>
+                          )}
+                          <label className="flex items-center gap-2 text-sm">
+                            Status
+                            <select
+                              className={inputClass}
+                              value={m.status}
+                              aria-label={`Status of the message from ${m.name}`}
+                              onChange={(e) =>
+                                void change(m.message_id, e.target.value as MessageStatus)
+                              }
+                            >
+                              {Object.entries(LABELS).map(([v, l]) => (
+                                <option key={v} value={v}>
+                                  {l}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </p>
+                      </div>
                     </li>
                   )
                 })}

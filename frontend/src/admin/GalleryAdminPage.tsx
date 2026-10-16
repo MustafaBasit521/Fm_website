@@ -10,7 +10,7 @@ import { ApiError, type GalleryImageType } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { ConfirmButton, Pager, State, PageTitle } from './ui'
+import { ConfirmButton, Pager, State, PageTitle, Switch, cardClass } from './ui'
 import { useLoad } from './useLoad'
 
 const TYPES: [GalleryImageType, string][] = [
@@ -80,7 +80,10 @@ export default function GalleryAdminPage() {
 
   return (
     <>
-      <PageTitle title="Gallery" />
+      <PageTitle
+        eyebrow={data ? `${data.total} ${data.total === 1 ? 'picture' : 'pictures'}` : undefined}
+        title="Gallery"
+      />
       <p className="mt-1 max-w-xl text-bark">
         Pictures shown publicly fill the gallery on the home page. Tick &ldquo;Top of the home
         page&rdquo; on up to two shown pictures to make them the big photos next to the headline
@@ -90,7 +93,7 @@ export default function GalleryAdminPage() {
       <form
         onSubmit={onUpload}
         aria-label="Add a gallery picture"
-        className="mt-4 flex max-w-xl flex-col gap-3 rounded-[18px] border border-sand bg-paper p-4"
+        className={`${cardClass} mt-5 flex max-w-xl flex-col gap-3 p-4 md:p-5`}
       >
         <div className="flex flex-col gap-1">
           <label htmlFor="g-file" className="text-sm font-medium text-bark">
@@ -137,38 +140,25 @@ export default function GalleryAdminPage() {
             <>
               <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {data.items.map((img) => (
-                  <li
-                    key={img.gallery_image_id}
-                    className="flex flex-col gap-2 rounded-[18px] border border-sand bg-paper p-3"
-                  >
+                  <li key={img.gallery_image_id} className={`${cardClass} flex flex-col gap-2 p-3`}>
                     <img
                       src={img.url}
                       alt={img.title ?? 'Gallery photo'}
                       className="aspect-square w-full rounded-lg object-cover"
                     />
                     <p className="font-semibold">{img.title ?? 'Untitled'}</p>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={img.is_visible}
-                        aria-label={`Show ${img.title ?? 'picture'} in the gallery`}
-                        onChange={(e) =>
-                          void change(img.gallery_image_id, { is_visible: e.target.checked })
-                        }
-                      />
-                      Shown publicly
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={img.show_in_hero}
-                        aria-label={`Show ${img.title ?? 'picture'} at the top of the home page`}
-                        onChange={(e) =>
-                          void change(img.gallery_image_id, { show_in_hero: e.target.checked })
-                        }
-                      />
-                      Top of the home page
-                    </label>
+                    <Switch
+                      checked={img.is_visible}
+                      label="Shown publicly"
+                      hiddenLabel={`Show ${img.title ?? 'picture'} in the gallery`}
+                      onChange={(next) => void change(img.gallery_image_id, { is_visible: next })}
+                    />
+                    <Switch
+                      checked={img.show_in_hero}
+                      label="Top of the home page"
+                      hiddenLabel={`Show ${img.title ?? 'picture'} at the top of the home page`}
+                      onChange={(next) => void change(img.gallery_image_id, { show_in_hero: next })}
+                    />
                     <label className="flex flex-col gap-1 text-sm">
                       Type
                       <select
