@@ -87,6 +87,7 @@ def create_app() -> FastAPI:
         engagement.gallery,
         engagement.custom_orders,
         engagement.contact,
+        engagement.newsletter,
         admin_engagement.reviews,
         admin_engagement.gallery,
         admin_engagement.custom_orders,

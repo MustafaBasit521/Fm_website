@@ -11,7 +11,7 @@ import { formatPrice, paisaToRupeesInput, parseRupeesToPaisa } from '../lib/mone
 import { Drawer } from '../shop/Drawer'
 import { CloseIcon, FilterIcon } from '../shop/icons'
 import { ProductCard } from './ProductCard'
-import { useWishlist } from './useWishlist'
+import { useWishlist } from '../wishlist/context'
 import { buttonClass } from './ui'
 
 const PAGE_SIZE = 12

@@ -7,6 +7,7 @@ import HomePage from './HomePage'
 
 const getProducts = vi.fn()
 const getWishlistIds = vi.fn()
+const getGallery = vi.fn()
 const addToWishlist = vi.fn()
 const removeFromWishlist = vi.fn()
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
@@ -14,6 +15,7 @@ vi.mock('../lib/api', async (orig) => ({
   ...(await orig<typeof import('../lib/api')>()),
   getProducts: (...a: unknown[]) => getProducts(...a),
   getWishlistIds: (...a: unknown[]) => getWishlistIds(...a),
+  getGallery: (...a: unknown[]) => getGallery(...a),
   addToWishlist: (...a: unknown[]) => addToWishlist(...a),
   removeFromWishlist: (...a: unknown[]) => removeFromWishlist(...a),
 }))
@@ -33,6 +35,7 @@ const renderHome = (auth = {}) => render(makeAuth(auth).wrap(<HomePage />))
 
 beforeEach(() => {
   getProducts.mockReset()
+  getGallery.mockReset().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 24 })
   getWishlistIds.mockReset().mockResolvedValue([])
   addToWishlist.mockReset().mockResolvedValue({})
   removeFromWishlist.mockReset().mockResolvedValue(undefined)
@@ -71,7 +74,8 @@ it('still shows the hero when products cannot be loaded or there are none', asyn
   getProducts.mockReset().mockResolvedValue(page([]))
   renderHome()
   await vi.waitFor(() => expect(getProducts).toHaveBeenCalledTimes(2))
-  expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: /Fresh off the/ })).not.toBeInTheDocument()
+  expect(screen.queryByRole('list', { name: 'From the shop' })).not.toBeInTheDocument()
 })
 
 it('shows no hearts when signed out, and does not ask for the wishlist', async () => {
@@ -101,4 +105,44 @@ it('shows hearts for signed-in shoppers and saves and removes with them', async 
   expect(
     await screen.findByRole('button', { name: 'Save Piece 2 to wishlist' }),
   ).toBeInTheDocument()
+})
+
+it('fills the hero with photos of the featured pieces', async () => {
+  const withPhoto = (n: number): ProductSummary => ({
+    ...item(n),
+    image: { url: `https://img/${n}.jpg`, alt_text: null } as ProductSummary['image'],
+  })
+  getProducts.mockResolvedValue(page([withPhoto(1), withPhoto(2), item(3)]))
+  renderHome()
+  const hero = await screen.findByRole('list', { name: 'From the shop' })
+  const links = hero.querySelectorAll('a')
+  expect(links).toHaveLength(2) // only pieces that have a photo
+  expect(links[0]).toHaveAttribute('href', '/shop/p1')
+})
+
+it('shows a gallery section with a button to the full gallery page', async () => {
+  getProducts.mockResolvedValue(page([item(1)]))
+  getGallery.mockResolvedValue({
+    items: [
+      { gallery_image_id: 'g1', url: 'https://img/g1.jpg', title: 'Studio table' },
+      { gallery_image_id: 'g2', url: 'https://img/g2.jpg', title: null },
+    ],
+    total: 2,
+    page: 1,
+    page_size: 24,
+  })
+  renderHome()
+  expect(await screen.findByRole('img', { name: 'Studio table' })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /Open the gallery/ })).toHaveAttribute('href', '/gallery')
+})
+
+it('has no gallery section while the gallery is empty, and offers custom orders', async () => {
+  getProducts.mockResolvedValue(page([item(1)]))
+  renderHome()
+  await screen.findByText('Piece 1')
+  expect(screen.queryByRole('heading', { name: /studio table/i })).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /Start a custom order/ })).toHaveAttribute(
+    'href',
+    '/custom-order',
+  )
 })

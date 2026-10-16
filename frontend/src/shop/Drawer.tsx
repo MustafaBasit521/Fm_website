@@ -1,10 +1,10 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { CloseIcon } from './icons'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/** A slide-in panel (menu, filters). Accessible: it is a modal dialog, focus moves into it and
+/** A slide-in panel (menu, bag, wishlist, search sheet). Accessible: it is a modal dialog, focus moves into it and
  *  stays inside while it is open, Escape or a click outside closes it, the page behind does not
  *  scroll, and focus returns to the button that opened it. */
 export function Drawer({
@@ -18,18 +18,30 @@ export function Drawer({
   open: boolean
   onClose: () => void
   title: string
-  side?: 'left' | 'right'
+  side?: 'left' | 'right' | 'top'
   footer?: ReactNode
   children: ReactNode
 }) {
   const panel = useRef<HTMLDivElement>(null)
+  // Stay on screen for the length of the slide-out animation after `open` turns false.
+  const [mounted, setMounted] = useState(open)
+  if (open && !mounted) setMounted(true)
+  useEffect(() => {
+    if (open || !mounted) return
+    const timer = setTimeout(() => setMounted(false), 200)
+    return () => clearTimeout(timer)
+  }, [open, mounted])
+  const closing = mounted && !open
 
   useEffect(() => {
     if (!open) return
     const opener = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    panel.current?.querySelector<HTMLElement>('[data-autofocus]')?.focus()
+    const target =
+      panel.current?.querySelector<HTMLElement>('[data-initial-focus]') ??
+      panel.current?.querySelector<HTMLElement>('[data-autofocus]')
+    target?.focus()
 
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') return onClose()
@@ -54,18 +66,30 @@ export function Drawer({
     }
   }, [open, onClose])
 
-  if (!open) return null
+  if (!mounted) return null
+  const place =
+    side === 'right'
+      ? 'right-0 top-0 h-full w-[min(100%,26rem)]'
+      : side === 'left'
+        ? 'left-0 top-0 h-full w-[min(100%,24rem)]'
+        : 'left-0 top-0 max-h-[90vh] w-full'
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-ink/40" aria-hidden="true" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50"
+      aria-hidden={closing || undefined}
+      inert={closing || undefined}
+    >
+      <div
+        className={`panel-backdrop absolute inset-0 bg-ink/40 ${closing ? 'closing' : ''}`}
+        aria-hidden="true"
+        onClick={onClose}
+      />
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`absolute top-0 flex h-full w-[min(100%,24rem)] flex-col bg-cream shadow-xl ${
-          side === 'right' ? 'right-0' : 'left-0'
-        }`}
+        className={`panel-${side} absolute flex flex-col bg-cream shadow-xl ${place} ${closing ? 'closing' : ''}`}
       >
         <div className="flex items-center justify-between border-b border-sand px-5 py-4">
           <h2 className="font-serif text-2xl">{title}</h2>

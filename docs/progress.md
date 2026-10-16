@@ -106,12 +106,19 @@ Done — shop site:
 * [x] remaining shop pages restyled with the design system: gallery ("From the studio table" with type pills), custom order (the mockup's headline, three-step explanation, form card, dashed upload zone, "no payment now" note), contact ("Say hello" with a details card and WhatsApp button beside the form), login and register (centred card), and a shared `PageHeader` (eyebrow, serif title, intro) on the orders, custom orders, addresses, notifications and wishlist pages; custom-order statuses use the same coloured badges
 * [x] wording follows the mockup: "bag" instead of "cart" on screen (URLs and code names unchanged)
 * [x] accessible drawer; colour-contrast matrix over every text colour on every surface (passes AA); axe on every page; guards: no non-wrapping rows (`flex-nowrap` marks deliberate ones)
-* [x] tests: 292 frontend
+* [x] panels instead of pages for quick actions: the **bag** and the **wishlist** open as panels sliding in from the right (slide-in and slide-out animation, switched off for visitors who prefer reduced motion), **search** drops from the top as a sheet with live results (pictures, name, price; starts at two letters, waits 250 ms after typing); the full `/cart` and `/wishlist` pages still exist. The heart in the header is shown to everyone (signed out: the panel invites to log in) and counts saved pieces; wishlist state is now shared (`WishlistProvider`)
+* [x] header navigation is Shop / Custom order / Contact; the **Gallery** is a section on the home page (six photos and a button to the full `/gallery` page, which stays and is linked from the footer)
+* [x] dark footer (ink background; light text meets AA) with Explore and Get in touch columns
+* [x] "Join the circle" newsletter block above the footer, backend (`/api/newsletter`, `/api/newsletter/unsubscribe`, table `newsletter_subscribers`), unsubscribe page `/unsubscribe`, welcome and new-product emails (see business-rules §7, §31)
+* [x] home hero shows real photos of the featured pieces (nothing is shown when no piece has a photo yet); a "Customize anything" band leads to the custom-order page
+* [x] custom-order page: "what are you after?" chips (written at the top of the description), name/WhatsApp and budget/date in two columns, dashed upload zone
+* [x] tests: 322 frontend, 457 backend
 
 Not done yet:
 
-* reviews, addresses and notifications keep the new colours, buttons and headers but have no individually designed layouts; quick view on cards; the "meet the maker", studio gallery strip and the studio-letters sign-up of the home mockup; hero photography; the whole admin (it uses the new colours, buttons and inputs, but not the mockup's table/sidebar layout yet)
-* Deliberately NOT copied from the mockup because the business rules do not say so: "Free delivery over Rs 3,000", "Delivered in 2–4 days", a newsletter, a journal/articles section. They can be added if the owner confirms them as rules.
+* reviews, addresses and notifications keep the new colours, buttons and headers but have no individually designed layouts; quick view on cards; the "meet the maker" block of the home mockup; the whole admin (it uses the new colours, buttons and inputs, but not the mockup's table/sidebar layout yet)
+* Deliberately NOT copied from the mockup because the business rules do not say so: "Free delivery over Rs 3,000", "Delivered in 2–4 days", a journal/articles section. (The newsletter was confirmed by the owner and is now a rule.) They can be added if the owner confirms them as rules.
+* **Emails are still not delivered**: no email provider has been chosen. Welcome and new-product emails are built and tested with a fake provider; the live site sends nothing until a provider (and its key and a verified sender address) is configured. The migration `create newsletter subscribers` is applied to the Supabase database.
 * Not verified on the owner's own devices (checked with automated tests and Chrome screenshots at phone and desktop widths).
 
 ---

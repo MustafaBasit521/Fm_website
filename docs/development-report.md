@@ -360,3 +360,18 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Account area increment:** account hub with tiles, shared `OrderBreakdown` card on the confirmation and order pages, `useWishlist` hook and hearts on product cards (shop and home). The responsive guard again caught two new single-line rows, now marked deliberately. Not checked in a browser while signed in (login needs a real session); covered by 302 frontend tests.
 
 **Remaining shop pages:** gallery, custom order, contact, login/register restyled and a shared `PageHeader` applied to the account list pages; custom-order statuses got the coloured badges (`CUSTOM_ORDER_TONE`). Checked with Chrome screenshots (desktop and phone) for custom order, contact, login and gallery, and by the axe test on every page. The footer's contact column stays empty until the owner fills the business settings (phone, WhatsApp, email).
+
+---
+
+## UI polish — increment 3 (panels, search sheet, dark footer, newsletter, home)
+
+**Owner's requests:** home-page side pictures; dark footer; wishlist and bag as sliding panels and search as a top overlay; a restyled custom-order page; "Join the circle" above the footer; check that subscribed customers actually receive news; Gallery as a home-page section instead of a nav link.
+
+**Findings:** the mockup's side pictures were never a feature (only a placeholder in the design), so the hero now uses photos of the real featured pieces. Customers subscribed to updates received only in-app notifications; there were no emails (no provider), no articles feature, and guests could not subscribe.
+
+**Built:**
+* Backend: `newsletter_subscribers` table and migration, `POST /api/newsletter` (rate limited, same answer for repeats), `POST /api/newsletter/unsubscribe` (secret token, single use), welcome email, and `events.new_product` now also queues an email for subscribed customers and list subscribers (once per address, with the right opt-out link). 457 backend tests.
+* Frontend: animated `Drawer` (right/left/top; stays mounted for the slide-out; reduced-motion respected), `BagDrawer`, `WishlistDrawer`, `SearchSheet` with live results, shared `WishlistProvider` and `useQuote` hook, dark footer, `NewsletterSignup`, `/unsubscribe` page, hero photos, home gallery section and custom-order band, custom-order page restyle. 322 frontend tests; axe checks the three panels open and the unsubscribe page.
+
+**Notes:** a test of mine returned the mock from `beforeEach`, which Vitest runs as a cleanup function; it threw the mocked rejection after the test (fixed by using a block body). Not verified: delivery of any email (no provider), the panels on real devices.
+

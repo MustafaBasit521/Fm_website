@@ -29,10 +29,12 @@ from app.schemas.engagement import (
     UploadRequest,
     UploadTarget,
 )
+from app.schemas.newsletter import NewsletterSubscribe, NewsletterUnsubscribe
 from app.services import catalog as catalog_service
 from app.services import contact as contact_service
 from app.services import custom_orders as custom_service
 from app.services import gallery as gallery_service
+from app.services import newsletter as newsletter_service
 from app.services import notifications as notification_service
 from app.services import reviews as review_service
 
@@ -211,3 +213,21 @@ contact = APIRouter(prefix="/contact", tags=["contact"])
 async def send_message(data: ContactCreate, session: Session):
     await contact_service.submit(session, data)
     return {"received": True}
+
+
+# ---- newsletter ("Join the circle") --------------------------------------------------------
+
+newsletter = APIRouter(prefix="/newsletter", tags=["newsletter"])
+
+
+@newsletter.post("", dependencies=[Depends(rate_limit("newsletter", 5, 3600))])
+async def join_newsletter(data: NewsletterSubscribe, session: Session):
+    """Public. The answer is the same whether or not the address was already on the list."""
+    await newsletter_service.subscribe(session, data.email)
+    return {"subscribed": True}
+
+
+@newsletter.post("/unsubscribe", dependencies=[Depends(rate_limit("newsletter-unsub", 30, 3600))])
+async def leave_newsletter(data: NewsletterUnsubscribe, session: Session):
+    await newsletter_service.unsubscribe(session, data.token)
+    return {"unsubscribed": True}

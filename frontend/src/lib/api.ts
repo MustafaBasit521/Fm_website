@@ -351,6 +351,13 @@ export const getGallery = (type: GalleryImageType | '', page: number, signal?: A
     signal,
   )
 
+// ---- newsletter ---------------------------------------------------------------------------
+
+export const subscribeNewsletter = (email: string) =>
+  apiPost<{ subscribed: boolean }>('/newsletter', { email })
+export const unsubscribeNewsletter = (token: string) =>
+  apiPost<{ unsubscribed: boolean }>('/newsletter/unsubscribe', { token })
+
 // ---- custom orders ------------------------------------------------------------------------
 
 export type CustomOrderStatus =

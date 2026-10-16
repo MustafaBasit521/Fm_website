@@ -1,16 +1,20 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { useCart } from '../cart/context'
 import { getPublicSettings, type BusinessSettings } from '../lib/api'
 import { NotificationsLink } from '../pages/NotificationsLink'
+import { useWishlist } from '../wishlist/context'
+import { BagDrawer } from './BagDrawer'
 import { Drawer } from './Drawer'
+import { NewsletterSignup } from './NewsletterSignup'
+import { SearchSheet } from './SearchSheet'
+import { WishlistDrawer } from './WishlistDrawer'
 import { ShopName } from './ShopName'
 import { BagIcon, HeartIcon, MenuIcon, SearchIcon, UserIcon } from './icons'
 
 const NAV: [string, string][] = [
   ['/shop', 'Shop'],
-  ['/gallery', 'Gallery'],
   ['/custom-order', 'Custom order'],
   ['/contact', 'Contact'],
 ]
@@ -30,48 +34,14 @@ function useShopSettings() {
   return settings
 }
 
-function SearchBar({ onDone }: { onDone: () => void }) {
-  const navigate = useNavigate()
-  const input = useRef<HTMLInputElement>(null)
-  useEffect(() => input.current?.focus(), [])
-
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const term = input.current?.value.trim() ?? ''
-    navigate(term ? `/shop?search=${encodeURIComponent(term)}` : '/shop')
-    onDone()
-  }
-  return (
-    <form
-      role="search"
-      onSubmit={onSubmit}
-      onKeyDown={(e) => e.key === 'Escape' && onDone()}
-      className="border-t border-sand bg-cream-100"
-    >
-      <div className="mx-auto flex max-w-6xl flex-nowrap items-center gap-3 px-4 py-3">
-        <label htmlFor="site-search" className="sr-only">
-          Search the shop
-        </label>
-        <input
-          id="site-search"
-          ref={input}
-          type="search"
-          maxLength={100}
-          placeholder="Search the shop"
-          className="min-w-0 flex-1 rounded-full border border-sand bg-paper px-4 py-2 focus:outline-2 focus:outline-offset-2 focus:outline-terracotta"
-        />
-        <button type="submit" className="rounded-full bg-ink px-5 py-2 font-semibold text-cream">
-          Search
-        </button>
-      </div>
-    </form>
-  )
-}
-
 function SiteHeader({ name }: { name: string }) {
   const { session, signOut } = useAuth()
   const { units } = useCart()
+  const wl = useWishlist()
+  const saved = wl.ids?.size ?? 0
   const [searching, setSearching] = useState(false)
+  const [bagOpen, setBagOpen] = useState(false)
+  const [wishOpen, setWishOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const signedIn = session !== null
 
@@ -115,20 +85,28 @@ function SiteHeader({ name }: { name: string }) {
             type="button"
             className={iconButton}
             aria-label="Search"
-            aria-expanded={searching}
-            onClick={() => setSearching((s) => !s)}
+            aria-haspopup="dialog"
+            onClick={() => setSearching(true)}
           >
             <SearchIcon />
           </button>
-          {signedIn && (
-            <Link
-              to="/wishlist"
-              className={`${iconButton} hidden sm:inline-flex`}
-              aria-label="Wishlist"
-            >
-              <HeartIcon />
-            </Link>
-          )}
+          <button
+            type="button"
+            className={`${iconButton} hidden sm:inline-flex`}
+            aria-label={saved > 0 ? `Wishlist, ${saved} saved` : 'Wishlist'}
+            aria-haspopup="dialog"
+            onClick={() => setWishOpen(true)}
+          >
+            <HeartIcon />
+            {saved > 0 && (
+              <span
+                aria-hidden="true"
+                className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-terracotta px-1 text-xs font-semibold text-white"
+              >
+                {saved}
+              </span>
+            )}
+          </button>
           <Link
             to={signedIn ? '/account' : '/login'}
             className={`${iconButton} hidden sm:inline-flex`}
@@ -136,10 +114,12 @@ function SiteHeader({ name }: { name: string }) {
           >
             <UserIcon />
           </Link>
-          <Link
-            to="/cart"
+          <button
+            type="button"
             className={iconButton}
             aria-label={units > 0 ? `Bag, ${units} items` : 'Bag'}
+            aria-haspopup="dialog"
+            onClick={() => setBagOpen(true)}
           >
             <BagIcon />
             {units > 0 && (
@@ -150,10 +130,12 @@ function SiteHeader({ name }: { name: string }) {
                 {units}
               </span>
             )}
-          </Link>
+          </button>
         </div>
       </div>
-      {searching && <SearchBar onDone={() => setSearching(false)} />}
+      <SearchSheet open={searching} onClose={() => setSearching(false)} />
+      <BagDrawer open={bagOpen} onClose={() => setBagOpen(false)} />
+      <WishlistDrawer open={wishOpen} onClose={() => setWishOpen(false)} />
 
       <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" side="left">
         <nav aria-label="Menu" className="flex flex-col gap-1 text-lg">
@@ -204,21 +186,25 @@ function SiteHeader({ name }: { name: string }) {
 function SiteFooter({ settings, name }: { settings: BusinessSettings | null; name: string }) {
   const wa = settings?.whatsapp?.replace(/[^\d]/g, '')
   const social = Object.entries(settings?.social_links ?? {})
+  const link =
+    'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-linen'
   return (
-    <footer className="mt-16 border-t border-sand bg-cream-200">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
-        <div>
-          <p className="font-serif text-2xl">
+    <footer className="mt-16 bg-ink text-cream">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 md:grid-cols-4">
+        <div className="md:col-span-2">
+          <p className="font-serif text-3xl">
             <ShopName name={name} />
           </p>
-          <p className="mt-2 text-bark">Handmade crochet, made with care in Lahore.</p>
+          <p className="mt-2 max-w-sm text-linen">
+            Handmade crochet, made with care in Lahore. Your idea, our crochet.
+          </p>
         </div>
         <nav aria-label="Footer">
-          <p className="font-semibold">Shop</p>
-          <ul className="mt-2 flex flex-col gap-1">
-            {NAV.map(([to, label]) => (
+          <p className="font-semibold">Explore</p>
+          <ul className="mt-3 flex flex-col gap-2 text-linen">
+            {[...NAV, ['/gallery', 'Gallery']].map(([to, label]) => (
               <li key={to}>
-                <Link to={to} className="underline-offset-4 hover:underline">
+                <Link to={to} className={link}>
                   {label}
                 </Link>
               </li>
@@ -227,14 +213,14 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
         </nav>
         <div>
           <p className="font-semibold">Get in touch</p>
-          <ul className="mt-2 flex flex-col gap-1">
+          <ul className="mt-3 flex flex-col gap-2 text-linen">
             {wa && (
               <li>
                 <a
                   href={`https://wa.me/${wa}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline-offset-4 hover:underline"
+                  className={link}
                 >
                   WhatsApp
                 </a>
@@ -245,12 +231,7 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
             {settings?.address && <li>{settings.address}</li>}
             {social.map(([key, url]) => (
               <li key={key}>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline-offset-4 hover:underline"
-                >
+                <a href={url} target="_blank" rel="noopener noreferrer" className={link}>
                   {key.charAt(0).toUpperCase() + key.slice(1)}
                 </a>
               </li>
@@ -258,7 +239,7 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
           </ul>
         </div>
       </div>
-      <p className="border-t border-sand py-4 text-center text-sm text-bark">
+      <p className="border-t border-bark py-4 text-center text-sm text-linen">
         © {new Date().getFullYear()} {name}
       </p>
     </footer>
@@ -286,6 +267,7 @@ export default function ShopLayout() {
       <div id="main-content" className="flex-1">
         <Outlet />
       </div>
+      <NewsletterSignup />
       <SiteFooter settings={settings} name={name} />
     </div>
   )

@@ -11,6 +11,8 @@ const STEPS: [string, string][] = [
   ['We confirm on WhatsApp', 'We message you with the price, colours and delivery date.'],
   ['Stitched & delivered', 'We make it by hand and deliver across Lahore.'],
 ]
+// Just a starting point for the request: the choice is written at the top of the description.
+const KINDS = ['Flowers', 'Car charm', 'Keychain', 'Bouquet', 'Something else']
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_BYTES = 5 * 1024 * 1024 // the bucket enforces its own limit too
 
@@ -54,7 +56,9 @@ export default function CustomOrderPage() {
       await submitCustomOrder({
         name: text('name'),
         whatsapp_number: text('whatsapp_number'),
-        description: text('description'),
+        description: text('kind')
+          ? `Type: ${text('kind')}\n\n${text('description')}`.slice(0, 3000)
+          : text('description'),
         budget_paisa: budget,
         required_date: text('required_date') || null,
         reference_image_path: path,
@@ -129,15 +133,31 @@ export default function CustomOrderPage() {
           aria-label="Custom order request"
           className="flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
         >
-          <Field id="name" name="name" label="Your name" maxLength={100} required />
-          <Field
-            id="whatsapp_number"
-            name="whatsapp_number"
-            label="WhatsApp number"
-            type="tel"
-            maxLength={20}
-            required
-          />
+          <fieldset>
+            <legend className="text-sm font-medium text-bark">What are you after?</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {KINDS.map((kind) => (
+                <label
+                  key={kind}
+                  className="cursor-pointer rounded-full border border-linen bg-paper px-4 py-1.5 text-sm has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-cream has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-dashed has-[:focus-visible]:outline-bark"
+                >
+                  <input type="radio" name="kind" value={kind} className="sr-only" />
+                  {kind}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="name" name="name" label="Your name" maxLength={100} required />
+            <Field
+              id="whatsapp_number"
+              name="whatsapp_number"
+              label="WhatsApp number"
+              type="tel"
+              maxLength={20}
+              required
+            />
+          </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="description" className="text-sm font-medium text-bark">
               What should we make? (include sizes, colours and quantity)
@@ -151,14 +171,16 @@ export default function CustomOrderPage() {
               className={inputClass}
             />
           </div>
-          <Field id="budget" name="budget" label="Budget in Rs (optional)" inputMode="decimal" />
-          <Field
-            id="required_date"
-            name="required_date"
-            label="Needed by (optional)"
-            type="date"
-            min={today}
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field id="budget" name="budget" label="Budget in Rs (optional)" inputMode="decimal" />
+            <Field
+              id="required_date"
+              name="required_date"
+              label="Needed by (optional)"
+              type="date"
+              min={today}
+            />
+          </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="reference" className="text-sm font-medium text-bark">
               Reference picture (optional, JPG/PNG/WebP, under 5 MB)
@@ -168,7 +190,7 @@ export default function CustomOrderPage() {
               name="reference"
               type="file"
               accept={ALLOWED_TYPES.join(',')}
-              className="rounded-[10px] border border-dashed border-linen bg-cream-100 p-4"
+              className="rounded-[10px] border-2 border-dashed border-linen bg-cream-100 p-6 text-bark file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-ink file:px-4 file:py-2 file:font-semibold file:text-cream"
             />
           </div>
           <FormError message={error} />

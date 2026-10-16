@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import AdminApp from './admin/App'
 import { fakeSession, makeAuth } from './test/auth'
@@ -361,6 +362,7 @@ const SIGNED_OUT = [
   '/contact',
   '/login',
   '/register',
+  '/unsubscribe?token=abcdefghijklmnop',
   '/order-confirmation',
   '/nonexistent',
 ]
@@ -417,4 +419,20 @@ it.each(ADMIN)('admin %s has no accessibility violations', async (path) => {
 })
 it('the admin login page has no accessibility violations', async () => {
   await checkPage(AdminApp, '/login', false)
+})
+
+// The sliding panels are dialogs on top of the page: check them open, for both kinds of shopper.
+it.each([
+  ['Bag, 2 items', 'Your bag'],
+  ['Wishlist', 'Wishlist'],
+  ['Search', 'Search'],
+])('the %s panel has no accessibility violations when open', async (button, title) => {
+  const { wrap } = makeAuth({ session: fakeSession })
+  const { container, unmount } = render(wrap(<ShopApp />, '/'))
+  await userEvent.click(await screen.findByRole('button', { name: new RegExp(`^${button}`) }))
+  const dialog = await screen.findByRole('dialog', { name: title })
+  await waitFor(() => expect(screen.queryByText(/^(Loading…|Searching…)$/)).not.toBeInTheDocument())
+  await expectNoA11yViolations(container)
+  expect(dialog).toBeInTheDocument()
+  unmount()
 })

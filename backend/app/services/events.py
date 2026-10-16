@@ -13,6 +13,7 @@ in); guests are reached by email at the address they gave. Notifications are not
 from sqlalchemy import func, insert, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.email.base import EmailMessage
 from app.core.email.outbox import queue_email
 from app.core.money import format_price
@@ -27,6 +28,7 @@ from app.models.enums import (
     OrderStatus,
     PaymentMethod,
 )
+from app.models.newsletter import NewsletterSubscriber
 from app.models.orders import Order
 
 DEFAULT_SHOP_NAME = "Bundle of Loops"  # used until the owner sets a name in the settings
@@ -315,12 +317,30 @@ async def message_received(session: AsyncSession, message: Message) -> None:
 # ---- catalog -------------------------------------------------------------------------------
 
 
-async def new_product(session: AsyncSession, product: Product) -> None:
-    """Tell every customer who subscribed to shop updates that a product was published.
+async def newsletter_welcome(session: AsyncSession, email: str, token: str) -> None:
+    shop = await _shop_name(session)
+    link = f"{get_settings().frontend_url}/unsubscribe?token={token}"
+    queue_email(
+        session,
+        EmailMessage(
+            to=email,
+            subject=f"Welcome to {shop}",
+            body=(
+                f"Thank you for joining the circle!\n\nWe will let you know when new pieces "
+                f"arrive.\n\nChanged your mind? Unsubscribe in one click: {link}\n\n- {shop}"
+            ),
+        ),
+    )
 
-    One INSERT ... SELECT creates all the in-app notifications in a single statement, inside the
-    caller's transaction. Only in-app: a mass email to all subscribers needs the (still unchosen)
-    email provider and a proper unsubscribe flow, so it is not sent."""
+
+async def new_product(session: AsyncSession, product: Product) -> None:
+    """Tell everyone who asked to hear about new pieces that a product was published.
+
+    * Customers with `subscribed_to_updates`: an in-app notification (one INSERT ... SELECT with
+      a database-generated id per row) and an email.
+    * Visitors on the newsletter list: an email with their own unsubscribe link.
+    Everything is queued inside the publishing transaction; emails are released only if it commits
+    (and, until an email provider is configured, nothing is actually sent)."""
     await session.execute(
         insert(Notification).from_select(
             ["notification_id", "customer_id", "type", "title", "message", "status"],
@@ -336,3 +356,48 @@ async def new_product(session: AsyncSession, product: Product) -> None:
             ).where(Customer.subscribed_to_updates.is_(True)),
         )
     )
+    shop = await _shop_name(session)
+    base = get_settings().frontend_url
+    piece = f"{base}/shop/{product.product_id}"
+    customers = (
+        await session.scalars(
+            select(Customer.email).where(Customer.subscribed_to_updates.is_(True))
+        )
+    ).all()
+    seen: set[str] = set()
+    for email in customers:
+        if email in seen:
+            continue
+        seen.add(email)
+        queue_email(
+            session,
+            EmailMessage(
+                to=email,
+                subject=f"New in the shop: {product.name}",
+                body=(
+                    f"{product.name} is now available at {shop}.\n\nSee it here: {piece}\n\n"
+                    f"You get these because you chose shop updates. You can change that any time "
+                    f"under My details: {base}/account\n\n- {shop}"
+                ),
+            ),
+        )
+    rows = (
+        await session.execute(
+            select(NewsletterSubscriber.email, NewsletterSubscriber.unsubscribe_token)
+        )
+    ).all()
+    for email, token in rows:
+        if email in seen:  # a customer who is also on the list gets one email, not two
+            continue
+        seen.add(email)
+        queue_email(
+            session,
+            EmailMessage(
+                to=email,
+                subject=f"New in the shop: {product.name}",
+                body=(
+                    f"{product.name} is now available at {shop}.\n\nSee it here: {piece}\n\n"
+                    f"Unsubscribe in one click: {base}/unsubscribe?token={token}\n\n- {shop}"
+                ),
+            ),
+        )

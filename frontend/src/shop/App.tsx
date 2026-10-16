@@ -21,6 +21,7 @@ import FakeGatewayPage from '../pages/FakeGatewayPage'
 import PaymentReturnPage from '../pages/PaymentReturnPage'
 import ProductPage from '../pages/ProductPage'
 import RegisterPage from '../pages/RegisterPage'
+import UnsubscribePage from '../pages/UnsubscribePage'
 import WishlistPage from '../pages/WishlistPage'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         {import.meta.env.DEV && <Route path="/dev/fake-gateway" element={<FakeGatewayPage />} />}
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/custom-order" element={<CustomOrderPage />} />
+        <Route path="/unsubscribe" element={<UnsubscribePage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

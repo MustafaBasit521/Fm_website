@@ -1,23 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/context'
 import { addToWishlist, ApiError, getWishlistIds, removeFromWishlist } from '../lib/api'
+import { WishlistContext } from './context'
 
-/** Which products the signed-in shopper has saved, with a toggle. Signed out: `enabled` is false
- *  and nothing is requested (hearts are simply not shown). */
-export function useWishlist() {
+/** Which products the signed-in shopper has saved, shared by every heart, the header badge and
+ *  the wishlist panel. Signed out: nothing is requested. */
+export function WishlistProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth()
-  const enabled = session !== null
+  const signedIn = session !== null
   const [ids, setIds] = useState<Set<string> | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!signedIn) return
     const controller = new AbortController()
     getWishlistIds(controller.signal)
       .then((list) => setIds(new Set(list)))
       .catch(() => {})
     return () => controller.abort()
-  }, [enabled])
+  }, [signedIn])
 
   const toggle = useCallback(
     async (productId: string) => {
@@ -45,5 +46,9 @@ export function useWishlist() {
     [ids],
   )
 
-  return { enabled: enabled && ids !== null, ids, toggle, failed }
+  const value = useMemo(
+    () => ({ enabled: signedIn && ids !== null, ids: signedIn ? ids : null, toggle, failed }),
+    [signedIn, ids, toggle, failed],
+  )
+  return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>
 }

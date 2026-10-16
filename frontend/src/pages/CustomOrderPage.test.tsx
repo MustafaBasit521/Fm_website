@@ -58,6 +58,16 @@ it('submits a request without a picture, converting the budget to paisa', async 
   expect(await screen.findByText('Request sent')).toBeInTheDocument()
 })
 
+it('writes the chosen kind of piece at the top of the description', async () => {
+  renderPage()
+  await fillBasics()
+  await userEvent.click(screen.getByLabelText('Keychain'))
+  await userEvent.click(screen.getByRole('button', { name: 'Send request' }))
+  expect(api.submitCustomOrder).toHaveBeenCalledWith(
+    expect.objectContaining({ description: 'Type: Keychain\n\nA jersey with a name' }),
+  )
+})
+
 it('uploads the picture straight to private storage, then submits its path', async () => {
   api.getCustomOrderUploadTarget.mockResolvedValue({
     storage_path: 'custom-orders/abc.png',

@@ -916,3 +916,18 @@ Not recorded: reads by the admin, and unauthenticated requests (there is no iden
 
 The application only inserts and reads rows; no route edits or deletes them. (A database administrator can still change the table; protect database access accordingly.)
 
+---
+
+# 29. Newsletter Subscribers
+
+```text
+newsletter_subscribers
+-----------
+subscriber_id UUID PK (default gen_random_uuid in the application)
+email TEXT NOT NULL UNIQUE (stored in lower case)
+unsubscribe_token TEXT NOT NULL UNIQUE
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+Visitors (with or without an account) who asked to hear about new pieces (`business-rules.md`, Newsletter). No foreign key: a subscriber need not be a customer, and a customer who is also on the list is emailed once. `unsubscribe_token` is a random secret (`secrets.token_urlsafe(24)`) used only in the unsubscribe link; unsubscribing **deletes** the row. Joining uses `INSERT ... ON CONFLICT (email) DO NOTHING`, so a repeat is a no-op. Migration `create newsletter subscribers` (revision `704352cdd7e1`).
+

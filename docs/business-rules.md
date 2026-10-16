@@ -153,6 +153,17 @@ Customers remain subscribed unless they later unsubscribe.
 
 Customers should be able to unsubscribe through a future notification preference mechanism.
 
+## Newsletter ("Join the circle") — decided in the UI polish phase
+
+Anyone, with or without an account, may leave an email address to hear about new pieces (a "Join the circle" block above the footer of every shop page).
+
+* The address is stored in lower case. Joining twice is a harmless no-op and the visitor gets the same answer either way, so the form cannot be used to find out who is already on the list.
+* A new address gets one welcome email containing a one-click unsubscribe link. The link carries a secret per-address token; opening it only asks for confirmation (so a mail scanner that opens the link does not unsubscribe anyone), and pressing the button removes the address. A used or unknown token gives "this link is no longer valid".
+* The form is rate limited (5 per hour per client address; 30 for the unsubscribe call).
+* When the admin publishes a product (§31), a "new in the shop" email is queued for every customer subscribed to updates **and** every address on the newsletter list, once per address (a customer who is also on the list gets one email). Customer emails point to *My details* for opting out; list emails carry their own unsubscribe link.
+* Emails go through the email provider interface. **No provider is chosen yet, so nothing is actually delivered**; the list, the welcome and the announcement emails start working as soon as a provider is configured.
+* There is no articles/journal feature: the list is only told about new pieces.
+
 ---
 
 # 8. Customer Account Deletion
@@ -740,7 +751,7 @@ Notifications are not email delivery logs.
 
 Decided: a notification is UNREAD until the customer opens it (one at a time or all at once). In-app notifications exist for registered customers only; guests are reached by email at the address they gave. Implemented events: order placed, order confirmed, status changed (processing, cancelled), shipped, delivered, payment success, payment failure and custom-order updates; each notification is saved in the same transaction as the change that caused it. An order cancelled by the automatic payment-window expiry does not yet send a notification.
 
-NEW_PRODUCT (implemented in Phase 9): when the admin publishes a product (it is created visible, or changed from hidden to visible), every customer subscribed to shop updates gets an in-app notification ("New in the shop"). Customers who unsubscribed get nothing. It is in-app only: a mass email needs the unchosen email provider and an unsubscribe flow. Hiding or editing a product announces nothing; showing it again announces it again.
+NEW_PRODUCT (implemented in Phase 9): when the admin publishes a product (it is created visible, or changed from hidden to visible), every customer subscribed to shop updates gets an in-app notification ("New in the shop"). Customers who unsubscribed get nothing. Customers subscribed to updates and newsletter subscribers (§7) are also queued an email; it is delivered once an email provider is configured. Hiding or editing a product announces nothing; showing it again announces it again.
 
 Email: the service provider is still to be chosen, so emails are built behind a provider interface (default: send nothing; a development option logs them). Emails are queued while a change is built and sent only after the database commit succeeds, in the background; a mail problem never breaks an order. Customers get emails for the order and payment events above (guests too); the shop gets an alert for each new order, custom order and contact message.
 

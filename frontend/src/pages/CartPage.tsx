@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../cart/context'
-import { getQuote, type Quote, type QuoteLine } from '../lib/api'
+import { useQuote } from '../cart/useQuote'
+import type { QuoteLine } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { QuantityStepper } from './QuantityStepper'
 import { buttonClass, secondaryButtonClass } from './ui'
@@ -15,23 +15,7 @@ function issueText(line: QuoteLine): string | null {
 
 export default function CartPage() {
   const { items, setQuantity, remove } = useCart()
-  // The quote (prices, availability, totals) always comes from the backend; the cart only holds
-  // ids and quantities. Results are tagged with the cart they answer so loading is derived.
-  const key = JSON.stringify(items)
-  const [loaded, setLoaded] = useState<{ key: string; quote: Quote | null } | null>(null)
-
-  useEffect(() => {
-    if (items.length === 0) return
-    const controller = new AbortController()
-    getQuote(items, controller.signal)
-      .then((quote) => setLoaded({ key, quote }))
-      .catch((e: unknown) => {
-        if (!(e instanceof DOMException && e.name === 'AbortError')) setLoaded({ key, quote: null })
-      })
-    return () => controller.abort()
-    // `key` captures `items`
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  const { current, quote } = useQuote(items)
 
   if (items.length === 0) {
     return (
@@ -48,9 +32,6 @@ export default function CartPage() {
       </main>
     )
   }
-
-  const current = loaded?.key === key ? loaded : null
-  const quote = current?.quote ?? null
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
