@@ -58,7 +58,7 @@ export default function NotificationsPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">Notifications</h1>
+      <h1 className="mt-2 font-serif text-5xl">Notifications</h1>
 
       {!current && (
         <p role="status" className="mt-6">

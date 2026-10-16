@@ -74,7 +74,7 @@ export default function CustomOrderPage() {
   if (done) {
     return (
       <main className="mx-auto max-w-xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Request sent</h1>
+        <h1 className="font-serif text-5xl">Request sent</h1>
         <p role="status" className="mt-4">
           Thank you! We received your custom order request and will contact you on WhatsApp to
           discuss the details and the price.
@@ -93,7 +93,7 @@ export default function CustomOrderPage() {
       <Link to="/" className="text-terracotta underline">
         ← Home
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">Custom order</h1>
+      <h1 className="mt-2 font-serif text-5xl">Custom order</h1>
       <p className="mt-2 text-muted">
         Tell us what you would like us to make. We will contact you on WhatsApp to agree the
         details.

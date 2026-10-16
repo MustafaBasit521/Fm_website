@@ -5,6 +5,7 @@ import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { PayNowButton } from './PayNowButton'
 import { buttonClass, Field, FormError } from './ui'
+import { OrderBreakdown } from './OrderBreakdown'
 import { StatusBadge } from './StatusBadge'
 
 // Which actions the customer is offered. The server enforces the same rules (business-rules
@@ -56,7 +57,7 @@ export default function OrderDetailPage() {
       <main className="mx-auto max-w-2xl px-4 py-8">
         {back}
         {current.notFound ? (
-          <h1 className="mt-2 font-serif text-4xl">Order not found</h1>
+          <h1 className="mt-2 font-serif text-5xl">Order not found</h1>
         ) : (
           <p role="alert" className="mt-4 text-danger">
             Could not load this order.
@@ -123,7 +124,7 @@ export default function OrderDetailPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       {back}
-      <h1 className="mt-2 font-serif text-4xl">Order</h1>
+      <h1 className="mt-2 font-serif text-5xl">Order</h1>
       <p className="text-sm text-muted break-all">Reference: {order.order_id}</p>
       <p className="mt-2">
         <StatusBadge status={order.status} /> · placed {formatDate(order.created_at)} ·{' '}
@@ -162,28 +163,9 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      <h2 className="mt-6 text-xl font-semibold">Items</h2>
-      <ul className="mt-2 flex flex-col gap-1">
-        {order.items.map((i) => (
-          <li
-            key={`${i.product_name_snapshot}-${i.unit_price_at_purchase_paisa}`}
-            className="flex justify-between"
-          >
-            <span>
-              {i.quantity} × {i.product_name_snapshot}
-            </span>
-            <span>{formatPrice(i.quantity * i.unit_price_at_purchase_paisa)}</span>
-          </li>
-        ))}
-      </ul>
-      <dl className="mt-4 grid grid-cols-2 gap-1 text-right">
-        <dt className="text-left">Subtotal</dt>
-        <dd>{formatPrice(order.subtotal_paisa)}</dd>
-        <dt className="text-left">Delivery</dt>
-        <dd>{formatPrice(order.delivery_fee_paisa)}</dd>
-        <dt className="text-left font-semibold">Total</dt>
-        <dd className="font-semibold">{formatPrice(order.total_amount_paisa)}</dd>
-      </dl>
+      <div className="mt-6">
+        <OrderBreakdown order={order} />
+      </div>
 
       <h2 className="mt-6 text-xl font-semibold">Delivering to</h2>
       {!editingAddress ? (

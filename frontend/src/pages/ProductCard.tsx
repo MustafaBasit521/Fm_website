@@ -1,12 +1,20 @@
 import { Link } from 'react-router-dom'
 import type { ProductSummary } from '../lib/api'
 import { formatPrice } from '../lib/money'
+import { HeartIcon } from '../shop/icons'
 import { stockLabel } from './stock'
 
-export function ProductCard({ product }: { product: ProductSummary }) {
+export function ProductCard({
+  product,
+  wishlist,
+}: {
+  product: ProductSummary
+  /** Provide this for signed-in shoppers to show a heart on the picture. */
+  wishlist?: { saved: boolean; onToggle: () => void }
+}) {
   const stock = stockLabel(product)
   return (
-    <div>
+    <div className="relative">
       <Link
         to={`/shop/${product.product_id}`}
         className="group block rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-terracotta"
@@ -33,6 +41,17 @@ export function ProductCard({ product }: { product: ProductSummary }) {
           {stock.text}
         </p>
       </Link>
+      {wishlist && (
+        <button
+          type="button"
+          aria-pressed={wishlist.saved}
+          aria-label={`${wishlist.saved ? 'Remove' : 'Save'} ${product.name} ${wishlist.saved ? 'from' : 'to'} wishlist`}
+          onClick={wishlist.onToggle}
+          className={`absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-full shadow focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-bark ${wishlist.saved ? 'bg-terracotta text-white' : 'bg-paper text-ink hover:bg-cream-200'}`}
+        >
+          <HeartIcon fill={wishlist.saved ? 'currentColor' : 'none'} />
+        </button>
+      )}
     </div>
   )
 }

@@ -356,3 +356,5 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 **Notes:** a visual check found a broken divider in the summary box (grid gap) and default-blue radio buttons: both fixed. The live Supabase settings still hold the old name until the owner edits it.
 
 **Follow-up:** the shop name is renamed in the live settings by migration `rename default shop name` (conditional on the old default, so an owner-chosen name is never overwritten; applied on Supabase). Added `StatusBadge` (design-system colours, words always shown, contrast tested) to the shop and admin order screens.
+
+**Account area increment:** account hub with tiles, shared `OrderBreakdown` card on the confirmation and order pages, `useWishlist` hook and hearts on product cards (shop and home). The responsive guard again caught two new single-line rows, now marked deliberately. Not checked in a browser while signed in (login needs a real session); covered by 302 frontend tests.

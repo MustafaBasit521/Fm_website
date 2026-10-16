@@ -28,7 +28,7 @@ export default function FakeGatewayPage() {
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-4 px-4 py-8">
-      <h1 className="font-serif text-4xl">Fake payment gateway</h1>
+      <h1 className="font-serif text-5xl">Fake payment gateway</h1>
       <p className="rounded-lg border border-danger p-3 text-danger">
         Development only. No real payment happens here.
       </p>

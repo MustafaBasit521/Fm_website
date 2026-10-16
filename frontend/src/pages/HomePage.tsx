@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getProducts, type ProductSummary } from '../lib/api'
 import { ArrowIcon } from '../shop/icons'
 import { ProductCard } from './ProductCard'
+import { useWishlist } from './useWishlist'
 
 const TRUST = [
   'Every piece made by hand, never mass-produced',
@@ -25,6 +26,7 @@ async function loadFeatured(signal: AbortSignal): Promise<Featured> {
 
 export default function HomePage() {
   const [featured, setFeatured] = useState<Featured | null>(null)
+  const wl = useWishlist()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -94,7 +96,17 @@ export default function HomePage() {
           <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4">
             {featured.items.map((p) => (
               <li key={p.product_id}>
-                <ProductCard product={p} />
+                <ProductCard
+                  product={p}
+                  wishlist={
+                    wl.enabled
+                      ? {
+                          saved: wl.ids!.has(p.product_id),
+                          onToggle: () => void wl.toggle(p.product_id),
+                        }
+                      : undefined
+                  }
+                />
               </li>
             ))}
           </ul>

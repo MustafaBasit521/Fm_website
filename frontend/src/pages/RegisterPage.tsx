@@ -33,7 +33,7 @@ export default function RegisterPage() {
   if (confirmEmail) {
     return (
       <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
-        <h1 className="font-serif text-4xl">Check your email</h1>
+        <h1 className="font-serif text-5xl">Check your email</h1>
         <p role="status" className="text-muted">
           We sent you a confirmation link. Open it, then{' '}
           <Link to="/login" className="text-terracotta underline">
@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto flex min-h-[60vh] max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="font-serif text-4xl">Create account</h1>
+      <h1 className="font-serif text-5xl">Create account</h1>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field id="name" name="name" label="Name" autoComplete="name" maxLength={100} required />
         <Field id="email" name="email" label="Email" type="email" autoComplete="email" required />

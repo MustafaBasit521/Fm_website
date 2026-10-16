@@ -38,7 +38,7 @@ export default function GalleryPage() {
       <Link to="/" className="text-terracotta underline">
         ← Home
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">Gallery</h1>
+      <h1 className="mt-2 font-serif text-5xl">Gallery</h1>
 
       <div className="mt-4 flex flex-col gap-1 sm:w-64">
         <label htmlFor="gallery-type" className="text-sm font-medium text-bark">

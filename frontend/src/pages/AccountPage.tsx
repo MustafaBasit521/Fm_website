@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { ApiError, getMe, updateMe, type Customer } from '../lib/api'
-import { buttonClass, Field, FormError } from './ui'
+import { buttonClass, Field, FormError, secondaryButtonClass } from './ui'
 
 export default function AccountPage() {
   const { signOut } = useAuth()
@@ -58,18 +58,41 @@ export default function AccountPage() {
       </p>
     )
 
+  const firstName = customer.name.split(' ')[0]
+  const TILES: [string, string, string][] = [
+    ['/orders', 'My orders', 'Track and manage your orders'],
+    ['/wishlist', 'Wishlist', 'Pieces you have saved'],
+    ['/account/addresses', 'Saved addresses', 'Where we deliver in Lahore'],
+    ['/custom-orders', 'Custom orders', 'Your custom piece requests'],
+    ['/notifications', 'Notifications', 'Updates about your orders'],
+  ]
+
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center gap-4 px-4">
-      <h1 className="font-serif text-4xl">My account</h1>
-      <p className="text-muted">{customer.email}</p>
-      <nav className="flex flex-wrap gap-4 text-terracotta underline">
-        <Link to="/orders">My orders</Link>
-        <Link to="/custom-orders">Custom orders</Link>
-        <Link to="/notifications">Notifications</Link>
-        <Link to="/account/addresses">Saved addresses</Link>
-        <Link to="/wishlist">Wishlist</Link>
+    <main className="mx-auto max-w-3xl px-4 py-8">
+      <h1 className="font-serif text-5xl">Hi, {firstName}</h1>
+      <p className="mt-1 text-muted">{customer.email}</p>
+
+      <nav aria-label="My account" className="mt-6">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {TILES.map(([to, title, text]) => (
+            <li key={to}>
+              <Link
+                to={to}
+                className="block rounded-[18px] border border-sand bg-paper p-5 hover:border-ink focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-bark"
+              >
+                <span className="block text-lg font-semibold">{title}</span>
+                <span className="text-sm text-bark">{text}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </nav>
-      <form onSubmit={onSubmit} className="flex flex-col gap-4">
+
+      <h2 className="mt-10 font-serif text-3xl">My details</h2>
+      <form
+        onSubmit={onSubmit}
+        className="mt-3 flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+      >
         <Field
           id="name"
           name="name"
@@ -87,7 +110,7 @@ export default function AccountPage() {
           defaultValue={customer.phone ?? ''}
           maxLength={20}
         />
-        <label className="flex items-center gap-2">
+        <label className="flex flex-nowrap items-center gap-3">
           <input
             type="checkbox"
             name="subscribed"
@@ -97,17 +120,17 @@ export default function AccountPage() {
         </label>
         <FormError message={error} />
         {saveState === 'saved' && <p role="status">Saved.</p>}
-        <button type="submit" className={buttonClass} disabled={saveState === 'saving'}>
-          {saveState === 'saving' ? 'Saving…' : 'Save changes'}
-        </button>
+        <div>
+          <button type="submit" className={buttonClass} disabled={saveState === 'saving'}>
+            {saveState === 'saving' ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
       </form>
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="text-left text-terracotta underline"
-      >
-        Log out
-      </button>
+      <p className="mt-6">
+        <button type="button" onClick={() => void signOut()} className={secondaryButtonClass}>
+          Log out
+        </button>
+      </p>
     </main>
   )
 }

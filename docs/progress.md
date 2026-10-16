@@ -102,13 +102,14 @@ Done — shop site:
 * [x] checkout: contact, delivery and payment as cards (payment and saved addresses as selectable cards), order summary with "Place order · total"
 * [x] coloured order-status badges from the design system (words always shown; AA contrast tested) in the shop's order list and order page and in the admin's dashboard, orders, order page and customer page
 * [x] the live shop name is changed to "Bundle of Loops" by a migration (only if it still holds the old default), so no manual database edit is needed
+* [x] account area: an account hub with tiles (orders, wishlist, addresses, custom orders, notifications) above the details form; the order confirmation and order pages share one items-and-totals card (`OrderBreakdown`); hearts on product cards for signed-in shoppers (shop and home; signed-out visitors see none and nothing is requested)
 * [x] wording follows the mockup: "bag" instead of "cart" on screen (URLs and code names unchanged)
 * [x] accessible drawer; colour-contrast matrix over every text colour on every surface (passes AA); axe on every page; guards: no non-wrapping rows (`flex-nowrap` marks deliberate ones)
 * [x] tests: 292 frontend
 
 Not done yet:
 
-* order confirmation, orders list/detail, account, addresses, wishlist, notifications, reviews, gallery, custom order, contact, login/register pages keep the new colours and buttons but not yet the mockup's layout; wishlist hearts and quick view on cards; the "meet the maker", studio gallery strip and the studio-letters sign-up of the home mockup; hero photography; the whole admin (it uses the new colours, buttons and inputs, but not the mockup's table/sidebar layout yet)
+* addresses, wishlist, notifications, reviews, gallery, custom order, contact, login/register pages keep the new colours and buttons but not yet individually designed layouts; quick view on cards; the "meet the maker", studio gallery strip and the studio-letters sign-up of the home mockup; hero photography; the whole admin (it uses the new colours, buttons and inputs, but not the mockup's table/sidebar layout yet)
 * Deliberately NOT copied from the mockup because the business rules do not say so: "Free delivery over Rs 3,000", "Delivered in 2–4 days", a newsletter, a journal/articles section. They can be added if the owner confirms them as rules.
 * Not verified on the owner's own devices (checked with automated tests and Chrome screenshots at phone and desktop widths).
 

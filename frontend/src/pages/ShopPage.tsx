@@ -11,6 +11,7 @@ import { formatPrice, paisaToRupeesInput, parseRupeesToPaisa } from '../lib/mone
 import { Drawer } from '../shop/Drawer'
 import { CloseIcon, FilterIcon } from '../shop/icons'
 import { ProductCard } from './ProductCard'
+import { useWishlist } from './useWishlist'
 import { buttonClass } from './ui'
 
 const PAGE_SIZE = 12
@@ -34,6 +35,7 @@ const pill = (active: boolean) =>
 
 export default function ShopPage() {
   const [params, setParams] = useSearchParams()
+  const wl = useWishlist()
   const [categories, setCategories] = useState<Category[]>([])
   // Each response is tagged with the query it answers; "loading" is derived, never set.
   const [loaded, setLoaded] = useState<{ query: string; data: Page<ProductSummary> | null } | null>(
@@ -142,7 +144,7 @@ export default function ShopPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="font-serif text-4xl md:text-5xl">{categoryName ?? 'Shop'}</h1>
+      <h1 className="font-serif text-5xl md:text-5xl">{categoryName ?? 'Shop'}</h1>
 
       <nav
         aria-label="Categories"
@@ -227,7 +229,17 @@ export default function ShopPage() {
             <ul className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
               {result.items.map((p) => (
                 <li key={p.product_id}>
-                  <ProductCard product={p} />
+                  <ProductCard
+                    product={p}
+                    wishlist={
+                      wl.enabled
+                        ? {
+                            saved: wl.ids!.has(p.product_id),
+                            onToggle: () => void wl.toggle(p.product_id),
+                          }
+                        : undefined
+                    }
+                  />
                 </li>
               ))}
             </ul>

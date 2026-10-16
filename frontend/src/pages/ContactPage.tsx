@@ -94,7 +94,7 @@ export default function ContactPage() {
   if (done) {
     return (
       <main className="mx-auto max-w-xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Message sent</h1>
+        <h1 className="font-serif text-5xl">Message sent</h1>
         <p role="status" className="mt-4">
           Thank you! We received your message and will reply soon.
         </p>
@@ -112,7 +112,7 @@ export default function ContactPage() {
       <Link to="/" className="text-terracotta underline">
         ← Home
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">Contact us</h1>
+      <h1 className="mt-2 font-serif text-5xl">Contact us</h1>
       <ShopDetails />
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
         <Field id="name" name="name" label="Your name" maxLength={100} required />

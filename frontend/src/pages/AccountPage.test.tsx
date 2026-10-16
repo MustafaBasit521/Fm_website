@@ -63,3 +63,18 @@ it('shows an error state when the profile cannot be loaded', async () => {
   render(wrap(<AccountPage />, '/account'))
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
 })
+
+it('greets the customer by first name and links to every part of the account', async () => {
+  const { wrap } = makeAuth({ session: fakeSession })
+  render(wrap(<AccountPage />, '/account'))
+  expect(await screen.findByRole('heading', { name: 'Hi, Ayesha' })).toBeInTheDocument()
+  const nav = screen.getByRole('navigation', { name: 'My account' })
+  const targets = [...nav.querySelectorAll('a')].map((a) => a.getAttribute('href'))
+  expect(targets).toEqual([
+    '/orders',
+    '/wishlist',
+    '/account/addresses',
+    '/custom-orders',
+    '/notifications',
+  ])
+})

@@ -24,7 +24,7 @@ export default function PaymentReturnPage() {
   if (!orderId) {
     return (
       <main className="mx-auto max-w-xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Payment</h1>
+        <h1 className="font-serif text-5xl">Payment</h1>
         <p className="mt-4">No order was specified.</p>
         <p className="mt-2">
           <Link to="/shop" className="text-terracotta underline">
@@ -88,7 +88,7 @@ export default function PaymentReturnPage() {
 
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-4 px-4 py-8">
-      <h1 className="font-serif text-4xl" role="status">
+      <h1 className="font-serif text-5xl" role="status">
         {heading}
       </h1>
       {body}

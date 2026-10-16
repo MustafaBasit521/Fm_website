@@ -98,7 +98,7 @@ export default function AddressesPage() {
       <Link to="/account" className="text-terracotta underline">
         ← My account
       </Link>
-      <h1 className="mt-2 font-serif text-4xl">Saved addresses</h1>
+      <h1 className="mt-2 font-serif text-5xl">Saved addresses</h1>
       <p className="mt-1 text-muted">We currently deliver only within Lahore.</p>
 
       {addresses.length === 0 && !editing && (

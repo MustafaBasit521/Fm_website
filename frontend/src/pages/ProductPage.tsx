@@ -52,7 +52,7 @@ export default function ProductPage() {
   if (state === 'notfound')
     return (
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Product not found</h1>
+        <h1 className="font-serif text-5xl">Product not found</h1>
         <p className="mt-2">{back}</p>
       </main>
     )

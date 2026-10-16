@@ -68,7 +68,7 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="font-serif text-4xl">Checkout</h1>
+        <h1 className="font-serif text-5xl">Checkout</h1>
         <p className="mt-4">
           Your bag is empty.{' '}
           <Link to="/shop" className="text-terracotta underline">
