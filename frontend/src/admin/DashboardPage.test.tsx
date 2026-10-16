@@ -73,3 +73,15 @@ it('shows friendly empty states and an error state', async () => {
   renderPage()
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
 })
+
+it('shows a banner with the number of orders waiting, only when there are some', async () => {
+  getDashboard.mockResolvedValue(data({ orders_needing_action: 1 }))
+  const first = renderPage()
+  expect(await screen.findByText(/1 order is waiting for you/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Review orders' })).toHaveAttribute('href', '/orders')
+  first.unmount()
+  getDashboard.mockResolvedValue(data({ orders_needing_action: 0 }))
+  renderPage()
+  await screen.findByText('orders to process')
+  expect(screen.queryByText(/waiting for you/)).not.toBeInTheDocument()
+})

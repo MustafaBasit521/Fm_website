@@ -119,7 +119,11 @@ it('lists orders and sends the filters to the server', async () => {
   api.getAdminOrders.mockResolvedValue(page([summary()], 45))
   renderList()
   expect(await screen.findByText('Ayesha Khan')).toBeInTheDocument()
-  expect(screen.getByText(/Rs 2,701 · Cash on delivery/)).toBeInTheDocument()
+  expect(screen.getByText('Rs 2,701')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: /Cash on delivery/ })).toHaveAttribute(
+    'href',
+    '/orders/o1',
+  )
   await userEvent.selectOptions(screen.getByLabelText('Status'), 'SHIPPED')
   await userEvent.selectOptions(screen.getByLabelText('Payment'), 'ONLINE')
   await userEvent.type(screen.getByLabelText(/Search/), 'zainab{Enter}')

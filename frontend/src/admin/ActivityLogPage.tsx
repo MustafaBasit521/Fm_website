@@ -8,7 +8,7 @@ export default function ActivityLogPage() {
   const { data, loading, failed } = useLoad((s) => getAuditLog(page, s), [page])
   return (
     <>
-      <h1 className="font-serif text-4xl">Activity log</h1>
+      <h1 className="font-serif text-4xl md:text-5xl">Activity log</h1>
       <p className="mt-1 text-muted">
         Every change made in the admin area, and every refused attempt, newest first. Entries cannot
         be edited or deleted here.

@@ -7,7 +7,7 @@ import {
 } from '../lib/adminApi'
 import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
-import { Badge, Pager, State } from './ui'
+import { Badge, Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 const LABELS: Record<MessageStatus, string> = {
@@ -40,7 +40,7 @@ export default function MessagesAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Messages</h1>
+      <PageTitle title="Messages" />
       <form
         role="search"
         className="mt-4 grid gap-3 sm:grid-cols-2"

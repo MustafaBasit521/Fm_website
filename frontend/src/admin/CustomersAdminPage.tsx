@@ -4,7 +4,7 @@ import { getAdminCustomer, getAdminCustomers } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
 import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
-import { Pager, State } from './ui'
+import { Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 import { StatusBadge } from '../pages/StatusBadge'
 
@@ -17,7 +17,7 @@ export function CustomersAdminPage() {
   )
   return (
     <>
-      <h1 className="font-serif text-4xl">Customers</h1>
+      <PageTitle title="Customers" />
       <div className="mt-4 flex flex-col gap-1 sm:w-80">
         <label htmlFor="c-search" className="text-sm font-medium text-bark">
           Search name or email

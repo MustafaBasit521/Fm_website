@@ -3,7 +3,7 @@ import { createCategory, deleteCategory, getAdminCategories, renameCategory } fr
 import { ApiError } from '../lib/api'
 import { buttonClass, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { ConfirmButton, State } from './ui'
+import { ConfirmButton, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 export default function CategoriesAdminPage() {
@@ -37,7 +37,7 @@ export default function CategoriesAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Categories</h1>
+      <PageTitle title="Categories" />
       <form
         onSubmit={onAdd}
         aria-label="Add category"

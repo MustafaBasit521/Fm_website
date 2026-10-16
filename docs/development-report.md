@@ -407,3 +407,13 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Verified:** 9 new tests with a mock transport (no network); full suite passes. **Not verified:** real delivery (needs the owner's API key; until a domain is verified Resend delivers only to the owner's own address).
 
+## UI polish — increment 6 (admin redesign)
+
+**Owner's request:** focus on the design; match the admin pages of the deck.
+
+**Built:** new `AdminLayout` (grouped sidebar, icons, logo, badges from the dashboard counts, mobile top bar), shared `PageTitle`, `Switch` and row/card styles, restyled Overview, Orders (table-style rows) and Products (card grid with an immediate "In shop" switch via the existing update call); every other admin page got the new page title. No API or permission changes.
+
+**Verified:** 345 frontend tests (new: layout badges and links, product switch and its failure, dashboard banner), axe on all admin pages, both builds, and Chrome screenshots at 1440 px and 390 px with a mocked API (no horizontal overflow). A first screenshot showed the dashboard order rows broken (status badge cut off by a wrong grid order); fixed before finishing.
+
+**Not done:** order detail, product edit form, settings, messages, custom orders and gallery keep their previous inner layouts; the deck's activity feed is not built (there is no such data source); the greeting says "welcome back" because the admin's name is not stored anywhere.
+

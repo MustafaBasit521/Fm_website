@@ -4,7 +4,7 @@ import { ApiError } from '../lib/api'
 import { paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { State } from './ui'
+import { State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 const SOCIAL: [string, string][] = [
@@ -61,7 +61,7 @@ export default function SettingsAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Settings</h1>
+      <PageTitle title="Settings" />
       <div className="mt-4">
         <State loading={loading && !settings} failed={failed && !settings}>
           {settings && (

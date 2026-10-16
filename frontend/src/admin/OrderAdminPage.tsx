@@ -14,7 +14,7 @@ import { formatPrice, parseRupeesToPaisa } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { Badge, ConfirmButton, State } from './ui'
+import { Badge, ConfirmButton, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 import { StatusBadge } from '../pages/StatusBadge'
 
@@ -110,7 +110,7 @@ export default function OrderAdminPage() {
         {order && (
           <div className="mt-2 flex flex-col gap-6">
             <header>
-              <h1 className="font-serif text-4xl">Order</h1>
+              <PageTitle title="Order" />
               <p className="break-all text-sm text-muted">{order.order_id}</p>
               <p className="mt-1 flex flex-wrap items-center gap-2">
                 <StatusBadge status={order.status} />

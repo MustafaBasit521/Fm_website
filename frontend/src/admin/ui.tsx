@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { ChevronRightIcon } from './icons'
 
 export function Pager({
   page,
@@ -109,5 +110,70 @@ export function ConfirmButton({
         Keep
       </button>
     </span>
+  )
+}
+
+/** The top of an admin page: a small line above (counts, date), the serif title, actions on the right. */
+export function PageTitle({
+  eyebrow,
+  title,
+  actions,
+}: {
+  eyebrow?: ReactNode
+  title: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        {eyebrow && <p className="text-sm text-bark">{eyebrow}</p>}
+        <h1 className="font-serif text-4xl leading-tight md:text-5xl">{title}</h1>
+      </div>
+      {actions && <div className="flex flex-wrap gap-3">{actions}</div>}
+    </header>
+  )
+}
+
+/** A rounded white panel (cards, tables). */
+export const cardClass = 'rounded-[18px] border border-sand bg-paper'
+
+/** A row of a list shown like a table row: the whole row is the link, with a chevron. */
+export const rowLinkClass =
+  'grid items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-cream-100 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-bark'
+
+export const Chevron = () => <ChevronRightIcon className="hidden text-bark md:block" />
+
+/** An on/off switch (role="switch"), e.g. "In shop". */
+export function Switch({
+  checked,
+  onChange,
+  label,
+  hiddenLabel,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+  /** The accessible name when it differs from the visible text. */
+  hiddenLabel?: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={hiddenLabel}
+      onClick={() => onChange(!checked)}
+      className="inline-flex flex-nowrap items-center gap-2 text-sm focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-bark"
+    >
+      <span
+        aria-hidden="true"
+        className={`relative inline-block h-5 w-9 rounded-full transition ${checked ? 'bg-moss-dark' : 'bg-linen'}`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${checked ? 'left-[1.1rem]' : 'left-0.5'}`}
+        />
+      </span>
+      {label}
+    </button>
   )
 }

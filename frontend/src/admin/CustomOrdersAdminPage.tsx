@@ -6,7 +6,7 @@ import { formatDate } from '../lib/orderStatus'
 import { inputClass } from './styles'
 import { StatusBadge } from '../pages/StatusBadge'
 import { CUSTOM_ORDER_TONE } from '../pages/statusColors'
-import { Pager, State } from './ui'
+import { Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 const LABELS: Record<CustomOrderStatus, string> = {
@@ -67,7 +67,7 @@ export default function CustomOrdersAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Custom orders</h1>
+      <PageTitle title="Custom orders" />
       <form
         role="search"
         className="mt-4 grid gap-3 sm:grid-cols-2"

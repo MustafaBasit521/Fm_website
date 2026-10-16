@@ -4,7 +4,7 @@ import { getAdminOrders } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
 import { inputClass } from './styles'
-import { Pager, State } from './ui'
+import { Chevron, PageTitle, Pager, State, cardClass, rowLinkClass } from './ui'
 import { useLoad } from './useLoad'
 import { StatusBadge } from '../pages/StatusBadge'
 
@@ -22,10 +22,13 @@ export default function OrdersAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Orders</h1>
+      <PageTitle
+        eyebrow={data ? `${data.total} ${data.total === 1 ? 'order' : 'orders'}` : undefined}
+        title="Orders"
+      />
       <form
         role="search"
-        className="mt-4 grid gap-3 sm:grid-cols-3"
+        className="mt-5 grid gap-3 sm:grid-cols-3"
         onSubmit={(e) => e.preventDefault()}
       >
         <div className="flex flex-col gap-1">
@@ -94,35 +97,50 @@ export default function OrdersAdminPage() {
         >
           {data && (
             <>
-              <p className="text-muted">{data.total} orders</p>
-              <ul className="mt-2 flex flex-col gap-2">
-                {data.items.map((o) => (
-                  <li key={o.order_id} className="rounded-[18px] border border-sand bg-paper p-3">
-                    <Link
-                      to={`/orders/${o.order_id}`}
-                      className="flex flex-wrap justify-between gap-2"
-                    >
-                      <span>
-                        <strong>{o.customer_name}</strong>{' '}
-                        <span className="text-sm text-muted">{o.customer_email}</span>
-                        <span className="block text-sm text-muted">
-                          {formatDate(o.created_at)} · {o.item_count}{' '}
-                          {o.item_count === 1 ? 'item' : 'items'}
+              <div className={`${cardClass} overflow-hidden`}>
+                <div
+                  aria-hidden="true"
+                  className="hidden grid-cols-[1fr_1.4fr_7rem_9rem_7rem_1rem] gap-x-4 border-b border-sand px-4 py-3 text-[11px] font-medium uppercase tracking-widest text-bark md:grid"
+                >
+                  <span>Order</span>
+                  <span>Customer</span>
+                  <span>Amount</span>
+                  <span>Payment</span>
+                  <span>Status</span>
+                  <span />
+                </div>
+                <ul className="divide-y divide-sand">
+                  {data.items.map((o) => (
+                    <li key={o.order_id}>
+                      <Link
+                        to={`/orders/${o.order_id}`}
+                        className={`${rowLinkClass} grid-cols-[1fr_auto] md:grid-cols-[1fr_1.4fr_7rem_9rem_7rem_1rem]`}
+                      >
+                        <span className="text-sm text-bark">{formatDate(o.created_at)}</span>
+                        <span className="col-span-2 row-start-2 md:col-span-1 md:row-start-auto">
+                          <strong>{o.customer_name}</strong>
+                          <span className="block text-sm text-muted">
+                            {o.item_count} {o.item_count === 1 ? 'item' : 'items'} ·{' '}
+                            {o.customer_email}
+                          </span>
                         </span>
-                      </span>
-                      <span className="text-right">
-                        <StatusBadge status={o.status} />
-                        <span className="block text-sm text-muted">
-                          {formatPrice(o.total_amount_paisa)} ·{' '}
+                        <span className="whitespace-nowrap font-semibold">
+                          {formatPrice(o.total_amount_paisa)}
+                        </span>
+                        <span className="text-sm">
                           {o.payment_method === 'COD'
                             ? 'Cash on delivery'
                             : paymentStatusLabel(o.payment_status)}
                         </span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+                        <span>
+                          <StatusBadge status={o.status} />
+                        </span>
+                        <Chevron />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
               <Pager page={page} total={data.total} pageSize={20} onPage={setPage} />
             </>
           )}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { deleteAdminReview, getAdminReviews } from '../lib/adminApi'
 import { formatDate } from '../lib/orderStatus'
-import { ConfirmButton, Pager, State } from './ui'
+import { ConfirmButton, Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 export default function ReviewsAdminPage() {
@@ -11,7 +11,7 @@ export default function ReviewsAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Reviews</h1>
+      <PageTitle title="Reviews" />
       {error && (
         <p role="alert" className="mt-4 text-danger">
           Could not remove that review.

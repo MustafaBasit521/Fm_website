@@ -122,6 +122,25 @@ it('lists products with visibility, stock and filters', async () => {
   expect(api.getAdminProducts.mock.calls.at(-1)![0].search).toBe('bun')
 })
 
+it('switches a product on or off in the shop right from the list', async () => {
+  api.getAdminProducts.mockResolvedValue(page([product({ is_visible: false })]))
+  api.updateProduct.mockResolvedValue(product({ is_visible: true }))
+  renderList()
+  const toggle = await screen.findByRole('switch', { name: 'Sunflower is shown in the shop' })
+  expect(toggle).toHaveAttribute('aria-checked', 'false')
+  await userEvent.click(toggle)
+  expect(api.updateProduct).toHaveBeenCalledWith('p1', { is_visible: true })
+  await vi.waitFor(() => expect(api.getAdminProducts.mock.calls.length).toBeGreaterThan(1)) // reloaded
+})
+
+it('says so when switching a product fails', async () => {
+  api.getAdminProducts.mockResolvedValue(page([product()]))
+  api.updateProduct.mockRejectedValue(new Error('x'))
+  renderList()
+  await userEvent.click(await screen.findByRole('switch'))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not change that product')
+})
+
 it('shows empty and error states for the list', async () => {
   api.getAdminProducts.mockResolvedValue(page([]))
   const a = renderList()

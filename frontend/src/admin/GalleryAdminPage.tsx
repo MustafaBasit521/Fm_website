@@ -10,7 +10,7 @@ import { ApiError, type GalleryImageType } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { buttonClass, Field, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { ConfirmButton, Pager, State } from './ui'
+import { ConfirmButton, Pager, State, PageTitle } from './ui'
 import { useLoad } from './useLoad'
 
 const TYPES: [GalleryImageType, string][] = [
@@ -80,7 +80,7 @@ export default function GalleryAdminPage() {
 
   return (
     <>
-      <h1 className="font-serif text-4xl">Gallery</h1>
+      <PageTitle title="Gallery" />
       <p className="mt-1 max-w-xl text-bark">
         Pictures shown publicly fill the gallery on the home page. Tick &ldquo;Top of the home
         page&rdquo; on up to two shown pictures to make them the big photos next to the headline
