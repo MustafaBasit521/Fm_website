@@ -28,16 +28,30 @@ def bob(make_token):
     return auth(make_token(sub=uuid.uuid4(), email="bob@example.com", name="Bob"))
 
 
+OWNERS: dict[str, dict] = {}  # request id -> the registered customer's headers
+
+
 async def submit(client, headers=None, **over):
     r = await client.post(URL, json=BODY | over, headers=headers)
     assert r.status_code == 201, r.text
+    if headers:
+        OWNERS[r.json()["custom_order_id"]] = headers
     return r.json()
 
 
 async def move(client, admin_h, cid, status):
-    if status == "ACCEPTED":  # acceptance carries the agreed price, so it has its own route
+    if status == "ACCEPTED":
+        owner = OWNERS.get(cid)
+        if owner is None:  # a guest: the admin records the price agreed on WhatsApp
+            return await client.post(
+                f"{ADMIN}/{cid}/accept", headers=admin_h, json={"agreed_price_paisa": 100000}
+            )
+        # a registered customer: the shop proposes, the customer confirms
+        await client.post(
+            f"{ADMIN}/{cid}/propose-price", headers=admin_h, json={"price_paisa": 100000}
+        )
         return await client.post(
-            f"{ADMIN}/{cid}/accept", headers=admin_h, json={"agreed_price_paisa": 100000}
+            f"{URL}/{cid}/confirm-price", headers=owner, json={"price_paisa": 100000}
         )
     return await client.post(f"{ADMIN}/{cid}/status", headers=admin_h, json={"status": status})
 
@@ -207,6 +221,7 @@ async def test_deleting_a_customer_keeps_their_custom_orders(client, alice, db_e
         ("GET", f"{ADMIN}/{uuid.uuid4()}"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/status"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/accept"),
+        ("POST", f"{ADMIN}/{uuid.uuid4()}/propose-price"),
         ("GET", f"{ADMIN}/{uuid.uuid4()}/messages"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/messages"),
     ],
@@ -287,7 +302,7 @@ async def test_events_notify_the_customer_and_alert_the_shop(
     await move(client, admin_h, co["custom_order_id"], "IN_DISCUSSION")
     await move(client, admin_h, co["custom_order_id"], "ACCEPTED")
     notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
-    assert [n["type"] for n in notes] == ["CUSTOM_ORDER_UPDATE"] * 3
+    assert [n["type"] for n in notes] == ["CUSTOM_ORDER_UPDATE"] * 4  # incl. the price proposal
     assert "accepted" in notes[0]["message"]
     assert emails.to("alice@example.com")[-1].subject == "Your custom order was accepted"
 
@@ -387,32 +402,102 @@ async def test_the_discussion_closes_when_the_request_is_finished(client, admin_
     assert len((await client.get(f"{URL}/{cid}/messages", headers=alice)).json()) == 3
 
 
-async def test_the_admin_accepts_at_the_price_agreed_in_the_discussion(
-    client, admin_h, alice, emails
+async def test_the_shop_proposes_a_price_and_only_the_customer_can_accept_it(
+    client, admin_h, alice, bob, emails
 ):
     cid = (await submit(client, headers=alice, budget_paisa=150000))["custom_order_id"]
-    url = f"{ADMIN}/{cid}/accept"
+    propose = f"{ADMIN}/{cid}/propose-price"
+    confirm = f"{URL}/{cid}/confirm-price"
     # a new request must be discussed first
-    early = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    early = await client.post(propose, headers=admin_h, json={"price_paisa": 200000})
     assert early.status_code == 409 and early.json()["detail"]["code"] == "INVALID_TRANSITION"
     await move(client, admin_h, cid, "IN_DISCUSSION")
     assert (
-        await client.post(url, headers=admin_h, json={"agreed_price_paisa": -1})
+        await client.post(propose, headers=admin_h, json={"price_paisa": -1})
     ).status_code == 422
-    r = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    r = await client.post(propose, headers=admin_h, json={"price_paisa": 200000})
     assert r.status_code == 200
-    assert (r.json()["status"], r.json()["agreed_price_paisa"], r.json()["budget_paisa"]) == (
-        "ACCEPTED",
+    assert (
+        r.json()["status"],
+        r.json()["proposed_price_paisa"],
+        r.json()["agreed_price_paisa"],
+    ) == (
+        "IN_DISCUSSION",
         200000,
+        None,  # nothing is agreed until the customer confirms
+    )
+    assert "Rs 2,000" in emails.to("alice@example.com")[-1].body
+
+    # the customer sees the proposal; nobody else can confirm it; the admin cannot force it
+    mine = (await client.get(f"{URL}/{cid}", headers=alice)).json()
+    assert mine["proposed_price_paisa"] == 200000 and mine["agreed_price_paisa"] is None
+    assert (
+        await client.post(confirm, headers=bob, json={"price_paisa": 200000})
+    ).status_code == 404
+    assert (await client.post(confirm, json={"price_paisa": 200000})).status_code == 401
+    forced = await client.post(
+        f"{ADMIN}/{cid}/accept", headers=admin_h, json={"agreed_price_paisa": 200000}
+    )
+    assert forced.status_code == 409 and forced.json()["detail"]["code"] == "CUSTOMER_MUST_CONFIRM"
+
+    # a price changed in the meantime is never accepted by mistake
+    await client.post(propose, headers=admin_h, json={"price_paisa": 250000})
+    stale = await client.post(confirm, headers=alice, json={"price_paisa": 200000})
+    assert stale.status_code == 409 and stale.json()["detail"]["code"] == "PRICE_CHANGED"
+
+    ok = await client.post(confirm, headers=alice, json={"price_paisa": 250000})
+    assert ok.status_code == 200
+    assert (ok.json()["status"], ok.json()["agreed_price_paisa"], ok.json()["budget_paisa"]) == (
+        "ACCEPTED",
+        250000,
         150000,  # what the customer offered is kept as it was
     )
-    mine = (await client.get(f"{URL}/{cid}", headers=alice)).json()
-    assert mine["agreed_price_paisa"] == 200000 and mine["status"] == "ACCEPTED"
     notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
-    assert "Rs 2,000" in notes[0]["message"]
-    assert "Rs 2,000" in emails.to("alice@example.com")[-1].body
-    again = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 300000})
-    assert again.status_code == 409  # the price is final once accepted
+    assert "Rs 2,500" in notes[0]["message"]
+    again = await client.post(propose, headers=admin_h, json={"price_paisa": 300000})
+    assert again.status_code == 409  # final once accepted
+    assert (
+        await client.post(confirm, headers=alice, json={"price_paisa": 250000})
+    ).status_code == 409
+
+
+async def test_confirming_needs_a_proposal(client, admin_h, alice):
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    r = await client.post(f"{URL}/{cid}/confirm-price", headers=alice, json={"price_paisa": 100})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "NO_PROPOSAL"
+
+
+async def test_the_shop_is_told_when_the_customer_confirms(
+    client, admin_h, alice, emails, db_engine
+):
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET email = 'shop@example.com'"))
+    cid = (await submit(client, headers=alice))["custom_order_id"]
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    emails.sent.clear()
+    await move(client, admin_h, cid, "ACCEPTED")
+    alert = [m for m in emails.to("shop@example.com") if "accepted" in m.subject.lower()]
+    assert len(alert) == 1 and "Rs 1,000" in alert[0].body
+
+
+async def test_guest_requests_are_accepted_by_the_admin_at_the_price_agreed_on_whatsapp(
+    client, admin_h
+):
+    cid = (await submit(client))["custom_order_id"]
+    url = f"{ADMIN}/{cid}/accept"
+    early = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    assert early.status_code == 409 and early.json()["detail"]["code"] == "INVALID_TRANSITION"
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    no_proposal = await client.post(
+        f"{ADMIN}/{cid}/propose-price", headers=admin_h, json={"price_paisa": 1}
+    )
+    assert (
+        no_proposal.status_code == 409 and no_proposal.json()["detail"]["code"] == "NO_DISCUSSION"
+    )
+    r = await client.post(url, headers=admin_h, json={"agreed_price_paisa": 200000})
+    assert r.status_code == 200
+    assert (r.json()["status"], r.json()["agreed_price_paisa"]) == ("ACCEPTED", 200000)
 
 
 async def test_a_new_message_tells_the_other_side(client, admin_h, alice, emails, db_engine):

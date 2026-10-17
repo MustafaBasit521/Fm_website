@@ -4,13 +4,15 @@ import {
   deleteGalleryImage,
   getAdminGallery,
   getGalleryUpload,
+  type AdminGalleryImage,
   updateGalleryImage,
 } from '../lib/adminApi'
 import { ApiError, type GalleryImageType } from '../lib/api'
 import { supabase } from '../lib/supabase'
-import { buttonClass, Field, FilePicker, FormError } from '../pages/ui'
+import { ConfirmDialog } from '../pages/ConfirmDialog'
+import { buttonClass, dangerButtonClass, Field, FilePicker, FormError } from '../pages/ui'
 import { inputClass } from './styles'
-import { ConfirmButton, Pager, State, PageTitle, Switch, cardClass } from './ui'
+import { Pager, State, PageTitle, Switch, cardClass } from './ui'
 import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
 
@@ -30,6 +32,7 @@ export default function GalleryAdminPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const toast = useToast()
+  const [deleting, setDeleting] = useState<AdminGalleryImage | null>(null)
 
   async function onUpload(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -182,18 +185,13 @@ export default function GalleryAdminPage() {
                         ))}
                       </select>
                     </label>
-                    <ConfirmButton
-                      label="Delete"
-                      confirmLabel="Yes, delete"
-                      onConfirm={async () => {
-                        try {
-                          await deleteGalleryImage(img.gallery_image_id)
-                          reload()
-                        } catch {
-                          setError('Could not delete the picture.')
-                        }
-                      }}
-                    />
+                    <button
+                      type="button"
+                      className={`${dangerButtonClass} min-h-10 self-start px-5`}
+                      onClick={() => setDeleting(img)}
+                    >
+                      Delete
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -202,6 +200,32 @@ export default function GalleryAdminPage() {
           )}
         </State>
       </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete this picture?"
+        confirmLabel="Delete picture"
+        danger
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => {
+          const img = deleting
+          setDeleting(null)
+          if (!img) return
+          void (async () => {
+            try {
+              await deleteGalleryImage(img.gallery_image_id)
+              toast.show('Picture deleted')
+              reload()
+            } catch {
+              setError('Could not delete the picture.')
+            }
+          })()
+        }}
+      >
+        <p>
+          {deleting?.title ? `“${deleting.title}” ` : 'This picture '}will be removed from the
+          gallery for good.
+        </p>
+      </ConfirmDialog>
     </>
   )
 }

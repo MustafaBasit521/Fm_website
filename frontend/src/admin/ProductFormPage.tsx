@@ -21,9 +21,11 @@ import {
   buttonClass,
   Field,
   FilePicker,
+  dangerButtonClass,
   FormError,
   secondaryButtonClass,
 } from '../pages/ui'
+import { ConfirmDialog } from '../pages/ConfirmDialog'
 import { inputClass } from './styles'
 import { ConfirmButton, PageTitle, State, cardClass } from './ui'
 import { useToast } from '../toast/context'
@@ -47,6 +49,7 @@ export default function ProductFormPage() {
   const [type, setType] = useState<'READY_TO_SHIP' | 'MADE_TO_ORDER' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const toast = useToast()
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [busy, setBusy] = useState(false)
   // pictures chosen while creating a new product; they are uploaded right after it is saved
   const [pending, setPending] = useState<File[]>([])
@@ -303,6 +306,17 @@ export default function ProductFormPage() {
             </form>
 
             <div className="flex flex-col gap-6">
+              {!isNew && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className={dangerButtonClass}
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    Delete product
+                  </button>
+                </div>
+              )}
               {!isNew && current && (
                 <section aria-label="Pictures" className={`${cardClass} p-4 md:p-5`}>
                   <h2 className="font-serif text-2xl">Pictures</h2>
@@ -447,20 +461,27 @@ export default function ProductFormPage() {
                 <Link to="/products" className={`${secondaryButtonClass} w-full`}>
                   Cancel
                 </Link>
-                {!isNew && (
-                  <p className="text-center">
-                    <ConfirmButton
-                      label="Delete product"
-                      confirmLabel="Yes, delete this product"
-                      onConfirm={() => void onDelete()}
-                    />
-                  </p>
-                )}
               </div>
             </div>
           </div>
         </State>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this product?"
+        confirmLabel="Delete product"
+        danger
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => {
+          setConfirmingDelete(false)
+          void onDelete()
+        }}
+      >
+        <p>
+          {current ? `“${current.name}” ` : 'This product '}will disappear from the shop and its
+          pictures are removed. Orders already placed keep their details.
+        </p>
+      </ConfirmDialog>
     </>
   )
 }

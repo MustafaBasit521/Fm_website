@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -124,8 +124,14 @@ it('shows, hides, re-types and deletes gallery pictures', async () => {
   await userEvent.selectOptions(screen.getAllByLabelText('Type')[1], 'DESIGN')
   expect(api.updateGalleryImage).toHaveBeenCalledWith('g1', { image_type: 'DESIGN' })
   await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  const dialog = screen.getByRole('alertdialog', { name: 'Delete this picture?' })
+  expect(api.deleteGalleryImage).not.toHaveBeenCalled() // a pop-up asks first
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }))
   expect(api.deleteGalleryImage).not.toHaveBeenCalled()
-  await userEvent.click(screen.getByRole('button', { name: 'Yes, delete' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+  await userEvent.click(
+    within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete picture' }),
+  )
   expect(api.deleteGalleryImage).toHaveBeenCalledWith('g1')
 })
 
@@ -137,6 +143,7 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
   whatsapp_number: '0300 1234567',
   description: 'A jersey with a name',
   budget_paisa: 250000,
+  proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: '2026-12-01',
   status: 'NEW',

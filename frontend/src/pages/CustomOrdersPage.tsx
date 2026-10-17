@@ -111,6 +111,12 @@ export default function CustomOrdersPage() {
                     {c.required_date && <>Needed by {formatDate(c.required_date)} · </>}
                     {c.has_reference_image ? 'Picture attached' : 'No picture'}
                   </p>
+                  {c.proposed_price_paisa !== null && c.status === 'IN_DISCUSSION' && (
+                    <p className="mt-2 rounded-[10px] bg-accent-tint px-3 py-2 text-sm">
+                      The shop proposed {formatPrice(c.proposed_price_paisa)} — open the request to
+                      confirm it.
+                    </p>
+                  )}
                   <p className="mt-3">
                     <Link
                       to={`/custom-orders/${c.custom_order_id}`}

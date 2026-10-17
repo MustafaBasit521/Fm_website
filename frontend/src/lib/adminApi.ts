@@ -240,6 +240,11 @@ export const getAdminCustomOrders = (
   apiGet<Page<AdminCustomOrder>>(`/admin/custom-orders${qs({ ...filters, page_size: 20 })}`, signal)
 export const getAdminCustomOrder = (customOrderId: string, signal?: AbortSignal) =>
   apiGet<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}`, signal)
+export const proposeCustomOrderPrice = (customOrderId: string, pricePaisa: number) =>
+  apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/propose-price`, {
+    price_paisa: pricePaisa,
+  })
+/** Guest requests only: record the price the guest agreed on WhatsApp. */
 export const acceptCustomOrder = (customOrderId: string, agreedPricePaisa: number) =>
   apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/accept`, {
     agreed_price_paisa: agreedPricePaisa,

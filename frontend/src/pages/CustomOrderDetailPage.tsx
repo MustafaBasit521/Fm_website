@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import {
   ApiError,
   getCustomOrder,
+  confirmCustomOrderPrice,
   getCustomOrderMessages,
   sendCustomOrderMessage,
   type CustomOrder,
@@ -10,11 +11,12 @@ import {
 } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate } from '../lib/orderStatus'
+import { ConfirmDialog } from './ConfirmDialog'
 import { Discussion } from './Discussion'
 import { PageHeader } from './PageHeader'
 import { StatusBadge } from './StatusBadge'
 import { CUSTOM_ORDER_TONE } from './statusColors'
-import { BackLink } from './ui'
+import { BackLink, buttonClass, FormError } from './ui'
 
 const CUSTOM_LABELS: Record<string, string> = {
   NEW: 'Received',
@@ -38,6 +40,9 @@ export default function CustomOrderDetailPage() {
     notFound: boolean
   } | null>(null)
   const [version, setVersion] = useState(0)
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -61,6 +66,26 @@ export default function CustomOrderDetailPage() {
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
   const current = state?.id === id ? state : null
   const order = current?.order ?? null
+
+  async function confirmPrice(price: number) {
+    setBusy(true)
+    setProblem(null)
+    try {
+      const updated = await confirmCustomOrderPrice(id, price)
+      setState((st) => (st ? { ...st, order: updated } : st))
+      setAsking(false)
+    } catch (e) {
+      setAsking(false)
+      setProblem(
+        e instanceof ApiError && e.code === 'PRICE_CHANGED'
+          ? 'The shop changed the price a moment ago. Please look at the new price below.'
+          : 'Could not confirm the price. Please try again.',
+      )
+      refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   async function send(body: string) {
     const created = await sendCustomOrderMessage(id, body)
@@ -114,11 +139,34 @@ export default function CustomOrderDetailPage() {
                 <span className="text-bark">Agreed price</span>{' '}
                 <strong className="text-lg">{formatPrice(order.agreed_price_paisa)}</strong>
               </p>
+            ) : order.proposed_price_paisa !== null && order.status === 'IN_DISCUSSION' ? (
+              <div className="mt-4 rounded-[10px] bg-accent-tint p-4">
+                <p>
+                  The shop proposed{' '}
+                  <strong className="text-lg">{formatPrice(order.proposed_price_paisa)}</strong>
+                </p>
+                <p className="mt-1 text-sm text-bark">
+                  Nothing is agreed until you confirm. If the price does not suit you, keep talking
+                  in the discussion below: the shop can change it.
+                </p>
+                <button
+                  type="button"
+                  className={`${buttonClass} mt-3`}
+                  onClick={() => {
+                    setProblem(null)
+                    setAsking(true)
+                  }}
+                >
+                  Accept this price
+                </button>
+              </div>
             ) : (
               <p className="mt-4 text-bark">
-                The price is agreed in the discussion below. The shop then confirms it here.
+                The price is agreed in the discussion below. The shop proposes it and you confirm it
+                here.
               </p>
             )}
+            <FormError message={problem} />
           </section>
           <div className="mt-6">
             <Discussion
@@ -133,6 +181,23 @@ export default function CustomOrderDetailPage() {
           </div>
         </>
       )}
+      <ConfirmDialog
+        open={asking}
+        title="Accept this price?"
+        confirmLabel="Yes, accept"
+        cancelLabel="Not yet"
+        busy={busy}
+        onCancel={() => setAsking(false)}
+        onConfirm={() =>
+          order?.proposed_price_paisa != null && void confirmPrice(order.proposed_price_paisa)
+        }
+      >
+        <p>
+          You agree to{' '}
+          {order?.proposed_price_paisa != null && formatPrice(order.proposed_price_paisa)} for this
+          custom order. Once you accept, the price is final and the shop can start making it.
+        </p>
+      </ConfirmDialog>
     </main>
   )
 }

@@ -449,3 +449,19 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Not built (kept simple):** live updating of the thread (there is a "Check for new messages" button), unread markers, editing or deleting messages, attachments, a guest discussion.
 
+## Real-service check tool
+
+**Why:** several services were only ever tested against mocks (Storage, email, two-factor, pg_cron). A read-only script now checks the real project from `backend/.env` and prints PASS/FAIL/WARN/MANUAL lines without secrets (`app/tools/check_services.py`, 6 tests with mock transports).
+
+**First result:** database, migrations, pg_cron expiry job and Supabase signing keys are fine. Findings: the private `custom-order-references` bucket is missing (custom-order picture uploads would fail), and the product and gallery buckets have no size or file-type limits (those limits are the only enforcement of CLAUDE.md §10). Resend is configured; a test email and the verified domain are still to be checked by the owner.
+
+## Delete pop-ups and customer-confirmed prices
+
+**Owner's requests:** the delete button of the product page moves to the top right, above the pictures, and asks first in a pop-up; the gallery's delete becomes a proper button, same place, with a pop-up; the price of a custom order must be confirmed by the customer so the admin cannot settle a wrong price alone.
+
+**Changed:** shared `ConfirmDialog` (alert dialog, focus on the safe button, Escape/backdrop cancel, focus trap) and `dangerButtonClass`; the earlier "admin accepts at a price" became **propose (admin) and confirm (customer)**: column `proposed_price_paisa` (migration `433a196d7ae5`), routes `propose-price` (admin) and `confirm-price` (customer, sends the price it saw so a stale price is refused with 409 `PRICE_CHANGED`), `accept` kept only for guest requests (409 `CUSTOMER_MUST_CONFIRM` otherwise), notifications for the proposal and for the customer's confirmation.
+
+**Mistake caught while migrating:** the generated migration lacked the check constraint and had already been applied; it was rolled back, completed and re-applied (constraints verified in the database).
+
+**Verified:** backend custom-order tests rewritten for the new flow (proposal, stale price, only the owner can confirm, guests); frontend tests for both pop-ups, the proposal card and the admin Price card; Chrome screenshots of all four screens. The local test database had stopped after a restart (`make db` starts it); all tests were re-run afterwards.
+

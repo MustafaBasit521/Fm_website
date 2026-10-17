@@ -25,6 +25,7 @@ from app.schemas.engagement import (
     CustomOrderAccept,
     CustomOrderMessageCreate,
     CustomOrderMessageRead,
+    CustomOrderPropose,
     CustomOrderStatusChange,
     GalleryCreate,
     GalleryUpdate,
@@ -160,12 +161,23 @@ async def change_custom_order_status(
     return await custom_service.to_admin_read(co, storage)
 
 
+@custom_orders.post("/{custom_order_id}/propose-price", response_model=AdminCustomOrderRead)
+async def propose_custom_order_price(
+    custom_order_id: uuid.UUID, data: CustomOrderPropose, session: Session, storage: Storage
+):
+    """Propose a price in the discussion. The customer confirms it (that accepts the request)."""
+    co = await custom_service.propose_price(session, custom_order_id, data.price_paisa)
+    return await custom_service.to_admin_read(co, storage)
+
+
 @custom_orders.post("/{custom_order_id}/accept", response_model=AdminCustomOrderRead)
-async def accept_custom_order(
+async def accept_guest_custom_order(
     custom_order_id: uuid.UUID, data: CustomOrderAccept, session: Session, storage: Storage
 ):
-    """Accept at the final price agreed in the discussion (moves IN_DISCUSSION to ACCEPTED)."""
-    co = await custom_service.accept_at_price(session, custom_order_id, data.agreed_price_paisa)
+    """Guest requests only: record the price the guest agreed on WhatsApp and accept."""
+    co = await custom_service.accept_guest_request(
+        session, custom_order_id, data.agreed_price_paisa
+    )
     return await custom_service.to_admin_read(co, storage)
 
 

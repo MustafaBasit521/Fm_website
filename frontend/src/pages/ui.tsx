@@ -170,3 +170,6 @@ export function FilePicker({
     </div>
   )
 }
+
+/** Outlined red pill for destructive actions (delete). Always paired with a confirmation dialog. */
+export const dangerButtonClass = `${pill} border border-danger bg-transparent text-danger hover:bg-accent-tint`

@@ -12,6 +12,7 @@ const api = {
   getAdminCustomOrderMessages: vi.fn(),
   sendAdminCustomOrderMessage: vi.fn(),
   acceptCustomOrder: vi.fn(),
+  proposeCustomOrderPrice: vi.fn(),
   setCustomOrderStatus: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
@@ -20,6 +21,7 @@ vi.mock('../lib/adminApi', () => ({
   getAdminCustomOrderMessages: (...a: unknown[]) => api.getAdminCustomOrderMessages(...a),
   sendAdminCustomOrderMessage: (...a: unknown[]) => api.sendAdminCustomOrderMessage(...a),
   acceptCustomOrder: (...a: unknown[]) => api.acceptCustomOrder(...a),
+  proposeCustomOrderPrice: (...a: unknown[]) => api.proposeCustomOrderPrice(...a),
   setCustomOrderStatus: (...a: unknown[]) => api.setCustomOrderStatus(...a),
 }))
 
@@ -29,6 +31,7 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
   whatsapp_number: '0300 1234567',
   description: 'A jersey with a name',
   budget_paisa: 150000,
+  proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: null,
   status: 'IN_DISCUSSION',
@@ -82,34 +85,61 @@ it('replies to the customer in the discussion', async () => {
   expect(await screen.findByText(/Yes, blush pink is fine/)).toBeInTheDocument()
 })
 
-it('accepts at the agreed price, starting from the customer budget', async () => {
-  api.acceptCustomOrder.mockResolvedValue(co({ status: 'ACCEPTED', agreed_price_paisa: 200000 }))
+it('proposes a price, starting from the customer budget; the request is not accepted by this', async () => {
+  api.proposeCustomOrderPrice.mockResolvedValue(co({ proposed_price_paisa: 200000 }))
   open()
-  const price = await screen.findByLabelText('Agreed price in Rs')
+  const price = await screen.findByLabelText('Price to propose in Rs')
   expect(price).toHaveValue('1500')
   await userEvent.clear(price)
   await userEvent.type(price, '2000')
-  await userEvent.click(screen.getByRole('button', { name: 'Accept at this price' }))
-  expect(api.acceptCustomOrder).toHaveBeenCalledWith('c1', 200000)
+  await userEvent.click(screen.getByRole('button', { name: 'Propose this price' }))
+  expect(api.proposeCustomOrderPrice).toHaveBeenCalledWith('c1', 200000)
+  expect(api.acceptCustomOrder).not.toHaveBeenCalled()
+  expect(await screen.findByText(/Waiting for the customer to confirm/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Change the proposed price' })).toBeInTheDocument()
+  expect(screen.getByText('Not accepted yet')).toBeInTheDocument()
+})
+
+it('shows the agreed price once the customer has confirmed, with nothing left to propose', async () => {
+  api.getAdminCustomOrder.mockResolvedValue(
+    co({ status: 'ACCEPTED', proposed_price_paisa: 200000, agreed_price_paisa: 200000 }),
+  )
+  open()
   expect(await screen.findByText('Rs 2,000')).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Accept at this price' })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Price to propose in Rs')).not.toBeInTheDocument()
+  expect(screen.queryByText(/Waiting for the customer/)).not.toBeInTheDocument()
 })
 
 it('rejects a price that is not a number before calling the server', async () => {
   open()
-  const price = await screen.findByLabelText('Agreed price in Rs')
+  const price = await screen.findByLabelText('Price to propose in Rs')
   await userEvent.clear(price)
   await userEvent.type(price, 'lots')
-  await userEvent.click(screen.getByRole('button', { name: 'Accept at this price' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Propose this price' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('like 2500')
-  expect(api.acceptCustomOrder).not.toHaveBeenCalled()
+  expect(api.proposeCustomOrderPrice).not.toHaveBeenCalled()
 })
 
-it('explains a refused acceptance', async () => {
-  api.acceptCustomOrder.mockRejectedValue(new ApiError(409, 'x', { code: 'INVALID_TRANSITION' }))
+it('explains a refused proposal', async () => {
+  api.proposeCustomOrderPrice.mockRejectedValue(
+    new ApiError(409, 'x', { code: 'INVALID_TRANSITION' }),
+  )
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Propose this price' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('not allowed from the current status')
+})
+
+it('lets the admin record the price a guest agreed on WhatsApp (guests cannot confirm in the system)', async () => {
+  api.getAdminCustomOrder.mockResolvedValue(co({ customer_id: null }))
+  api.getAdminCustomOrderMessages.mockResolvedValue([])
+  api.acceptCustomOrder.mockResolvedValue(
+    co({ customer_id: null, status: 'ACCEPTED', agreed_price_paisa: 150000 }),
+  )
   open()
   await userEvent.click(await screen.findByRole('button', { name: 'Accept at this price' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('not allowed from the current status')
+  expect(api.acceptCustomOrder).toHaveBeenCalledWith('c1', 150000)
+  expect(api.proposeCustomOrderPrice).not.toHaveBeenCalled()
+  expect(await screen.findByText('Accepted at Rs 1,500')).toBeInTheDocument()
 })
 
 it('offers no acceptance form before the discussion starts, and starts it with a button', async () => {
@@ -117,10 +147,10 @@ it('offers no acceptance form before the discussion starts, and starts it with a
   api.setCustomOrderStatus.mockResolvedValue(co({ status: 'IN_DISCUSSION' }))
   open()
   expect(await screen.findByText(/Start the discussion first/)).toBeInTheDocument()
-  expect(screen.queryByLabelText('Agreed price in Rs')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Price to propose in Rs')).not.toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Start discussion' }))
   expect(api.setCustomOrderStatus).toHaveBeenCalledWith('c1', 'IN_DISCUSSION')
-  expect(await screen.findByLabelText('Agreed price in Rs')).toBeInTheDocument()
+  expect(await screen.findByLabelText('Price to propose in Rs')).toBeInTheDocument()
 })
 
 it('says that a guest request has no discussion in the system', async () => {

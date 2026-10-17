@@ -4,6 +4,7 @@ import {
   acceptCustomOrder,
   getAdminCustomOrder,
   getAdminCustomOrderMessages,
+  proposeCustomOrderPrice,
   sendAdminCustomOrderMessage,
   setCustomOrderStatus,
   type AdminCustomOrder,
@@ -70,16 +71,23 @@ export default function CustomOrderAdminPage() {
     }
   }
 
-  async function onAccept(e: FormEvent<HTMLFormElement>) {
+  async function onPrice(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const price = parseRupeesToPaisa(String(new FormData(e.currentTarget).get('price') ?? ''))
-    if (price === null) return setError('Enter the agreed price in Rs, like 2500 or 2500.50.')
+    if (price === null) return setError('Enter the price in Rs, like 2500 or 2500.50.')
     setBusy(true)
     setError(null)
     try {
-      const updated = await acceptCustomOrder(id, price)
+      // a registered customer must confirm the proposal; a guest agreed it on WhatsApp
+      const updated = order?.customer_id
+        ? await proposeCustomOrderPrice(id, price)
+        : await acceptCustomOrder(id, price)
       setState((s) => (s ? { ...s, order: updated } : s))
-      toast.show(`Accepted at ${formatPrice(price)}`)
+      toast.show(
+        order?.customer_id
+          ? `Proposed ${formatPrice(price)} to the customer`
+          : `Accepted at ${formatPrice(price)}`,
+      )
     } catch (err) {
       setError(explain(err))
     } finally {
@@ -177,37 +185,55 @@ export default function CustomOrderAdminPage() {
                       </dd>
                     </div>
                   </dl>
+                  {order.proposed_price_paisa !== null && order.agreed_price_paisa === null && (
+                    <p className="mt-3 rounded-[10px] bg-accent-tint p-3">
+                      You proposed <strong>{formatPrice(order.proposed_price_paisa)}</strong>.
+                      Waiting for the customer to confirm it.
+                    </p>
+                  )}
                   {order.status === 'IN_DISCUSSION' && (
                     <form
-                      onSubmit={onAccept}
-                      aria-label="Accept at a price"
+                      onSubmit={onPrice}
+                      aria-label={order.customer_id ? 'Propose a price' : 'Record the agreed price'}
                       className="mt-4 flex flex-col gap-2"
                     >
                       <label htmlFor="agreed-price" className="text-sm font-medium text-bark">
-                        Agreed price in Rs
+                        {order.customer_id
+                          ? 'Price to propose in Rs'
+                          : 'Price agreed on WhatsApp in Rs'}
                       </label>
                       <input
                         id="agreed-price"
                         name="price"
                         inputMode="decimal"
                         defaultValue={
-                          order.budget_paisa !== null ? paisaToRupeesInput(order.budget_paisa) : ''
+                          order.proposed_price_paisa !== null
+                            ? paisaToRupeesInput(order.proposed_price_paisa)
+                            : order.budget_paisa !== null
+                              ? paisaToRupeesInput(order.budget_paisa)
+                              : ''
                         }
                         className={inputClass}
                       />
                       <p className="text-sm text-bark">
-                        Accept once you and the customer agree. The customer is told the price.
+                        {order.customer_id
+                          ? 'The customer is told and confirms the price themselves. Only then is the request accepted. You can change the price until they confirm.'
+                          : 'This request came from a guest: once the guest has agreed on WhatsApp, record it here to accept.'}
                       </p>
                       <div>
                         <button type="submit" className={buttonClass} disabled={busy}>
-                          Accept at this price
+                          {order.customer_id
+                            ? order.proposed_price_paisa !== null
+                              ? 'Change the proposed price'
+                              : 'Propose this price'
+                            : 'Accept at this price'}
                         </button>
                       </div>
                     </form>
                   )}
                   {order.status === 'NEW' && order.customer_id && (
                     <p className="mt-3 text-sm text-bark">
-                      Start the discussion first, then accept at the price you agree.
+                      Start the discussion first, then propose a price.
                     </p>
                   )}
                 </section>

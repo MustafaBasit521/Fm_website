@@ -86,6 +86,10 @@ class CustomOrder(Base):
         CheckConstraint(
             "agreed_price_paisa IS NULL OR agreed_price_paisa >= 0", name="ck_custom_orders_agreed"
         ),
+        CheckConstraint(
+            "proposed_price_paisa IS NULL OR proposed_price_paisa >= 0",
+            name="ck_custom_orders_proposed",
+        ),
         Index("ix_custom_orders_customer_id", "customer_id"),
         Index("ix_custom_orders_status", "status"),
         Index("ix_custom_orders_created_at", "created_at"),
@@ -99,7 +103,9 @@ class CustomOrder(Base):
     whatsapp_number: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
     budget_paisa: Mapped[int | None] = mapped_column(BigInteger)  # what the customer offered
-    # The price the admin accepted after the discussion (set together with ACCEPTED).
+    # The price the shop proposed during the discussion; the customer must confirm it.
+    proposed_price_paisa: Mapped[int | None] = mapped_column(BigInteger)
+    # The price both sides agreed: the customer's confirmation (set together with ACCEPTED).
     agreed_price_paisa: Mapped[int | None] = mapped_column(BigInteger)
     required_date: Mapped[date | None] = mapped_column(Date)
     # Private bucket path (custom-order-references). Admin reads it through a signed URL.

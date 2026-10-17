@@ -224,6 +224,7 @@ class CustomOrderRead(BaseModel):
     whatsapp_number: str
     description: str
     budget_paisa: int | None
+    proposed_price_paisa: int | None
     agreed_price_paisa: int | None
     required_date: date | None
     status: CustomOrderStatus
@@ -256,11 +257,28 @@ class CustomOrderMessageRead(BaseModel):
 
 
 class CustomOrderAccept(BaseModel):
-    """The admin accepts the request at a final price agreed in the discussion."""
+    """For a guest request only: the admin records the price the guest agreed on WhatsApp."""
 
     model_config = ConfigDict(extra="forbid")
 
     agreed_price_paisa: int = Field(ge=0, le=MAX_BUDGET_PAISA)
+
+
+class CustomOrderPropose(BaseModel):
+    """The admin proposes a price in the discussion; the customer has to confirm it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    price_paisa: int = Field(ge=0, le=MAX_BUDGET_PAISA)
+
+
+class CustomOrderConfirmPrice(BaseModel):
+    """The customer confirms the price they were shown (so a price changed a moment ago is not
+    accepted by mistake)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    price_paisa: int = Field(ge=0, le=MAX_BUDGET_PAISA)
 
 
 class CustomOrderStatusChange(BaseModel):

@@ -377,7 +377,9 @@ export interface CustomOrder {
   whatsapp_number: string
   description: string
   budget_paisa: number | null
-  /** The price the shop accepted after the discussion (set together with ACCEPTED). */
+  /** The price the shop proposed in the discussion; it is agreed once the customer confirms. */
+  proposed_price_paisa: number | null
+  /** The agreed price (the customer's confirmation, set together with ACCEPTED). */
   agreed_price_paisa: number | null
   required_date: string | null
   status: CustomOrderStatus
@@ -421,6 +423,10 @@ export const getCustomOrderMessages = (id: string, signal?: AbortSignal) =>
   apiGet<CustomOrderMessage[]>(`/custom-orders/${encodeURIComponent(id)}/messages`, signal)
 export const sendCustomOrderMessage = (id: string, body: string) =>
   apiPost<CustomOrderMessage>(`/custom-orders/${encodeURIComponent(id)}/messages`, { body })
+export const confirmCustomOrderPrice = (id: string, pricePaisa: number) =>
+  apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/confirm-price`, {
+    price_paisa: pricePaisa,
+  })
 export const cancelCustomOrder = (id: string) =>
   apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/cancel`, {})
 

@@ -47,6 +47,7 @@ def to_read(co: CustomOrder) -> CustomOrderRead:
         whatsapp_number=co.whatsapp_number,
         description=co.description,
         budget_paisa=co.budget_paisa,
+        proposed_price_paisa=co.proposed_price_paisa,
         agreed_price_paisa=co.agreed_price_paisa,
         required_date=co.required_date,
         status=co.status,
@@ -190,7 +191,7 @@ async def change_status(
         raise _problem(
             status.HTTP_409_CONFLICT,
             "USE_ACCEPT",
-            "Accept a custom order together with the price agreed in the discussion",
+            "A custom order is accepted when the customer confirms the proposed price",
         )
     co = await _load(session, custom_order_id, lock=True)
     if target not in ADMIN_TRANSITIONS.get(co.status, set()):
@@ -205,12 +206,69 @@ async def change_status(
     return await _load(session, custom_order_id, lock=False)
 
 
-async def accept_at_price(
+async def propose_price(
+    session: AsyncSession, custom_order_id: uuid.UUID, price_paisa: int
+) -> CustomOrder:
+    """The admin proposes a price during the discussion. It can be changed until the customer
+    confirms it. Nothing is agreed yet: the request stays IN_DISCUSSION."""
+    co = await _load(session, custom_order_id, lock=True)
+    if co.customer_id is None:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "NO_DISCUSSION",
+            "This request came from a guest: agree the price on WhatsApp, then record it.",
+        )
+    if co.status != S.IN_DISCUSSION:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "INVALID_TRANSITION",
+            "A price can be proposed only while the request is being discussed",
+        )
+    co.proposed_price_paisa = price_paisa
+    await events.custom_order_price_proposed(session, co)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+async def confirm_price(
+    session: AsyncSession, user: AuthUser, custom_order_id: uuid.UUID, price_paisa: int
+) -> CustomOrder:
+    """The customer confirms the proposed price: it becomes the agreed price and the request is
+    ACCEPTED. Only the customer can do this, so the shop cannot settle a price on its own."""
+    co = await _load(session, custom_order_id, lock=True)
+    if co.customer_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Custom order not found")
+    if co.status != S.IN_DISCUSSION or co.proposed_price_paisa is None:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "NO_PROPOSAL",
+            "There is no price waiting for your confirmation",
+        )
+    if co.proposed_price_paisa != price_paisa:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "PRICE_CHANGED",
+            "The shop changed the price. Please look at the new price before confirming.",
+        )
+    co.agreed_price_paisa = price_paisa
+    co.status = S.ACCEPTED
+    await events.custom_order_accepted(session, co, by_customer=True)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+async def accept_guest_request(
     session: AsyncSession, custom_order_id: uuid.UUID, agreed_price_paisa: int
 ) -> CustomOrder:
-    """The admin accepts the request at the final price agreed in the discussion: the price is
-    saved together with the move to ACCEPTED, so an accepted request always carries its price."""
+    """A guest has no account to confirm in, so the admin records the price the guest agreed on
+    WhatsApp. Requests from registered customers can only be accepted by the customer."""
     co = await _load(session, custom_order_id, lock=True)
+    if co.customer_id is not None:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "CUSTOMER_MUST_CONFIRM",
+            "Propose the price in the discussion: the customer confirms it",
+        )
     if S.ACCEPTED not in ADMIN_TRANSITIONS.get(co.status, set()):
         raise _problem(
             status.HTTP_409_CONFLICT,
@@ -219,7 +277,7 @@ async def accept_at_price(
         )
     co.agreed_price_paisa = agreed_price_paisa
     co.status = S.ACCEPTED
-    await events.custom_order_accepted(session, co)
+    await events.custom_order_accepted(session, co, by_customer=False)
     await session.commit()
     return await _load(session, custom_order_id, lock=False)
 

@@ -295,7 +295,37 @@ async def custom_order_status_changed(session: AsyncSession, custom_order: Custo
         )
 
 
-async def custom_order_accepted(session: AsyncSession, custom_order: CustomOrder) -> None:
+async def custom_order_price_proposed(session: AsyncSession, custom_order: CustomOrder) -> None:
+    shop = await _shop_name(session)
+    price = format_price(custom_order.proposed_price_paisa or 0)
+    text = f"The shop proposed {price} for your custom order. Please look at it and confirm."
+    _notify(
+        session,
+        custom_order.customer_id,
+        NotificationType.CUSTOM_ORDER_UPDATE,
+        "Price proposed for your custom order",
+        text,
+    )
+    email = await _customer_email(session, custom_order)
+    if email:
+        queue_email(
+            session,
+            EmailMessage(
+                to=email,
+                subject="A price was proposed for your custom order",
+                body=(
+                    f"Hi {custom_order.name},\n\n{text}\n\nOpen your request to confirm it or to "
+                    f"keep talking: "
+                    f"{get_settings().frontend_url}/custom-orders/{custom_order.custom_order_id}"
+                    f"\n\n- {shop}"
+                ),
+            ),
+        )
+
+
+async def custom_order_accepted(
+    session: AsyncSession, custom_order: CustomOrder, *, by_customer: bool
+) -> None:
     shop = await _shop_name(session)
     price = format_price(custom_order.agreed_price_paisa or 0)
     text = f"Your custom order has been accepted at {price}."
@@ -315,6 +345,12 @@ async def custom_order_accepted(session: AsyncSession, custom_order: CustomOrder
                 subject="Your custom order was accepted",
                 body=f"Hi {custom_order.name},\n\n{text}\n\n- {shop}",
             ),
+        )
+    if by_customer:  # the shop hears that the customer confirmed the price
+        await _alert_shop(
+            session,
+            "Custom order accepted by the customer",
+            f"{custom_order.name} confirmed {price} for their custom order.",
         )
 
 

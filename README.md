@@ -128,6 +128,21 @@ fake gateway page choose **Pay successfully** or **Fail the payment**. After a f
 **Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
 afterwards (the fake gateway keeps its state in memory only).
 
+## Check the real services
+
+One command tells you what is and is not set up (it prints no secrets and changes nothing):
+
+```bash
+cd backend && .venv/bin/python -m app.tools.check_services
+# also send one real test email through the configured provider:
+cd backend && .venv/bin/python -m app.tools.check_services --send-test you@example.com
+```
+
+It checks the database and migrations, the pg_cron expiry job, the Supabase signing keys, the three
+Storage buckets (existence, public/private, 5 MB limit, image types), the admin two-factor setting
+and the email provider. Lines marked `MANUAL` need a look in a dashboard (authenticator codes in
+Supabase, the verified domain in Resend).
+
 ## Email (Resend)
 
 By default no email is sent (`EMAIL_PROVIDER=none`). To see the emails the app would send, set

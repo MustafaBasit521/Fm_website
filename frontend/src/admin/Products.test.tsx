@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ToastProvider } from '../toast/ToastProvider'
@@ -296,8 +296,15 @@ it('loads a product, saves changes and deletes it after confirmation', async () 
   })
   expect(await screen.findByText('Product saved')).toBeInTheDocument()
   await userEvent.click(screen.getByRole('button', { name: 'Delete product' }))
+  const dialog = screen.getByRole('alertdialog', { name: 'Delete this product?' })
+  expect(api.deleteProduct).not.toHaveBeenCalled() // a pop-up asks first
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }))
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   expect(api.deleteProduct).not.toHaveBeenCalled()
-  await userEvent.click(screen.getByRole('button', { name: 'Yes, delete this product' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Delete product' }))
+  await userEvent.click(
+    within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete product' }),
+  )
   expect(api.deleteProduct).toHaveBeenCalledWith('p1')
   expect(await screen.findByText('products list')).toBeInTheDocument()
 })

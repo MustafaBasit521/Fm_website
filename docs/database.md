@@ -564,7 +564,7 @@ Customer deletion does not destroy the custom-order record (`ON DELETE SET NULL`
 
 The exact status enum will be finalized during custom-order implementation.
 
-`agreed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_agreed`) is the price the admin accepted; it is set together with the status `ACCEPTED` (`budget_paisa` stays what the customer offered). Migration `custom order discussion` (revision `d194a654f642`).
+`proposed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_proposed`) is the price the shop proposed in the discussion. `agreed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_agreed`) is the price both sides agreed: it is set together with the status `ACCEPTED`, by the customer's confirmation (for a guest request, by the admin recording what the guest agreed on WhatsApp). `budget_paisa` stays what the customer offered. Migrations `custom order discussion` (`d194a654f642`) and `custom order proposed price` (`433a196d7ae5`).
 
 ```text
 custom_order_messages
