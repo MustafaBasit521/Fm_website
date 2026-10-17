@@ -23,3 +23,13 @@ def get_payment_provider(settings: Annotated[Settings, Depends(get_settings)]) -
         )
         return _fake_provider(secret, settings.frontend_url)
     raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Online payment is not available")
+
+
+def get_optional_payment_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> PaymentProvider | None:
+    """The configured provider, or None when there is none (a transfer refund needs no provider)."""
+    try:
+        return get_payment_provider(settings)
+    except HTTPException:
+        return None

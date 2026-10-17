@@ -9,7 +9,11 @@ from app.core.db import get_session
 from app.core.payments.base import PaymentProvider, WebhookError
 from app.core.payments.registry import get_payment_provider
 from app.core.rate_limit import rate_limit
-from app.schemas.orders import InitiatePayment, PaymentStatusRead
+from app.core.storage import SupabaseStorage, require_storage
+from app.schemas.checkout import OrderRead
+from app.schemas.engagement import IMAGE_TYPES, UploadRequest, UploadTarget
+from app.schemas.orders import InitiatePayment, PaymentProofCreate, PaymentStatusRead
+from app.services import orders as orders_service
 from app.services import payments as service
 
 router = APIRouter(tags=["payments"])
@@ -40,6 +44,41 @@ async def pay(order_id: uuid.UUID, session: Session, provider: Provider, setting
 async def refresh(order_id: uuid.UUID, session: Session, provider: Provider):
     """The customer returned from the gateway: verify with the provider and report the status."""
     return await service.refresh_payment(session, provider, order_id)
+
+
+# Payment by transfer: the customer sends money to the shop's own account and then sends proof.
+# Like paying online, these routes are public (guests too) and use the unguessable order id.
+@router.post(
+    "/orders/{order_id}/payment-proof/upload-url",
+    response_model=UploadTarget,
+    dependencies=[Depends(rate_limit("proof-upload", 10, 3600))],
+)
+async def proof_upload_url(
+    order_id: uuid.UUID,
+    data: UploadRequest,
+    session: Session,
+    storage: Annotated[SupabaseStorage, Depends(require_storage)],
+):
+    """A signed upload URL for ONE screenshot in the PRIVATE payment-proofs bucket."""
+    await service.ensure_proof_can_be_sent(session, order_id)
+    path = f"payment-proofs/{uuid.uuid4().hex}.{IMAGE_TYPES[data.content_type]}"
+    signed = await storage.create_signed_upload(path, storage.payment_proofs_bucket)
+    return UploadTarget(
+        storage_path=signed.path,
+        upload_url=signed.upload_url,
+        token=signed.token,
+        bucket=storage.payment_proofs_bucket,
+    )
+
+
+@router.post(
+    "/orders/{order_id}/payment-proof",
+    response_model=OrderRead,
+    dependencies=[Depends(rate_limit("proof", 20, 3600))],
+)
+async def send_payment_proof(order_id: uuid.UUID, data: PaymentProofCreate, session: Session):
+    """The customer says they sent the money (a transaction number, a screenshot, or both)."""
+    return orders_service.to_read(await service.submit_transfer_proof(session, order_id, data))
 
 
 @router.post("/payments/webhook/{provider_name}")

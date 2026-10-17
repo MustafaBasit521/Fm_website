@@ -38,6 +38,8 @@ class PaymentMethod(enum.StrEnum):
 
     COD = "COD"
     ONLINE = "ONLINE"
+    # The customer sends money to the shop's own account and shows proof; the admin checks it.
+    TRANSFER = "TRANSFER"
 
 
 class GalleryImageType(enum.StrEnum):

@@ -222,6 +222,7 @@ async def test_deleting_a_customer_keeps_their_custom_orders(client, alice, db_e
         ("POST", f"{ADMIN}/{uuid.uuid4()}/status"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/accept"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/propose-price"),
+        ("POST", f"{ADMIN}/{uuid.uuid4()}/accept-offer"),
         ("GET", f"{ADMIN}/{uuid.uuid4()}/messages"),
         ("POST", f"{ADMIN}/{uuid.uuid4()}/messages"),
     ],
@@ -398,8 +399,8 @@ async def test_the_discussion_closes_when_the_request_is_finished(client, admin_
     for headers, admin in ((alice, False), (admin_h, True)):
         r = await talk(client, headers, cid, "too late", admin=admin)
         assert r.status_code == 409 and r.json()["detail"]["code"] == "DISCUSSION_CLOSED"
-    # what was said stays readable
-    assert len((await client.get(f"{URL}/{cid}/messages", headers=alice)).json()) == 3
+    # what was said stays readable (3 messages + the two lines recording the price steps)
+    assert len((await client.get(f"{URL}/{cid}/messages", headers=alice)).json()) == 5
 
 
 async def test_the_shop_proposes_a_price_and_only_the_customer_can_accept_it(
@@ -534,3 +535,102 @@ async def test_the_plain_status_route_cannot_accept_without_a_price(client, admi
     await move(client, admin_h, cid, "IN_DISCUSSION")
     r = await client.post(f"{ADMIN}/{cid}/status", headers=admin_h, json={"status": "ACCEPTED"})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "USE_ACCEPT"
+
+
+# ---- the customer answers a proposal: decline or offer another price ------------------------
+
+
+async def start(client, admin_h, alice, **over):
+    cid = (await submit(client, headers=alice, **over))["custom_order_id"]
+    await move(client, admin_h, cid, "IN_DISCUSSION")
+    return cid
+
+
+async def test_the_customer_can_decline_a_proposed_price(
+    client, admin_h, alice, bob, emails, db_engine
+):
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET email = 'shop@example.com'"))
+    cid = await start(client, admin_h, alice)
+    url = f"{URL}/{cid}/decline-price"
+    none_yet = await client.post(url, headers=alice)
+    assert none_yet.status_code == 409 and none_yet.json()["detail"]["code"] == "NO_PROPOSAL"
+    await client.post(f"{ADMIN}/{cid}/propose-price", headers=admin_h, json={"price_paisa": 800000})
+    assert (await client.post(url, headers=bob)).status_code == 404
+    assert (await client.post(url)).status_code == 401
+    emails.sent.clear()
+    r = await client.post(url, headers=alice)
+    assert r.status_code == 200
+    assert (r.json()["status"], r.json()["proposed_price_paisa"]) == ("IN_DISCUSSION", None)
+    assert any("declined" in m.subject.lower() for m in emails.to("shop@example.com"))
+    thread = (await client.get(f"{URL}/{cid}/messages", headers=alice)).json()
+    assert thread[-1]["sender"] == "CUSTOMER" and "decline Rs 8,000" in thread[-1]["body"]
+    # nothing to confirm any more
+    again = await client.post(
+        f"{URL}/{cid}/confirm-price", headers=alice, json={"price_paisa": 800000}
+    )
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "NO_PROPOSAL"
+
+
+async def test_the_customer_offers_a_price_and_the_shop_accepts_it(
+    client, admin_h, alice, bob, emails, db_engine
+):
+    async with db_engine.begin() as conn:
+        await conn.execute(text("UPDATE business_settings SET email = 'shop@example.com'"))
+    cid = await start(client, admin_h, alice, budget_paisa=500000)
+    offer = f"{URL}/{cid}/offer-price"
+    await client.post(f"{ADMIN}/{cid}/propose-price", headers=admin_h, json={"price_paisa": 800000})
+    assert (await client.post(offer, headers=alice, json={"price_paisa": -5})).status_code == 422
+    assert (await client.post(offer, headers=bob, json={"price_paisa": 600000})).status_code == 404
+    emails.sent.clear()
+    r = await client.post(offer, headers=alice, json={"price_paisa": 600000})
+    assert r.status_code == 200
+    # the shop's open proposal is replaced by the customer's offer
+    assert (r.json()["customer_offer_paisa"], r.json()["proposed_price_paisa"]) == (600000, None)
+    assert any("offer" in m.subject.lower() for m in emails.to("shop@example.com"))
+
+    accept = f"{ADMIN}/{cid}/accept-offer"
+    stale = await client.post(accept, headers=admin_h, json={"price_paisa": 700000})
+    assert stale.status_code == 409 and stale.json()["detail"]["code"] == "PRICE_CHANGED"
+    ok = await client.post(accept, headers=admin_h, json={"price_paisa": 600000})
+    assert ok.status_code == 200
+    assert (
+        ok.json()["status"],
+        ok.json()["agreed_price_paisa"],
+        ok.json()["customer_offer_paisa"],
+    ) == (
+        "ACCEPTED",
+        600000,
+        None,
+    )
+    notes = (await client.get("/api/customers/me/notifications", headers=alice)).json()["items"]
+    assert "Rs 6,000" in notes[0]["message"]
+    thread = [m["body"] for m in (await client.get(f"{URL}/{cid}/messages", headers=alice)).json()]
+    assert thread[-3:] == [
+        "We propose Rs 8,000.",
+        "I would like to offer Rs 6,000.",
+        "We accept Rs 6,000.",
+    ]
+    again = await client.post(accept, headers=admin_h, json={"price_paisa": 600000})
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "NO_OFFER"
+
+
+async def test_a_new_proposal_answers_the_customers_offer(client, admin_h, alice):
+    cid = await start(client, admin_h, alice)
+    await client.post(f"{URL}/{cid}/offer-price", headers=alice, json={"price_paisa": 600000})
+    r = await client.post(
+        f"{ADMIN}/{cid}/propose-price", headers=admin_h, json={"price_paisa": 700000}
+    )
+    assert (r.json()["proposed_price_paisa"], r.json()["customer_offer_paisa"]) == (700000, None)
+    accept = await client.post(
+        f"{ADMIN}/{cid}/accept-offer", headers=admin_h, json={"price_paisa": 600000}
+    )
+    assert accept.status_code == 409  # that offer is no longer open
+
+
+async def test_prices_can_be_negotiated_only_while_in_discussion(client, admin_h, alice):
+    cid = (await submit(client, headers=alice))["custom_order_id"]  # still NEW
+    for path in ("offer-price",):
+        r = await client.post(f"{URL}/{cid}/{path}", headers=alice, json={"price_paisa": 100})
+        assert r.status_code == 409
+    assert (await client.post(f"{URL}/{cid}/decline-price", headers=alice)).status_code == 409

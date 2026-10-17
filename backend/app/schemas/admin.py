@@ -79,6 +79,7 @@ class SettingsRead(BaseModel):
     delivery_information: str | None
     delivery_fee_paisa: int
     social_links: dict[str, str]
+    transfer_instructions: str | None = None
 
 
 class AdminSettingsRead(SettingsRead):
@@ -105,8 +106,11 @@ class SettingsUpdate(BaseModel):
     delivery_information: str | None = Field(default=None, max_length=2000)
     delivery_fee_paisa: int | None = Field(default=None, ge=0, le=MAX_DELIVERY_FEE_PAISA)
     social_links: dict[str, str] | None = None
+    transfer_instructions: str | None = Field(default=None, max_length=1000)
 
-    _blank = field_validator("business_name", "address", "delivery_information")(_blank_to_none)
+    _blank = field_validator(
+        "business_name", "address", "delivery_information", "transfer_instructions"
+    )(_blank_to_none)
 
     @field_validator("email")
     @classmethod

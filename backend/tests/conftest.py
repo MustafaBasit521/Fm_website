@@ -279,7 +279,7 @@ def online_enabled(client):
     """Turn online payments on with a fake gateway; returns that gateway so tests can drive it."""
     from app.core.config import Settings
     from app.core.payments.fake import FakeProvider
-    from app.core.payments.registry import get_payment_provider
+    from app.core.payments.registry import get_optional_payment_provider, get_payment_provider
 
     base = get_settings()
     provider = FakeProvider(webhook_secret="test-secret", frontend_url="http://front.test")
@@ -293,4 +293,6 @@ def online_enabled(client):
         _env_file=None,
     )
     client.app.dependency_overrides[get_payment_provider] = lambda: provider
+    # the refund route asks for the provider leniently (a transfer refund needs none)
+    client.app.dependency_overrides[get_optional_payment_provider] = lambda: provider
     return provider

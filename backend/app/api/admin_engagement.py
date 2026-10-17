@@ -25,6 +25,7 @@ from app.schemas.engagement import (
     CustomOrderAccept,
     CustomOrderMessageCreate,
     CustomOrderMessageRead,
+    CustomOrderOffer,
     CustomOrderPropose,
     CustomOrderStatusChange,
     GalleryCreate,
@@ -167,6 +168,15 @@ async def propose_custom_order_price(
 ):
     """Propose a price in the discussion. The customer confirms it (that accepts the request)."""
     co = await custom_service.propose_price(session, custom_order_id, data.price_paisa)
+    return await custom_service.to_admin_read(co, storage)
+
+
+@custom_orders.post("/{custom_order_id}/accept-offer", response_model=AdminCustomOrderRead)
+async def accept_customer_offer(
+    custom_order_id: uuid.UUID, data: CustomOrderOffer, session: Session, storage: Storage
+):
+    """Accept the customer's own offer (the price shown must still be their current offer)."""
+    co = await custom_service.accept_offer(session, custom_order_id, data.price_paisa)
     return await custom_service.to_admin_read(co, storage)
 
 

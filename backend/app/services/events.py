@@ -230,6 +230,57 @@ async def payment_failed(session: AsyncSession, order: Order) -> None:
     )
 
 
+async def transfer_proof_received(session: AsyncSession, order: Order) -> None:
+    shop = await _shop_name(session)
+    ref = short_ref(order)
+    payment = next((p for p in order.payments if p.method == PaymentMethod.TRANSFER), None)
+    detail = (payment.proof_reference if payment else None) or "a screenshot"
+    text = (
+        f"We received your payment details for order {ref}. The shop will check the payment and "
+        "confirm your order soon."
+    )
+    _notify(
+        session,
+        order.customer_id,
+        NotificationType.PAYMENT_SUCCESS,
+        "Payment details received",
+        text,
+    )
+    queue_email(
+        session,
+        EmailMessage(
+            to=order.customer_email,
+            subject=f"We received your payment details - order {ref}",
+            body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
+        ),
+    )
+    await _alert_shop(
+        session,
+        f"Payment to check - order {ref}",
+        f"{order.customer_name} says they paid {format_price(order.total_amount_paisa)} for order "
+        f"{ref} (proof: {detail}). Open the order in the admin to check your account and mark the "
+        "payment as received.",
+    )
+
+
+async def transfer_proof_rejected(session: AsyncSession, order: Order) -> None:
+    shop = await _shop_name(session)
+    ref = short_ref(order)
+    text = (
+        f"We could not find your payment for order {ref}. Please check the details and send them "
+        "again within 30 minutes; after that the order is cancelled."
+    )
+    _notify(session, order.customer_id, NotificationType.PAYMENT_FAILURE, "Payment not found", text)
+    queue_email(
+        session,
+        EmailMessage(
+            to=order.customer_email,
+            subject=f"We could not find your payment - order {ref}",
+            body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
+        ),
+    )
+
+
 # ---- custom orders -------------------------------------------------------------------------
 
 
@@ -321,6 +372,25 @@ async def custom_order_price_proposed(session: AsyncSession, custom_order: Custo
                 ),
             ),
         )
+
+
+async def custom_order_price_declined(
+    session: AsyncSession, custom_order: CustomOrder, declined: int
+) -> None:
+    await _alert_shop(
+        session,
+        "Custom order: price declined",
+        f"{custom_order.name} declined {format_price(declined)}. Open the request to answer.",
+    )
+
+
+async def custom_order_customer_offer(session: AsyncSession, custom_order: CustomOrder) -> None:
+    await _alert_shop(
+        session,
+        "Custom order: the customer made an offer",
+        f"{custom_order.name} offered {format_price(custom_order.customer_offer_paisa or 0)} for "
+        f"their custom order. Open the request to accept it or propose another price.",
+    )
 
 
 async def custom_order_accepted(

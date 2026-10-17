@@ -41,6 +41,7 @@ class SupabaseStorage:
         self._bucket = settings.product_images_bucket
         self.gallery_bucket = settings.gallery_images_bucket
         self.custom_orders_bucket = settings.custom_order_references_bucket
+        self.payment_proofs_bucket = settings.payment_proofs_bucket
         self._key = (
             settings.supabase_service_key.get_secret_value()
             if settings.supabase_service_key

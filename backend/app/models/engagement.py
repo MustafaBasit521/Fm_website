@@ -90,6 +90,10 @@ class CustomOrder(Base):
             "proposed_price_paisa IS NULL OR proposed_price_paisa >= 0",
             name="ck_custom_orders_proposed",
         ),
+        CheckConstraint(
+            "customer_offer_paisa IS NULL OR customer_offer_paisa >= 0",
+            name="ck_custom_orders_offer",
+        ),
         Index("ix_custom_orders_customer_id", "customer_id"),
         Index("ix_custom_orders_status", "status"),
         Index("ix_custom_orders_created_at", "created_at"),
@@ -103,6 +107,8 @@ class CustomOrder(Base):
     whatsapp_number: Mapped[str] = mapped_column(Text)
     description: Mapped[str] = mapped_column(Text)
     budget_paisa: Mapped[int | None] = mapped_column(BigInteger)  # what the customer offered
+    # A counter-offer from the customer; the shop accepts it or proposes another price.
+    customer_offer_paisa: Mapped[int | None] = mapped_column(BigInteger)
     # The price the shop proposed during the discussion; the customer must confirm it.
     proposed_price_paisa: Mapped[int | None] = mapped_column(BigInteger)
     # The price both sides agreed: the customer's confirmation (set together with ACCEPTED).

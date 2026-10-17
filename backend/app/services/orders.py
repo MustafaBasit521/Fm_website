@@ -72,6 +72,7 @@ def to_read(order: Order) -> OrderRead:
         payment_method=payment.method,
         payment_status=payment.status,
         payment_deadline_at=order.payment_deadline_at,
+        proof_submitted_at=payment.proof_submitted_at,
         customer_name=order.customer_name,
         customer_email=order.customer_email,
         customer_phone=order.customer_phone,
@@ -362,14 +363,15 @@ async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: Ord
     payment = _current_payment(order)
     if (
         target == OrderStatus.CONFIRMED
-        and payment.method == PaymentMethod.ONLINE
+        and payment.method in (PaymentMethod.ONLINE, PaymentMethod.TRANSFER)
         and payment.status != PaymentStatus.PAID
     ):
-        # business-rules §13: an online order is never confirmed before verified payment.
+        # business-rules §13: an online or transfer order is never confirmed before its payment is
+        # verified (by the provider, or by the admin for a transfer).
         raise _problem(
             status.HTTP_409_CONFLICT,
             "PAYMENT_NOT_VERIFIED",
-            "An online order cannot be confirmed before its payment is verified",
+            "This order cannot be confirmed before its payment is verified",
         )
     order.status = target
     await events.order_status_changed(session, order, target)

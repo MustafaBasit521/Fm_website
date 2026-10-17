@@ -122,6 +122,8 @@ class OrderRead(BaseModel):
     payment_method: PaymentMethod
     payment_status: PaymentStatus
     payment_deadline_at: datetime | None
+    # TRANSFER orders: when the customer sent proof (the shop is checking it), else None.
+    proof_submitted_at: datetime | None = None
     customer_name: str
     customer_email: str
     customer_phone: str | None

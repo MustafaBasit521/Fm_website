@@ -88,6 +88,7 @@ async def check_storage(
         (settings.product_images_bucket, True),
         (settings.gallery_images_bucket, True),
         (settings.custom_order_references_bucket, False),
+        (settings.payment_proofs_bucket, False),
     ):
         out += _bucket_rules(name, public, buckets.get(name))
     return out

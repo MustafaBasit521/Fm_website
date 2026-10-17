@@ -18,7 +18,7 @@ from app.core.config import Settings
 from app.core.payments.base import PaymentProvider, ProviderError, ProviderStatus
 from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.models.orders import Order, Payment
-from app.schemas.orders import InitiatePayment, PaymentStatusRead
+from app.schemas.orders import InitiatePayment, PaymentProofCreate, PaymentStatusRead
 from app.services import checkout as checkout_service
 from app.services import events
 from app.services import orders as orders_service
@@ -233,7 +233,7 @@ async def confirm_cod_payment(session: AsyncSession, order_id: uuid.UUID) -> Ord
 
 async def refund_order(
     session: AsyncSession,
-    provider: PaymentProvider,
+    provider: PaymentProvider | None,
     order_id: uuid.UUID,
     amount_paisa: int | None,
 ) -> Order:
@@ -255,7 +255,10 @@ async def refund_order(
         raise _problem(
             status.HTTP_409_CONFLICT, "NOT_CANCELLED", "Only cancelled orders can be refunded"
         )
-    if payment is None or payment.method != PaymentMethod.ONLINE or not payment.provider_reference:
+    manual = payment is not None and payment.method == PaymentMethod.TRANSFER
+    if payment is None or not (
+        manual or (payment.method == PaymentMethod.ONLINE and payment.provider_reference)
+    ):
         raise _problem(status.HTTP_409_CONFLICT, "NOTHING_TO_REFUND", "There is nothing to refund")
 
     due = payment.amount_paisa - order.cancellation_charge_paisa - payment.refunded_amount_paisa
@@ -271,17 +274,23 @@ async def refund_order(
             f"At most {due} paisa can still be refunded",
         )
 
-    # The key makes a retried request safe: the provider will not refund the same step twice.
-    key = f"{payment.payment_id}:{payment.refunded_amount_paisa}:{amount}"
-    try:
-        await provider.refund(payment.provider_reference, amount, key)
-    except ProviderError:
-        await session.rollback()
-        raise _problem(
-            status.HTTP_502_BAD_GATEWAY,
-            "REFUND_FAILED",
-            "The payment provider could not process the refund. Nothing was changed.",
-        ) from None
+    if not manual:
+        if provider is None:
+            raise _provider_down()
+        # The key makes a retried request safe: the provider will not refund the same step twice.
+        assert payment.provider_reference is not None
+        key = f"{payment.payment_id}:{payment.refunded_amount_paisa}:{amount}"
+        try:
+            await provider.refund(payment.provider_reference, amount, key)
+        except ProviderError:
+            await session.rollback()
+            raise _problem(
+                status.HTTP_502_BAD_GATEWAY,
+                "REFUND_FAILED",
+                "The payment provider could not process the refund. Nothing was changed.",
+            ) from None
+    # A transfer is refunded by the shop itself (it sends the money back from its own account);
+    # here the admin only records that it did.
 
     payment.refunded_amount_paisa += amount
     payment.status = (
@@ -295,3 +304,104 @@ async def refund_order(
 
 def webhook_headers(raw: Any) -> dict[str, str]:
     return {k.lower(): v for k, v in raw.items()}
+
+
+# ---- payment by transfer (the shop's own account; the admin checks the proof) ---------------
+
+
+def _transfer_payment(order: Order) -> Payment:
+    payment = next((p for p in order.payments if p.method == PaymentMethod.TRANSFER), None)
+    if payment is None:
+        raise _problem(
+            status.HTTP_409_CONFLICT, "NOT_A_TRANSFER", "This order is not paid by transfer"
+        )
+    return payment
+
+
+async def submit_transfer_proof(
+    session: AsyncSession, order_id: uuid.UUID, data: PaymentProofCreate
+) -> Order:
+    """The customer says they sent the money. This stops the 30-minute clock (the shop needs time
+    to check) and tells the shop. The payment stays Pending until the admin confirms it."""
+    order = await orders_service.load_order(session, order_id, lock=True)
+    payment = _transfer_payment(order)
+    if order.status != OrderStatus.PENDING or payment.status != PaymentStatus.PENDING:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "PAYMENT_CLOSED",
+            "This order can no longer receive payment details. If you already paid, please "
+            "contact the shop.",
+        )
+    if await _deadline_passed(session, order):
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "PAYMENT_WINDOW_CLOSED",
+            "The 30 minutes for this payment have passed. If you already paid, please contact the "
+            "shop.",
+        )
+    payment.proof_reference = data.reference
+    payment.proof_image_path = data.image_path
+    payment.proof_submitted_at = func.now()
+    order.payment_deadline_at = None  # the shop is checking: the order does not expire meanwhile
+    await session.flush()
+    await session.refresh(payment)
+    await events.transfer_proof_received(session, order)
+    await session.commit()
+    return await orders_service.load_order(session, order_id, lock=False)
+
+
+async def confirm_transfer(session: AsyncSession, order_id: uuid.UUID) -> Order:
+    """The admin saw the money in the shop's account: the payment is Paid and the order is
+    Confirmed (business-rules §13, the same outcome as a verified online payment)."""
+    order = await orders_service.load_order(session, order_id, lock=True)
+    payment = _transfer_payment(order)
+    if payment.status != PaymentStatus.PENDING:
+        raise _problem(status.HTTP_409_CONFLICT, "ALREADY_PAID", "Payment was already recorded")
+    if order.status != OrderStatus.PENDING:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "INVALID_TRANSITION",
+            "Only a pending order can be confirmed by receiving its payment",
+        )
+    payment.status = PaymentStatus.PAID
+    order.status = OrderStatus.CONFIRMED
+    order.payment_deadline_at = None
+    await events.payment_received(session, order)
+    await events.order_status_changed(session, order, OrderStatus.CONFIRMED)
+    await session.commit()
+    return await orders_service.load_order(session, order_id, lock=False)
+
+
+async def reject_transfer_proof(session: AsyncSession, order_id: uuid.UUID) -> Order:
+    """The admin could not find the money: the proof is cleared and the customer gets a fresh
+    30 minutes to send correct details."""
+    order = await orders_service.load_order(session, order_id, lock=True)
+    payment = _transfer_payment(order)
+    if (
+        order.status != OrderStatus.PENDING
+        or payment.status != PaymentStatus.PENDING
+        or payment.proof_submitted_at is None
+    ):
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "NO_PROOF",
+            "There are no payment details waiting to be checked",
+        )
+    payment.proof_reference = None
+    payment.proof_image_path = None
+    payment.proof_submitted_at = None
+    order.payment_deadline_at = func.now() + checkout_service.PAYMENT_WINDOW
+    await events.transfer_proof_rejected(session, order)
+    await session.commit()
+    return await orders_service.load_order(session, order_id, lock=False)
+
+
+async def ensure_proof_can_be_sent(session: AsyncSession, order_id: uuid.UUID) -> None:
+    """A signed upload is handed out only for an open transfer order (so the bucket cannot be
+    used by anyone who merely guesses an address)."""
+    order = await orders_service.load_order(session, order_id, lock=False)
+    payment = _transfer_payment(order)
+    if order.status != OrderStatus.PENDING or payment.status != PaymentStatus.PENDING:
+        raise _problem(
+            status.HTTP_409_CONFLICT, "PAYMENT_CLOSED", "This order can no longer receive payment"
+        )

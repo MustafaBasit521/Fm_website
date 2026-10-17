@@ -20,6 +20,7 @@ from app.schemas.engagement import (
     CustomOrderCreate,
     CustomOrderMessageCreate,
     CustomOrderMessageRead,
+    CustomOrderOffer,
     CustomOrderRead,
     GalleryImageRead,
     MyReviewState,
@@ -215,6 +216,21 @@ async def confirm_the_price(
 ):
     """The customer confirms the price the shop proposed: that accepts the request."""
     co = await custom_service.confirm_price(session, user, custom_order_id, data.price_paisa)
+    return custom_service.to_read(co)
+
+
+@custom_orders.post("/{custom_order_id}/decline-price", response_model=CustomOrderRead)
+async def decline_the_price(custom_order_id: uuid.UUID, user: CurrentUser, session: Session):
+    return custom_service.to_read(
+        await custom_service.decline_price(session, user, custom_order_id)
+    )
+
+
+@custom_orders.post("/{custom_order_id}/offer-price", response_model=CustomOrderRead)
+async def offer_my_price(
+    custom_order_id: uuid.UUID, data: CustomOrderOffer, user: CurrentUser, session: Session
+):
+    co = await custom_service.offer_price(session, user, custom_order_id, data.price_paisa)
     return custom_service.to_read(co)
 
 

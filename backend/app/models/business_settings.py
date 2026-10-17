@@ -23,6 +23,9 @@ class BusinessSettings(Base):
     whatsapp: Mapped[str | None] = mapped_column(Text)
     address: Mapped[str | None] = mapped_column(Text)
     delivery_information: Mapped[str | None] = mapped_column(Text)
+    # Where customers send money for the transfer payment method (account titles, numbers).
+    # Empty = the transfer method is not offered.
+    transfer_instructions: Mapped[str | None] = mapped_column(Text)
     delivery_fee_paisa: Mapped[int] = mapped_column(BigInteger, server_default="0")
     social_links: Mapped[dict | None] = mapped_column(JSONB)
     updated_at: Mapped[datetime] = mapped_column(

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     product_images_bucket: str = "product-images"
     gallery_images_bucket: str = "gallery-images"  # public
     custom_order_references_bucket: str = "custom-order-references"  # PRIVATE
+    payment_proofs_bucket: str = "payment-proofs"  # PRIVATE: screenshots of transfers
     # Online payment needs a gateway (chosen/implemented in the payments phase). Until then the
     # API refuses ONLINE orders so nobody places an order they cannot pay for.
     online_payments_enabled: bool = False

@@ -38,6 +38,7 @@ def _settings_read(row) -> SettingsRead:
         delivery_information=row.delivery_information,
         delivery_fee_paisa=row.delivery_fee_paisa,
         social_links=row.social_links or {},
+        transfer_instructions=row.transfer_instructions,
     )
 
 

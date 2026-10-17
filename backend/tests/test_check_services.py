@@ -38,9 +38,10 @@ async def test_storage_passes_with_the_right_buckets_and_rules():
         {"name": "product-images", **GOOD},
         {"name": "gallery-images", **GOOD},
         {"name": "custom-order-references", **GOOD, "public": False},
+        {"name": "payment-proofs", **GOOD, "public": False},
     ]
     results = await check_storage(settings(), transport(buckets))
-    assert [r.status for r in results] == [PASS, PASS, PASS]
+    assert [r.status for r in results] == [PASS, PASS, PASS, PASS]
 
 
 async def test_storage_reports_a_missing_bucket_and_a_public_private_bucket():
@@ -50,6 +51,7 @@ async def test_storage_reports_a_missing_bucket_and_a_public_private_bucket():
     ]
     got = by_name(await check_storage(settings(), transport(buckets)))
     assert got["storage bucket 'gallery-images'"].status == FAIL
+    assert got["storage bucket 'payment-proofs'"].status == FAIL  # transfers need this one too
     assert got["storage bucket 'custom-order-references' visibility"].status == FAIL
 
 

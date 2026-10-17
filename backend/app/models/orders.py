@@ -124,6 +124,11 @@ class Payment(Base):
     amount_paisa: Mapped[int] = mapped_column(BigInteger)
     refunded_amount_paisa: Mapped[int] = mapped_column(BigInteger, server_default="0")
     provider_reference: Mapped[str | None] = mapped_column(Text, unique=True)
+    # TRANSFER payments: what the customer sent as proof (a transaction number, a screenshot in
+    # the private payment-proofs bucket, or both). The admin checks it and marks the payment Paid.
+    proof_reference: Mapped[str | None] = mapped_column(Text)
+    proof_image_path: Mapped[str | None] = mapped_column(Text)
+    proof_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

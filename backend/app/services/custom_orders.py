@@ -9,6 +9,7 @@ from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser
+from app.core.money import format_price
 from app.core.storage import StorageNotConfiguredError, SupabaseStorage
 from app.models.engagement import CustomOrder, CustomOrderMessage
 from app.models.enums import CustomOrderMessageSender
@@ -47,6 +48,7 @@ def to_read(co: CustomOrder) -> CustomOrderRead:
         whatsapp_number=co.whatsapp_number,
         description=co.description,
         budget_paisa=co.budget_paisa,
+        customer_offer_paisa=co.customer_offer_paisa,
         proposed_price_paisa=co.proposed_price_paisa,
         agreed_price_paisa=co.agreed_price_paisa,
         required_date=co.required_date,
@@ -225,6 +227,8 @@ async def propose_price(
             "A price can be proposed only while the request is being discussed",
         )
     co.proposed_price_paisa = price_paisa
+    co.customer_offer_paisa = None  # the shop has answered the customer's offer
+    _note(session, co, CustomOrderMessageSender.ADMIN, f"We propose {format_price(price_paisa)}.")
     await events.custom_order_price_proposed(session, co)
     await session.commit()
     return await _load(session, custom_order_id, lock=False)
@@ -252,7 +256,90 @@ async def confirm_price(
         )
     co.agreed_price_paisa = price_paisa
     co.status = S.ACCEPTED
+    _note(session, co, CustomOrderMessageSender.CUSTOMER, f"I accept {format_price(price_paisa)}.")
     await events.custom_order_accepted(session, co, by_customer=True)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+def _note(
+    session: AsyncSession, co: CustomOrder, sender: CustomOrderMessageSender, body: str
+) -> None:
+    """A line in the discussion that records a price step, so both sides can read the history.
+    It does not send its own notification: the price event does."""
+    session.add(CustomOrderMessage(custom_order_id=co.custom_order_id, sender=sender, body=body))
+
+
+async def _load_mine_in_discussion(
+    session: AsyncSession, user: AuthUser, custom_order_id: uuid.UUID
+) -> CustomOrder:
+    co = await _load(session, custom_order_id, lock=True)
+    if co.customer_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Custom order not found")
+    if co.status != S.IN_DISCUSSION:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "INVALID_TRANSITION",
+            "Prices can be negotiated only while the request is being discussed",
+        )
+    return co
+
+
+async def decline_price(
+    session: AsyncSession, user: AuthUser, custom_order_id: uuid.UUID
+) -> CustomOrder:
+    """The customer turns down the proposed price. The request stays in discussion."""
+    co = await _load_mine_in_discussion(session, user, custom_order_id)
+    if co.proposed_price_paisa is None:
+        raise _problem(
+            status.HTTP_409_CONFLICT, "NO_PROPOSAL", "There is no price waiting for your answer"
+        )
+    declined = co.proposed_price_paisa
+    co.proposed_price_paisa = None
+    _note(session, co, CustomOrderMessageSender.CUSTOMER, f"I decline {format_price(declined)}.")
+    await events.custom_order_price_declined(session, co, declined)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+async def offer_price(
+    session: AsyncSession, user: AuthUser, custom_order_id: uuid.UUID, price_paisa: int
+) -> CustomOrder:
+    """The customer answers with an offer of their own (replacing any earlier offer and the
+    shop's open proposal). The shop accepts it or proposes another price."""
+    co = await _load_mine_in_discussion(session, user, custom_order_id)
+    co.customer_offer_paisa = price_paisa
+    co.proposed_price_paisa = None
+    _note(
+        session,
+        co,
+        CustomOrderMessageSender.CUSTOMER,
+        f"I would like to offer {format_price(price_paisa)}.",
+    )
+    await events.custom_order_customer_offer(session, co)
+    await session.commit()
+    return await _load(session, custom_order_id, lock=False)
+
+
+async def accept_offer(
+    session: AsyncSession, custom_order_id: uuid.UUID, price_paisa: int
+) -> CustomOrder:
+    """The admin accepts the customer's own offer: the customer proposed it, so no further
+    confirmation is needed. The price shown must still be the current offer."""
+    co = await _load(session, custom_order_id, lock=True)
+    if co.status != S.IN_DISCUSSION or co.customer_offer_paisa is None:
+        raise _problem(status.HTTP_409_CONFLICT, "NO_OFFER", "There is no customer offer to accept")
+    if co.customer_offer_paisa != price_paisa:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "PRICE_CHANGED",
+            "The customer changed their offer. Please look at the new price.",
+        )
+    co.agreed_price_paisa = price_paisa
+    co.customer_offer_paisa = None
+    co.status = S.ACCEPTED
+    _note(session, co, CustomOrderMessageSender.ADMIN, f"We accept {format_price(price_paisa)}.")
+    await events.custom_order_accepted(session, co, by_customer=False)
     await session.commit()
     return await _load(session, custom_order_id, lock=False)
 
