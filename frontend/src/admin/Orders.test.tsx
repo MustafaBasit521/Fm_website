@@ -435,3 +435,16 @@ it('shows no transfer actions for a payment that is already settled', async () =
   await screen.findByText('2 × Sunflower')
   expect(screen.queryByRole('button', { name: 'Payment received' })).not.toBeInTheDocument()
 })
+
+it('says "No actions left." for a delivered and paid order instead of an empty card', async () => {
+  api.getAdminOrder.mockResolvedValue(order({ status: 'DELIVERED', payment_status: 'PAID' }))
+  renderDetail()
+  expect(await screen.findByText('No actions left.')).toBeInTheDocument()
+})
+
+it('still offers "Confirm cash received" for a delivered cash order that is not paid yet', async () => {
+  api.getAdminOrder.mockResolvedValue(order({ status: 'DELIVERED' }))
+  renderDetail()
+  expect(await screen.findByRole('button', { name: 'Confirm cash received' })).toBeInTheDocument()
+  expect(screen.queryByText('No actions left.')).not.toBeInTheDocument()
+})

@@ -501,3 +501,13 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Verified:** 8 tests with a fake server (headers, login order, STARTTLS before the password, refused login reported without the password, other failures, settings validation, password not printed). **Not verified:** a real send through Gmail (needs the owner's App Password).
 
+## Quality-assurance phase
+
+**Request (owner):** test the whole functionality before deploying to Vercel.
+
+**Method:** a QA rig outside the repository: the real backend on a throw-away local database, a launcher that signs test logins and fakes Storage (so nothing touches Supabase), two Vite servers with the API proxy pointed at it, and Playwright scripts for guest, customer and admin journeys plus rule, security and accessibility probes (axe in real Chrome). Results are summarised in `docs/qa-report.md`.
+
+**Outcome:** six real problems found and fixed (listed in the report), each with a regression test where it can be tested in jsdom. The most useful finding was one only a real browser could make: the footer logo's contrast. The owner's message during the run (the admin's phone navigation is a scrolling bar) became the sixth fix.
+
+**Honest limits:** test-signed tokens replace Supabase Auth, so sign-up, login and authenticator enrolment, uploads, email delivery and a real phone remain manual checks.
+

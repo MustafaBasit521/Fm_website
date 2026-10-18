@@ -194,7 +194,7 @@ function SiteFooter({ settings, name }: { settings: BusinessSettings | null; nam
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-2 md:grid-cols-4">
         <div className="md:col-span-2">
           <p className="font-serif text-3xl">
-            <ShopName name={name} />
+            <ShopName name={name} accentClass="text-accent-light" />
           </p>
           <p className="mt-2 max-w-sm text-linen">
             Handmade crochet, made with care in Lahore. Your idea, our crochet.

@@ -1,27 +1,17 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/context'
 import { HeartIcon } from '../shop/icons'
+import { useWishlist } from '../wishlist/context'
 import { secondaryButtonClass } from './ui'
-import { addToWishlist, ApiError, getWishlistIds, removeFromWishlist } from '../lib/api'
 
-/** Wishlist is for registered customers only: signed-out visitors are pointed to log in. */
+/** Wishlist is for registered customers only: signed-out visitors are pointed to log in. The
+ *  saved pieces are shared with the header heart, the wishlist panel and the hearts on cards
+ *  (one list in `WishlistProvider`), so they can never disagree. */
 export function WishlistButton({ productId }: { productId: string }) {
   const { session } = useAuth()
-  const [state, setState] = useState<{ productId: string; saved: boolean } | null>(null)
-  const [error, setError] = useState(false)
-  const signedIn = session !== null
+  const wl = useWishlist()
 
-  useEffect(() => {
-    if (!signedIn) return
-    const controller = new AbortController()
-    getWishlistIds(controller.signal)
-      .then((ids) => setState({ productId, saved: ids.includes(productId) }))
-      .catch(() => {})
-    return () => controller.abort()
-  }, [signedIn, productId])
-
-  if (!signedIn) {
+  if (session === null) {
     return (
       <Link to="/login" className="text-terracotta underline">
         Log in to save to your wishlist
@@ -29,42 +19,21 @@ export function WishlistButton({ productId }: { productId: string }) {
     )
   }
 
-  const known = state?.productId === productId
-  const saved = known && state.saved
-
-  async function toggle() {
-    setError(false)
-    try {
-      if (saved) {
-        await removeFromWishlist(productId)
-        setState({ productId, saved: false })
-      } else {
-        try {
-          await addToWishlist(productId)
-        } catch (e) {
-          // 409 = already there (e.g. another tab): the end state is what the user wanted.
-          if (!(e instanceof ApiError && e.status === 409)) throw e
-        }
-        setState({ productId, saved: true })
-      }
-    } catch {
-      setError(true)
-    }
-  }
+  const saved = wl.ids?.has(productId) ?? false
 
   return (
     <div>
       <button
         type="button"
         aria-pressed={saved}
-        disabled={!known}
-        onClick={() => void toggle()}
+        disabled={!wl.enabled}
+        onClick={() => void wl.toggle(productId)}
         className={`${secondaryButtonClass} w-full ${saved ? 'border-terracotta text-terracotta' : ''}`}
       >
         <HeartIcon fill={saved ? 'currentColor' : 'none'} />
         {saved ? 'Saved to wishlist' : 'Add to wishlist'}
       </button>
-      {error && (
+      {wl.failed && (
         <p role="alert" className="mt-1 text-danger">
           Could not update your wishlist. Please try again.
         </p>

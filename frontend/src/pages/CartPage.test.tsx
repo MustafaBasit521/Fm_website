@@ -147,6 +147,6 @@ it('summarises the order beside the lines and links on to checkout', async () =>
   renderCart()
   const summary = await screen.findByRole('complementary', { name: 'Order summary' })
   expect(summary).toHaveTextContent('Delivery in Lahore')
-  expect(summary).toHaveTextContent('Cash on Delivery or online payment · Lahore only')
+  expect(summary).toHaveTextContent('Cash on Delivery · Lahore only') // only what the shop offers
   expect(summary.querySelector('a[href="/checkout"]')).toHaveTextContent('Proceed to checkout')
 })

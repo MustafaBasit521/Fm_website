@@ -22,6 +22,7 @@
   --color-accent-hover: #8e3e21;
   --color-accent-tint: #f3e1d6;
   --color-attention: #a87a22;
+  --color-accent-light: #e9a888; /* the terracotta accent on the dark footer (ink) */
 }
 
 body {

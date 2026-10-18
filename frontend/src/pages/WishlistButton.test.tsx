@@ -70,3 +70,22 @@ it('shows an error when the update fails', async () => {
   await userEvent.click(button)
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not update your wishlist')
 })
+
+it('shares its state with the rest of the shop: a pop-up and a second button agree (regression)', async () => {
+  api.addToWishlist.mockResolvedValue({})
+  const { wrap } = makeAuth({ session: fakeSession })
+  render(
+    wrap(
+      <>
+        <WishlistButton productId="p1" />
+        <WishlistButton productId="p1" />
+      </>,
+    ),
+  )
+  const buttons = await screen.findAllByRole('button', { name: /Add to wishlist/ })
+  await vi.waitFor(() => expect(buttons[0]).toBeEnabled())
+  await userEvent.click(buttons[0])
+  expect(await screen.findByText('Saved to your wishlist')).toBeInTheDocument()
+  // the other button on the page changed too: there is only one list
+  expect(await screen.findAllByRole('button', { name: /Saved to wishlist/ })).toHaveLength(2)
+})

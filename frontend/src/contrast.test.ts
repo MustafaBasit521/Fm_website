@@ -58,3 +58,16 @@ it.each(Object.entries(STATUS_COLORS))(
     expect(ratio(c.fg, c.bg)).toBeGreaterThanOrEqual(4.5)
   },
 )
+
+// The dark footer (ink) is a surface of its own: its text colours are checked here. The terracotta
+// accent is too dark on it (2.65:1, found by axe in a real browser), so the footer uses a lighter one.
+it.each([
+  ['paper', 4.5],
+  ['linen', 4.5],
+  ['accent-light', 4.5],
+])('%s text on the dark footer has AA contrast', (fg, min) => {
+  expect(ratio(color(fg), color('ink'))).toBeGreaterThanOrEqual(min)
+})
+it('the old terracotta accent would NOT have passed on the dark footer (why accent-light exists)', () => {
+  expect(ratio(color('terracotta'), color('ink'))).toBeLessThan(3)
+})

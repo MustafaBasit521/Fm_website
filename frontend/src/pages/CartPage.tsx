@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useCart } from '../cart/context'
 import { useQuote } from '../cart/useQuote'
 import type { QuoteLine } from '../lib/api'
+import { paymentSummary } from '../lib/paymentText'
 import { formatPrice } from '../lib/money'
 import { QuantityStepper } from './QuantityStepper'
 import { buttonClass, secondaryButtonClass } from './ui'
@@ -151,7 +152,7 @@ export default function CartPage() {
               <p className="mt-5 text-bark">Fix the items on the left to continue to checkout.</p>
             )}
             <p className="mt-3 text-sm text-bark">
-              Cash on Delivery or online payment · Lahore only
+              {paymentSummary(quote.payment_methods)} · Lahore only
             </p>
             <p className="mt-3">
               <Link to="/shop" className="text-sm text-terracotta underline">

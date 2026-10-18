@@ -12,6 +12,7 @@ import {
   type PaymentMethod,
   type Quote,
 } from '../lib/api'
+import { paymentSummary } from '../lib/paymentText'
 import { formatPrice } from '../lib/money'
 import { saveLastOrder } from '../lib/lastOrder'
 import { buttonClass, Field, FormError, BackLink } from './ui'
@@ -349,7 +350,7 @@ export default function CheckoutPage() {
               {busy ? 'Placing order…' : `Place order · ${formatPrice(total ?? quote.total_paisa)}`}
             </button>
             <p className="mt-3 text-sm text-bark">
-              Cash on Delivery or online payment · Lahore only
+              {paymentSummary(quote.payment_methods)} · Lahore only
             </p>
           </aside>
         </form>

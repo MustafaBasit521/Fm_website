@@ -16,7 +16,7 @@ import { primaryButtonClass, secondaryButtonClass } from './ui'
 const TRUST = [
   'Every piece made by hand, never mass-produced',
   'Delivered across Lahore',
-  'Cash on Delivery or secure online payment',
+  'Pay cash on delivery, no card needed',
 ]
 
 /** One photo in the hero: chosen by the admin (gallery), or a featured piece as the fallback. */
@@ -181,10 +181,7 @@ export default function HomePage() {
                 Fresh off the <em>hook</em>
               </h2>
             </div>
-            <Link
-              to="/shop"
-              className="inline-flex items-center gap-2 underline underline-offset-4"
-            >
+            <Link to="/shop" className={secondaryButtonClass}>
               View all pieces <ArrowIcon />
             </Link>
           </div>

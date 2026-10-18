@@ -161,9 +161,7 @@ function ProductDetailView({
         >
           Ask about this on WhatsApp
         </WhatsAppButton>
-        <p className="text-sm text-bark">
-          Cash on Delivery or secure online payment · Delivered across Lahore
-        </p>
+        <p className="text-sm text-bark">Cash on Delivery · Delivered across Lahore</p>
       </div>
     </div>
   )

@@ -380,11 +380,9 @@ export default function OrderAdminPage() {
                       </div>
                     </div>
                   )}
-                  {!NEXT[order.status] &&
-                    !['CANCELLED'].includes(order.status) &&
-                    order.status !== 'DELIVERED' &&
-                    null}
-                  {order.status === 'CANCELLED' && order.refund_due_paisa === 0 && (
+                  {((order.status === 'CANCELLED' && order.refund_due_paisa === 0) ||
+                    (order.status === 'DELIVERED' &&
+                      !(order.payment_method === 'COD' && order.payment_status === 'PENDING'))) && (
                     <p className="text-muted">No actions left.</p>
                   )}
                 </section>

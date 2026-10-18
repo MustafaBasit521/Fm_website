@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { makeAuth } from '../test/auth'
@@ -56,4 +57,36 @@ it('still works when the numbers cannot be loaded', async () => {
   getDashboard.mockRejectedValue(new Error('x'))
   renderLayout()
   expect(await screen.findByRole('link', { name: /Orders/ })).toBeInTheDocument()
+})
+
+it('has a main landmark and a skip link for keyboard users', () => {
+  renderLayout()
+  expect(screen.getByRole('main')).toHaveTextContent('page body')
+  expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute(
+    'href',
+    '#main-content',
+  )
+})
+
+it('on a phone the menu slides in from a button instead of a scrolling bar', async () => {
+  renderLayout()
+  const open = await screen.findByRole('button', { name: /Open menu, 7 new/ }) // 4 + 3 waiting
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  await userEvent.click(open)
+  const menu = screen.getByRole('dialog', { name: 'Menu' })
+  const nav = within(menu).getByRole('navigation', { name: 'Admin menu' })
+  for (const name of ['Overview', 'Orders', 'Products', 'Gallery', 'Messages', 'Settings'])
+    expect(within(nav).getByRole('link', { name: new RegExp(name) })).toBeInTheDocument()
+  expect(within(menu).getByRole('link', { name: /View shop/ })).toBeInTheDocument()
+  expect(within(menu).getByRole('button', { name: 'Log out' })).toBeInTheDocument()
+  await userEvent.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('the phone menu closes when a page is chosen', async () => {
+  renderLayout()
+  await userEvent.click(await screen.findByRole('button', { name: /Open menu/ }))
+  const menu = screen.getByRole('dialog', { name: 'Menu' })
+  await userEvent.click(within(menu).getByRole('link', { name: /Products/ }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
