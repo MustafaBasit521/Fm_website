@@ -31,7 +31,14 @@ export default function AdminLoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-4">
-      <h1 className="font-serif text-4xl">Shop admin</h1>
+      <img
+        src="/logo.png"
+        alt="Bundle of Loops logo"
+        width={112}
+        height={112}
+        className="mx-auto h-28 w-28 rounded-full shadow-sm"
+      />
+      <h1 className="text-center font-serif text-4xl">Shop admin</h1>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <Field
           id="email"

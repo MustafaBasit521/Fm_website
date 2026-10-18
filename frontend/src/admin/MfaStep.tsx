@@ -70,6 +70,13 @@ export function MfaStep({ onDone }: { onDone: () => void }) {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-4">
+      <img
+        src="/logo.png"
+        alt="Bundle of Loops logo"
+        width={80}
+        height={80}
+        className="mx-auto h-20 w-20 rounded-full shadow-sm"
+      />
       <h1 className="font-serif text-4xl">
         {phase.name === 'enroll' ? 'Set up two-factor login' : 'Two-factor login'}
       </h1>

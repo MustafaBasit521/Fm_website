@@ -44,3 +44,10 @@ it('moves on once there is a session', () => {
   renderLogin({ session: fakeSession })
   expect(screen.getByText('dashboard')).toBeInTheDocument()
 })
+
+it('shows the shop logo above the title', () => {
+  renderLogin()
+  const logo = screen.getByRole('img', { name: 'Bundle of Loops logo' })
+  expect(logo).toHaveAttribute('src', '/logo.png')
+  expect(screen.getByRole('heading', { name: 'Shop admin' })).toBeInTheDocument()
+})

@@ -67,18 +67,27 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
 function Logo({ name }: { name: string }) {
   const m = /^(.+?)\s+(of)\s+(.+)$/i.exec(name)
   return (
-    <p className="font-serif text-2xl leading-tight">
-      {m ? (
-        <>
-          {m[1]} <em className="text-terracotta">{m[2]}</em> {m[3]}
-        </>
-      ) : (
-        name
-      )}
-      <span className="block font-sans text-[10px] font-medium uppercase tracking-widest text-bark">
-        Studio admin
-      </span>
-    </p>
+    <div className="flex flex-nowrap items-center gap-3">
+      <img
+        src="/logo.png"
+        alt=""
+        width={40}
+        height={40}
+        className="h-10 w-10 shrink-0 rounded-full"
+      />
+      <p className="font-serif text-2xl leading-tight">
+        {m ? (
+          <>
+            {m[1]} <em className="text-terracotta">{m[2]}</em> {m[3]}
+          </>
+        ) : (
+          name
+        )}
+        <span className="block font-sans text-[10px] font-medium uppercase tracking-widest text-bark">
+          Studio admin
+        </span>
+      </p>
+    </div>
   )
 }
 

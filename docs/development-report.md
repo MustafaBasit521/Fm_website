@@ -511,3 +511,7 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Honest limits:** test-signed tokens replace Supabase Auth, so sign-up, login and authenticator enrolment, uploads, email delivery and a real phone remain manual checks.
 
+## Logo
+
+The owner supplied the shop's Instagram logo (a 201 x 190 screenshot of a round logo on a dark background). It was cut out with a circular mask (the screenshot's dark corners made transparent) and saved as `public/logo.png` (192 px) and `public/favicon.png` (64 px). Used on the admin login and two-factor pages, the admin sidebar and phone header, and as the favicon of both sites. The source is low resolution, so it is shown at 112 px or smaller; a larger original from the owner would look sharper on high-density screens.
+
