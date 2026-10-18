@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { loadLastOrder } from '../lib/lastOrder'
+import { loadLastOrder, saveLastOrder } from '../lib/lastOrder'
 import { OrderBreakdown } from './OrderBreakdown'
 import { PayNowButton } from './PayNowButton'
+import { TransferPayment } from './TransferPayment'
 import { primaryButtonClass } from './ui'
 
 export default function OrderConfirmationPage() {
-  const order = loadLastOrder()
+  const [order, setOrder] = useState(loadLastOrder)
 
   if (!order) {
     return (
@@ -32,7 +34,9 @@ export default function OrderConfirmationPage() {
       <p className="mt-2 text-muted">
         {order.payment_method === 'COD'
           ? 'You will pay cash on delivery.'
-          : 'Your order is waiting for payment.'}{' '}
+          : order.payment_method === 'TRANSFER' && order.status !== 'PENDING'
+            ? 'Your payment is confirmed.'
+            : 'Your order is waiting for payment.'}{' '}
         A confirmation will be sent to {order.customer_email}.
       </p>
 
@@ -48,6 +52,14 @@ export default function OrderConfirmationPage() {
           <PayNowButton orderId={order.order_id} />
         </div>
       )}
+
+      <TransferPayment
+        order={order}
+        onUpdated={(updated) => {
+          saveLastOrder(updated)
+          setOrder(updated)
+        }}
+      />
 
       <div className="mt-6">
         <OrderBreakdown order={order} />

@@ -143,6 +143,7 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
   whatsapp_number: '0300 1234567',
   description: 'A jersey with a name',
   budget_paisa: 250000,
+  customer_offer_paisa: null,
   proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: '2026-12-01',
@@ -165,6 +166,10 @@ it('shows custom orders with the private picture link and moves them along', asy
   )
   expect(await screen.findByText('A jersey with a name')).toBeInTheDocument()
   expect(screen.getByText(/Budget Rs 2,500/)).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: 'Reference picture from Sara' })).toHaveAttribute(
+    'src',
+    'https://down.example/x?sig=1',
+  )
   const link = screen.getByRole('link', { name: 'View reference picture' })
   expect(link).toHaveAttribute('href', 'https://down.example/x?sig=1')
   expect(link).toHaveAttribute('rel', 'noopener noreferrer')

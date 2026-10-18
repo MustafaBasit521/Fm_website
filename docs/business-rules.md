@@ -323,6 +323,18 @@ Expiry mechanism (decided): the database function `expire_unpaid_online_orders()
 
 Late payment (decided): if a verified payment arrives after the window has closed — whether the expiry job has already cancelled the order or has not run yet — the order stays Cancelled and is never reopened. The payment is recorded as Paid and the full amount is refundable (no cancellation charge).
 
+## Transfer orders (decided by the owner, UI polish phase)
+
+The shop has no payment-gateway account (an Instagram business without NTN or business bank account), so customers may also **pay by transfer** to the shop's own account (JazzCash, Easypaisa or bank). The method is offered only while the admin has written payment instructions in the settings (account names and numbers); clearing the text switches it off.
+
+* A transfer order is created like an online order: Pending, payment Pending, stock or capacity reserved, and the same **30-minute window** (`payment_deadline_at`).
+* The customer sees the instructions and the amount, sends the money, and then tells the shop with a **transaction number, a screenshot, or both** (the screenshot goes straight to the private `payment-proofs` bucket). This works for guests as well (the unguessable order id is the capability; rate limited).
+* **Sending the details stops the clock** (`payment_deadline_at` becomes empty): the shop needs time to look, and the order does not expire meanwhile. The payment stays Pending. The shop gets an alert email and the customer a confirmation.
+* The **admin** checks the shop's account and chooses: **"Payment received"** (payment Paid and order Confirmed, the customer is told; the admin may also do this without any proof when the money is already there) or **"Not received"** (the proof is cleared, the customer is told and gets a **fresh 30 minutes** to send correct details).
+* If no details arrive within the window, the order expires like any unpaid online order: Cancelled and the stock returned (the same database function). If someone pays after that, it must be sorted out with the shop directly; nothing is reopened.
+* The order cannot be confirmed by a plain status change before its payment is received.
+* **Refunds**: the shop returns the money itself from its own account and the admin only records it (same limits as §22: never more than paid minus any cancellation charge minus what was already refunded; partial refunds allowed). No provider is called.
+
 ## COD orders
 
 COD orders do **not** use the 30-minute online payment window.
@@ -475,6 +487,7 @@ Payment methods:
 
 * COD
 * ONLINE
+* TRANSFER (money sent to the shop's own account, checked by the admin: see §13)
 
 Payment status:
 
@@ -708,6 +721,7 @@ Statuses (decided): NEW → IN_DISCUSSION → ACCEPTED → IN_PROGRESS → COMPL
 
 * The customer's `budget` is what they *offer*. The final price is decided **in a discussion** between the customer and the admin, written as messages inside the system (a "Discussion" on the request's page, for the customer under My custom orders and for the admin under Custom orders).
 * **The shop proposes, the customer confirms.** During the discussion the admin proposes a price (`proposed_price_paisa`; it can be changed until the customer confirms) and the customer is told (in the app and by email). The request is **ACCEPTED only when the customer confirms** that price (a confirmation pop-up on their page): the price then becomes the agreed price (`agreed_price_paisa`), the customer is notified and the shop gets an alert email. **The admin cannot accept a registered customer's request on their own**, and neither the plain status route nor the admin can set the agreed price. If the shop changes the price while the customer is looking at the old one, confirming is refused ("the price changed") so a wrong price is never accepted by mistake.
+* **The customer can answer a proposal in three ways** (all only while the request is IN_DISCUSSION): accept it (above), **decline** it (the proposal is cleared and the shop is told by email), or **offer a different price** of their own (`customer_offer_paisa`; it replaces the shop's open proposal and any earlier offer, and the shop is told by email). The shop then either **accepts the customer's offer** (the customer proposed it, so no second confirmation is needed: the request is ACCEPTED at that price and the customer is told) or **proposes another price**, which replaces the offer. Accepting an offer is refused if the customer changed it in the meantime ("the price changed"). Every price step (a proposal, a decline, an offer, an acceptance) is also written as a line in the discussion so both sides can read the history.
 * A price can be proposed only while the request is IN_DISCUSSION. Once accepted, the price is final.
 * **Guests** have no account to confirm in and no discussion. The admin talks to them on WhatsApp and, once the guest has agreed there, records the agreed price and accepts the request on the admin page.
 * Only **registered customers** have a discussion. Messages are plain text, 1 to 2,000 characters, shown oldest first, and cannot be edited or deleted. The discussion is open while the request is NEW, IN_DISCUSSION, ACCEPTED or IN_PROGRESS and closed (still readable) once it is COMPLETED, DECLINED or CANCELLED.

@@ -159,7 +159,7 @@ export const removeFromWishlist = (productId: string) =>
 
 // ---- cart, checkout, orders ---------------------------------------------------------------
 
-export type PaymentMethod = 'COD' | 'ONLINE'
+export type PaymentMethod = 'COD' | 'ONLINE' | 'TRANSFER'
 export type LineIssue = 'NOT_FOUND' | 'UNAVAILABLE' | 'EXCEEDS_AVAILABLE'
 
 export interface CartLine {
@@ -218,6 +218,8 @@ export interface Order {
   payment_method: PaymentMethod
   payment_status: string
   payment_deadline_at: string | null
+  /** Transfer orders: when the customer sent proof (the shop is checking it). */
+  proof_submitted_at?: string | null
   customer_name: string
   customer_email: string
   customer_phone: string | null
@@ -263,6 +265,14 @@ export const getOrders = (page: number, signal?: AbortSignal) =>
   apiGet<Page<OrderSummary>>(`/orders?page=${page}&page_size=10`, signal)
 export const getOrder = (id: string, signal?: AbortSignal) =>
   apiGet<Order>(`/orders/${encodeURIComponent(id)}`, signal)
+export const getProofUploadTarget = (orderId: string, contentType: string) =>
+  apiPost<UploadTarget>(`/orders/${encodeURIComponent(orderId)}/payment-proof/upload-url`, {
+    content_type: contentType,
+  })
+export const sendPaymentProof = (
+  orderId: string,
+  proof: { reference?: string | null; image_path?: string | null },
+) => apiPost<Order>(`/orders/${encodeURIComponent(orderId)}/payment-proof`, proof)
 export const cancelOrder = (id: string) =>
   apiPost<Order>(`/orders/${encodeURIComponent(id)}/cancel`, {})
 export const changeOrderAddress = (
@@ -377,6 +387,8 @@ export interface CustomOrder {
   whatsapp_number: string
   description: string
   budget_paisa: number | null
+  /** The customer's own offer, waiting for the shop to accept it or answer. */
+  customer_offer_paisa: number | null
   /** The price the shop proposed in the discussion; it is agreed once the customer confirms. */
   proposed_price_paisa: number | null
   /** The agreed price (the customer's confirmation, set together with ACCEPTED). */
@@ -427,6 +439,12 @@ export const confirmCustomOrderPrice = (id: string, pricePaisa: number) =>
   apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/confirm-price`, {
     price_paisa: pricePaisa,
   })
+export const declineCustomOrderPrice = (id: string) =>
+  apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/decline-price`, {})
+export const offerCustomOrderPrice = (id: string, pricePaisa: number) =>
+  apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/offer-price`, {
+    price_paisa: pricePaisa,
+  })
 export const cancelCustomOrder = (id: string) =>
   apiPost<CustomOrder>(`/custom-orders/${encodeURIComponent(id)}/cancel`, {})
 
@@ -474,6 +492,8 @@ export interface BusinessSettings {
   delivery_information: string | null
   delivery_fee_paisa: number
   social_links: Record<string, string>
+  /** Where customers send money for the transfer method (empty: not offered). */
+  transfer_instructions?: string | null
 }
 
 // The shop details rarely change and are needed by the header, footer and several pages: fetch

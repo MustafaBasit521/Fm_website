@@ -61,12 +61,12 @@ export function BagDrawer({ open, onClose }: { open: boolean; onClose: () => voi
                   <img
                     src={line.image.url}
                     alt=""
-                    className="h-20 w-16 shrink-0 rounded-[10px] bg-cream-200 object-cover"
+                    className="h-32 w-28 shrink-0 rounded-[10px] bg-cream-200 object-cover"
                   />
                 ) : (
                   <div
                     aria-hidden="true"
-                    className="h-20 w-16 shrink-0 rounded-[10px] bg-cream-200"
+                    className="h-32 w-28 shrink-0 rounded-[10px] bg-cream-200"
                   />
                 )}
                 <div className="flex min-w-0 flex-1 flex-col gap-1">

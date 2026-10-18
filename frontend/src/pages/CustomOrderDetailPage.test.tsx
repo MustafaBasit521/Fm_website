@@ -11,6 +11,8 @@ const api = {
   getCustomOrderMessages: vi.fn(),
   sendCustomOrderMessage: vi.fn(),
   confirmCustomOrderPrice: vi.fn(),
+  declineCustomOrderPrice: vi.fn(),
+  offerCustomOrderPrice: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/api', async (orig) => ({
@@ -19,6 +21,8 @@ vi.mock('../lib/api', async (orig) => ({
   getCustomOrderMessages: (...a: unknown[]) => api.getCustomOrderMessages(...a),
   sendCustomOrderMessage: (...a: unknown[]) => api.sendCustomOrderMessage(...a),
   confirmCustomOrderPrice: (...a: unknown[]) => api.confirmCustomOrderPrice(...a),
+  declineCustomOrderPrice: (...a: unknown[]) => api.declineCustomOrderPrice(...a),
+  offerCustomOrderPrice: (...a: unknown[]) => api.offerCustomOrderPrice(...a),
 }))
 
 const co = (over: Partial<CustomOrder> = {}): CustomOrder => ({
@@ -27,6 +31,7 @@ const co = (over: Partial<CustomOrder> = {}): CustomOrder => ({
   whatsapp_number: '0300',
   description: 'A jersey with a name',
   budget_paisa: 150000,
+  customer_offer_paisa: null,
   proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: null,
@@ -151,4 +156,56 @@ it('shows no accept button when nothing has been proposed or the request is not 
   open()
   await screen.findByText('A jersey with a name')
   expect(screen.queryByRole('button', { name: 'Accept this price' })).not.toBeInTheDocument()
+})
+
+it('lets the customer decline a proposed price after a pop-up', async () => {
+  api.getCustomOrder.mockResolvedValue(co({ proposed_price_paisa: 800000 }))
+  api.declineCustomOrderPrice.mockImplementation(async () => {
+    api.getCustomOrder.mockResolvedValue(co({ proposed_price_paisa: null })) // the reload sees it
+    return co({ proposed_price_paisa: null })
+  })
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Decline' }))
+  expect(api.declineCustomOrderPrice).not.toHaveBeenCalled() // the pop-up asks first
+  expect(screen.getByRole('alertdialog', { name: 'Decline this price?' })).toHaveTextContent(
+    'Rs 8,000',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, decline' }))
+  expect(api.declineCustomOrderPrice).toHaveBeenCalledWith('c1')
+  expect(screen.queryByRole('button', { name: 'Accept this price' })).not.toBeInTheDocument()
+})
+
+it('lets the customer offer a different price instead', async () => {
+  api.getCustomOrder.mockResolvedValue(co({ proposed_price_paisa: 800000 }))
+  api.offerCustomOrderPrice.mockImplementation(async () => {
+    const updated = co({ proposed_price_paisa: null, customer_offer_paisa: 600000 })
+    api.getCustomOrder.mockResolvedValue(updated) // the reload sees it
+    return updated
+  })
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Offer a different price' }))
+  await userEvent.type(screen.getByLabelText('Your offer in Rs'), '6000')
+  await userEvent.click(screen.getByRole('button', { name: 'Send my offer' }))
+  expect(api.offerCustomOrderPrice).toHaveBeenCalledWith('c1', 600000)
+  expect(await screen.findByText(/You offered/)).toBeInTheDocument()
+  expect(screen.getByText('Rs 6,000')).toBeInTheDocument()
+  expect(screen.getByText(/Waiting for the shop/)).toBeInTheDocument()
+})
+
+it('rejects an offer that is not a number before calling the server', async () => {
+  api.getCustomOrder.mockResolvedValue(co({ proposed_price_paisa: 800000 }))
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Offer a different price' }))
+  await userEvent.type(screen.getByLabelText('Your offer in Rs'), 'lots')
+  await userEvent.click(screen.getByRole('button', { name: 'Send my offer' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('like 2500')
+  expect(api.offerCustomOrderPrice).not.toHaveBeenCalled()
+})
+
+it('shows a waiting offer and lets the customer change it', async () => {
+  api.getCustomOrder.mockResolvedValue(co({ customer_offer_paisa: 600000 }))
+  open()
+  expect(await screen.findByText(/You offered/)).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Change my offer' }))
+  expect(screen.getByLabelText('Your offer in Rs')).toBeInTheDocument()
 })

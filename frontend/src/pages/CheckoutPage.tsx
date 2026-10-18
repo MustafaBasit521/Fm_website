@@ -306,7 +306,19 @@ export default function CheckoutPage() {
                     checked={method === m}
                     onChange={() => setMethod(m)}
                   />
-                  {m === 'COD' ? 'Cash on delivery' : 'Pay online'}
+                  <span>
+                    {m === 'COD'
+                      ? 'Cash on delivery'
+                      : m === 'TRANSFER'
+                        ? 'Bank or wallet transfer'
+                        : 'Pay online'}
+                    {m === 'TRANSFER' && (
+                      <span className="block text-sm text-bark">
+                        Send the money from JazzCash, Easypaisa or your bank to the shop&apos;s
+                        account and share the proof. We hold your order for 30 minutes.
+                      </span>
+                    )}
+                  </span>
                 </label>
               ))}
             </fieldset>

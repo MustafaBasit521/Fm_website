@@ -44,6 +44,7 @@ export default function SettingsAdminPage() {
           address: optional('address'),
           delivery_information: optional('delivery_information'),
           delivery_fee_paisa: fee,
+          transfer_instructions: optional('transfer_instructions'),
           social_links: links,
         }),
       )
@@ -137,6 +138,27 @@ export default function SettingsAdminPage() {
                       defaultValue={settings.delivery_information ?? ''}
                     />
                   </div>
+                </div>
+              </section>
+              <section aria-label="Payment by transfer" className={`${cardClass} p-4 md:p-6`}>
+                <h2 className="font-serif text-2xl">Payment by transfer</h2>
+                <div className="mt-3 flex flex-col gap-1">
+                  <label htmlFor="transfer_instructions" className="text-sm font-medium text-bark">
+                    Where customers send the money
+                  </label>
+                  <textarea
+                    id="transfer_instructions"
+                    name="transfer_instructions"
+                    rows={4}
+                    maxLength={1000}
+                    className={inputClass}
+                    placeholder={'JazzCash: 0300 1234567 (account name)\nBank: IBAN ...'}
+                    defaultValue={settings.transfer_instructions ?? ''}
+                  />
+                  <p className="text-sm text-bark">
+                    Customers see this text when they pay by transfer. Leave it empty to switch
+                    transfer payments off (they can still pay cash on delivery).
+                  </p>
                 </div>
               </section>
               <fieldset className={`${cardClass} p-4 md:p-6`}>

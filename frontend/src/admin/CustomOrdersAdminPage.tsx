@@ -127,17 +127,26 @@ export default function CustomOrdersAdminPage() {
                         {c.customer_id ? 'Registered customer' : 'Guest'}
                       </p>
                       {c.reference_image_url && (
-                        <p className="mt-1">
-                          <a
-                            href={c.reference_image_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-terracotta underline"
-                          >
-                            View reference picture
-                          </a>{' '}
-                          <span className="text-sm text-muted">(link expires after an hour)</span>
-                        </p>
+                        <div className="mt-2">
+                          <a href={c.reference_image_url} target="_blank" rel="noopener noreferrer">
+                            <img
+                              src={c.reference_image_url}
+                              alt={`Reference picture from ${c.name}`}
+                              className="h-40 w-auto max-w-full rounded-[14px] bg-cream-200 object-cover"
+                            />
+                          </a>
+                          <p className="mt-1 text-sm">
+                            <a
+                              href={c.reference_image_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-terracotta underline"
+                            >
+                              View reference picture
+                            </a>{' '}
+                            <span className="text-muted">(link expires after an hour)</span>
+                          </p>
+                        </div>
                       )}
                       <p className="mt-3">
                         <Link

@@ -128,6 +128,15 @@ fake gateway page choose **Pay successfully** or **Fail the payment**. After a f
 **Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
 afterwards (the fake gateway keeps its state in memory only).
 
+## Pay by bank or wallet transfer
+
+Customers can pay by sending money to the shop's own JazzCash, Easypaisa or bank account (no gateway needed). One-time setup:
+
+1. In Supabase, **Storage -> New bucket** named `payment-proofs`, **Public off**, 5 MB limit, types `image/jpeg, image/png, image/webp` (customers' payment screenshots live here; the admin sees them through a temporary link).
+2. In the admin, **Settings -> Payment by transfer**: write where customers should send the money (account names and numbers). Saving an empty box switches the method off.
+
+Run `python -m app.tools.check_services` below to confirm the bucket.
+
 ## Check the real services
 
 One command tells you what is and is not set up (it prints no secrets and changes nothing):

@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   cancelAdminOrder,
   confirmCodPayment,
+  confirmTransferPayment,
+  getPaymentProofImage,
+  rejectTransferProof,
   getAdminOrder,
   refundOrder,
   setOrderStatus,
@@ -11,7 +14,8 @@ import {
 import { ApiError } from '../lib/api'
 import { formatPrice, parseRupeesToPaisa } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
-import { BackLink, buttonClass, FormError } from '../pages/ui'
+import { ConfirmDialog } from '../pages/ConfirmDialog'
+import { BackLink, buttonClass, FormError, secondaryButtonClass } from '../pages/ui'
 import { inputClass } from './styles'
 import { Badge, ConfirmButton, PageTitle, State, cardClass } from './ui'
 import { useLoad } from './useLoad'
@@ -50,6 +54,23 @@ export default function OrderAdminPage() {
   const [refundAmount, setRefundAmount] = useState('')
 
   const order = override?.order_id === id ? override : data
+  const [transferDialog, setTransferDialog] = useState<'confirm' | 'reject' | null>(null)
+  const [proofImage, setProofImage] = useState<{ key: string; url: string | null } | null>(null)
+  const transfer = order?.payments.find((p) => p.method === 'TRANSFER') ?? null
+  const proofKey = `${id}:${transfer?.proof_submitted_at ?? ''}`
+  // the proof is only shown (and so only fetched) while the payment is waiting to be checked
+  const proofOpen =
+    !!transfer?.proof_submitted_at && transfer.status === 'PENDING' && order?.status === 'PENDING'
+
+  // the screenshot sits in a private bucket: ask for a temporary link when a proof exists
+  useEffect(() => {
+    if (!proofOpen) return
+    const controller = new AbortController()
+    getPaymentProofImage(id, controller.signal)
+      .then(({ url }) => setProofImage({ key: proofKey, url }))
+      .catch(() => setProofImage({ key: proofKey, url: null }))
+    return () => controller.abort()
+  }, [id, proofKey, proofOpen])
 
   async function act(fn: () => Promise<AdminOrder>) {
     setBusy(true)
@@ -191,13 +212,81 @@ export default function OrderAdminPage() {
                   <ul className="mt-3 flex flex-col gap-1">
                     {order.payments.map((p) => (
                       <li key={p.payment_id}>
-                        {p.method === 'COD' ? 'Cash on delivery' : 'Online attempt'} —{' '}
-                        {paymentStatusLabel(p.status)} — {formatPrice(p.amount_paisa)}
+                        {p.method === 'COD'
+                          ? 'Cash on delivery'
+                          : p.method === 'TRANSFER'
+                            ? 'Bank or wallet transfer'
+                            : 'Online attempt'}{' '}
+                        — {paymentStatusLabel(p.status)} — {formatPrice(p.amount_paisa)}
                         {p.refunded_amount_paisa > 0 &&
                           ` (refunded ${formatPrice(p.refunded_amount_paisa)})`}
                       </li>
                     ))}
                   </ul>
+                  {transfer && transfer.status === 'PENDING' && order.status === 'PENDING' && (
+                    <div className="mt-4 flex flex-col gap-3 rounded-[10px] bg-cream-100 p-3">
+                      {transfer.proof_submitted_at ? (
+                        <>
+                          <p>
+                            <strong>The customer says they paid.</strong>{' '}
+                            {transfer.proof_reference && (
+                              <>
+                                Transaction number: <strong>{transfer.proof_reference}</strong>
+                                .{' '}
+                              </>
+                            )}
+                            Sent {formatDate(transfer.proof_submitted_at)}.
+                          </p>
+                          {proofImage?.key === proofKey && proofImage.url && (
+                            <figure>
+                              <a href={proofImage.url} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={proofImage.url}
+                                  alt="Screenshot of the payment sent by the customer"
+                                  className="max-h-96 w-full rounded-[10px] bg-cream-200 object-contain"
+                                />
+                              </a>
+                              <figcaption className="mt-1 text-sm text-muted">
+                                Payment screenshot (the link expires after an hour)
+                              </figcaption>
+                            </figure>
+                          )}
+                          <p className="text-sm text-bark">
+                            Check your account for {formatPrice(transfer.amount_paisa)}, then
+                            choose.
+                          </p>
+                        </>
+                      ) : (
+                        <p>
+                          Waiting for the customer to send their payment details
+                          {order.payment_deadline_at
+                            ? ` (until ${new Date(order.payment_deadline_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})`
+                            : ''}
+                          . If you already see the money in your account you can confirm it now.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          className={buttonClass}
+                          disabled={busy}
+                          onClick={() => setTransferDialog('confirm')}
+                        >
+                          Payment received
+                        </button>
+                        {transfer.proof_submitted_at && (
+                          <button
+                            type="button"
+                            className={secondaryButtonClass}
+                            disabled={busy}
+                            onClick={() => setTransferDialog('reject')}
+                          >
+                            Not received
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </section>
               </div>
 
@@ -333,6 +422,38 @@ export default function OrderAdminPage() {
           </div>
         )}
       </State>
+      <ConfirmDialog
+        open={transferDialog === 'confirm'}
+        title="Payment received?"
+        confirmLabel="Yes, confirm the order"
+        cancelLabel="Not yet"
+        onCancel={() => setTransferDialog(null)}
+        onConfirm={() => {
+          setTransferDialog(null)
+          void act(() => confirmTransferPayment(id))
+        }}
+      >
+        <p>
+          Only confirm if the money is really in your account. The payment is marked Paid, the order
+          is confirmed and the customer is told.
+        </p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={transferDialog === 'reject'}
+        title="Money not found?"
+        confirmLabel="Yes, ask them again"
+        cancelLabel="Back"
+        onCancel={() => setTransferDialog(null)}
+        onConfirm={() => {
+          setTransferDialog(null)
+          void act(() => rejectTransferProof(id))
+        }}
+      >
+        <p>
+          The customer is told you could not find their payment and gets another 30 minutes to send
+          correct details. After that the order is cancelled.
+        </p>
+      </ConfirmDialog>
     </>
   )
 }

@@ -83,10 +83,10 @@ export function WishlistDrawer({ open, onClose }: { open: boolean; onClose: () =
                   <img
                     src={p.image.url}
                     alt=""
-                    className="h-20 w-16 rounded-[10px] bg-cream-200 object-cover"
+                    className="h-32 w-28 rounded-[10px] bg-cream-200 object-cover"
                   />
                 ) : (
-                  <div aria-hidden="true" className="h-20 w-16 rounded-[10px] bg-cream-200" />
+                  <div aria-hidden="true" className="h-32 w-28 rounded-[10px] bg-cream-200" />
                 )}
               </Link>
               <div className="flex min-w-0 flex-1 flex-col gap-1">

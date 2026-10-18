@@ -80,11 +80,13 @@ export const getDashboard = (signal?: AbortSignal) => apiGet<Dashboard>('/admin/
 
 export interface AdminPayment {
   payment_id: string
-  method: 'COD' | 'ONLINE'
+  method: 'COD' | 'ONLINE' | 'TRANSFER'
   status: string
   amount_paisa: number
   refunded_amount_paisa: number
   provider_reference: string | null
+  proof_reference?: string | null
+  proof_submitted_at?: string | null
   created_at: string
 }
 
@@ -244,6 +246,10 @@ export const proposeCustomOrderPrice = (customOrderId: string, pricePaisa: numbe
   apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/propose-price`, {
     price_paisa: pricePaisa,
   })
+export const acceptCustomerOffer = (customOrderId: string, pricePaisa: number) =>
+  apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/accept-offer`, {
+    price_paisa: pricePaisa,
+  })
 /** Guest requests only: record the price the guest agreed on WhatsApp. */
 export const acceptCustomOrder = (customOrderId: string, agreedPricePaisa: number) =>
   apiPost<AdminCustomOrder>(`/admin/custom-orders/${id(customOrderId)}/accept`, {
@@ -290,6 +296,12 @@ export const getAdminSettings = (signal?: AbortSignal) =>
   apiGet<BusinessSettings & { updated_at: string }>('/admin/settings', signal)
 export const updateAdminSettings = (data: Partial<BusinessSettings>) =>
   apiPatch<BusinessSettings & { updated_at: string }>('/admin/settings', data)
+export const confirmTransferPayment = (orderId: string) =>
+  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/confirm-transfer`, {})
+export const rejectTransferProof = (orderId: string) =>
+  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/reject-transfer-proof`, {})
+export const getPaymentProofImage = (orderId: string, signal?: AbortSignal) =>
+  apiGet<{ url: string | null }>(`/admin/orders/${id(orderId)}/payment-proof-image`, signal)
 export const getPublicSettings = (signal?: AbortSignal) =>
   apiGet<BusinessSettings>('/settings', signal)
 

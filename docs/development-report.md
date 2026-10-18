@@ -465,3 +465,23 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 **Verified:** backend custom-order tests rewritten for the new flow (proposal, stale price, only the owner can confirm, guests); frontend tests for both pop-ups, the proposal card and the admin Price card; Chrome screenshots of all four screens. The local test database had stopped after a restart (`make db` starts it); all tests were re-run afterwards.
 
+## First hands-on test: feedback
+
+**Findings from the owner's own clicking:** the reference photo showed only as a link; the wishlist panel pictures were small; a second account that subscribed received no email; the customer had no way to say no to a proposed price.
+
+**Newsletter, cause:** the database shows both subscriptions were made on 16 Oct, before Resend was configured, so no welcome email was sent at that time (the welcome is sent once, when an address joins and a provider exists). Also, while the sender is `onboarding@resend.dev`, Resend delivers only to the Resend account's own address, so another person's address cannot receive any email until a domain is verified. Nothing is wrong in the code; both need the verified domain.
+
+**Built:** decline and counter-offer (customer), accept-offer (admin, stale price refused), notes in the thread, `customer_offer_paisa` (migration `ec0f63ac4520`); reference picture as an image (admin page and list); bigger wishlist/bag panel pictures.
+
+**Verified:** 5 new backend tests and 7 new frontend tests for the negotiation, the pop-ups and the inline picture; all suites re-run.
+
+## Payment by transfer (no gateway)
+
+**Decision (owner):** the business is an unregistered Instagram shop, so no gateway account is possible for now. Customers pay by sending money to the shop's own account and sharing the proof; the admin checks and marks it paid.
+
+**Design choices I made and documented (business-rules §13):** reuse the 30-minute window and the expiry function; sending proof stops the clock (the shop needs time); "Not received" gives a fresh window; the admin may confirm without proof; refunds are recorded by the admin only; the screenshot goes to a new private bucket; the instructions live in the business settings and switch the method on or off. Every one of these is a rule the owner can change.
+
+**Built:** migration `b061159f49d0` (enum value, proof columns, setting, expiry function), services `submit_transfer_proof`, `confirm_transfer`, `reject_transfer_proof`, a refund path without a provider (the provider dependency became optional), customer and admin routes, `TransferPayment` component, checkout option, admin proof view with pop-ups, settings field.
+
+**Verified:** 21 backend tests (offering, reservation, expiry, proof validation, stopping the clock, confirm, reject, privacy, refund, roles) and 14 frontend tests; all suites re-run.
+

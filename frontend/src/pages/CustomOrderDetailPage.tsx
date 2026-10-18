@@ -1,22 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   ApiError,
   getCustomOrder,
   confirmCustomOrderPrice,
+  declineCustomOrderPrice,
   getCustomOrderMessages,
+  offerCustomOrderPrice,
   sendCustomOrderMessage,
   type CustomOrder,
   type CustomOrderMessage,
 } from '../lib/api'
-import { formatPrice } from '../lib/money'
+import { formatPrice, parseRupeesToPaisa } from '../lib/money'
 import { formatDate } from '../lib/orderStatus'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Discussion } from './Discussion'
 import { PageHeader } from './PageHeader'
 import { StatusBadge } from './StatusBadge'
 import { CUSTOM_ORDER_TONE } from './statusColors'
-import { BackLink, buttonClass, FormError } from './ui'
+import { BackLink, buttonClass, FormError, inputClass, secondaryButtonClass } from './ui'
 
 const CUSTOM_LABELS: Record<string, string> = {
   NEW: 'Received',
@@ -41,6 +43,8 @@ export default function CustomOrderDetailPage() {
   } | null>(null)
   const [version, setVersion] = useState(0)
   const [asking, setAsking] = useState(false)
+  const [declining, setDeclining] = useState(false)
+  const [offering, setOffering] = useState(false)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
@@ -85,6 +89,32 @@ export default function CustomOrderDetailPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  /** Declining and offering both change the request and the thread, so reload both. */
+  async function negotiate(action: () => Promise<CustomOrder>) {
+    setBusy(true)
+    setProblem(null)
+    try {
+      const updated = await action()
+      setState((st) => (st ? { ...st, order: updated } : st))
+      setDeclining(false)
+      setOffering(false)
+      refresh()
+    } catch {
+      setDeclining(false)
+      setProblem('That did not work. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function sendOffer(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const price = parseRupeesToPaisa(String(new FormData(e.currentTarget).get('offer') ?? ''))
+    if (price === null || price === 0)
+      return setProblem('Enter your offer in Rs, like 2500 or 2500.50.')
+    void negotiate(() => offerCustomOrderPrice(id, price))
   }
 
   async function send(body: string) {
@@ -159,12 +189,68 @@ export default function CustomOrderDetailPage() {
                 >
                   Accept this price
                 </button>
+                <span className="mt-3 inline-flex flex-wrap gap-3 sm:ml-3">
+                  <button
+                    type="button"
+                    className={secondaryButtonClass}
+                    onClick={() => {
+                      setProblem(null)
+                      setDeclining(true)
+                    }}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    type="button"
+                    className={secondaryButtonClass}
+                    aria-expanded={offering}
+                    onClick={() => setOffering((o) => !o)}
+                  >
+                    Offer a different price
+                  </button>
+                </span>
+              </div>
+            ) : order.customer_offer_paisa !== null && order.status === 'IN_DISCUSSION' ? (
+              <div className="mt-4 rounded-[10px] bg-accent-tint p-4">
+                <p>
+                  You offered{' '}
+                  <strong className="text-lg">{formatPrice(order.customer_offer_paisa)}</strong>
+                </p>
+                <p className="mt-1 text-sm text-bark">
+                  Waiting for the shop to accept it or answer. You can talk about it below, or send
+                  a different offer.
+                </p>
+                <button
+                  type="button"
+                  className={`${secondaryButtonClass} mt-3`}
+                  aria-expanded={offering}
+                  onClick={() => setOffering((o) => !o)}
+                >
+                  Change my offer
+                </button>
               </div>
             ) : (
               <p className="mt-4 text-bark">
                 The price is agreed in the discussion below. The shop proposes it and you confirm it
                 here.
               </p>
+            )}
+            {offering && order.status === 'IN_DISCUSSION' && (
+              <form
+                onSubmit={sendOffer}
+                aria-label="Make an offer"
+                className="mt-3 flex flex-col gap-2 rounded-[10px] border border-sand p-3"
+              >
+                <label htmlFor="offer" className="text-sm font-medium text-bark">
+                  Your offer in Rs
+                </label>
+                <input id="offer" name="offer" inputMode="decimal" className={inputClass} />
+                <div>
+                  <button type="submit" className={buttonClass} disabled={busy}>
+                    Send my offer
+                  </button>
+                </div>
+              </form>
             )}
             <FormError message={problem} />
           </section>
@@ -196,6 +282,21 @@ export default function CustomOrderDetailPage() {
           You agree to{' '}
           {order?.proposed_price_paisa != null && formatPrice(order.proposed_price_paisa)} for this
           custom order. Once you accept, the price is final and the shop can start making it.
+        </p>
+      </ConfirmDialog>
+      <ConfirmDialog
+        open={declining}
+        title="Decline this price?"
+        confirmLabel="Yes, decline"
+        cancelLabel="Keep it"
+        busy={busy}
+        onCancel={() => setDeclining(false)}
+        onConfirm={() => void negotiate(() => declineCustomOrderPrice(id))}
+      >
+        <p>
+          The shop is told you do not accept{' '}
+          {order?.proposed_price_paisa != null && formatPrice(order.proposed_price_paisa)}. The
+          request stays open: you can talk about the price or offer a different one.
         </p>
       </ConfirmDialog>
     </main>

@@ -19,6 +19,7 @@ const co = (over: Partial<CustomOrder> = {}): CustomOrder => ({
   whatsapp_number: '0300',
   description: 'A jersey with a name',
   budget_paisa: 250000,
+  customer_offer_paisa: null,
   proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: '2026-12-01',

@@ -13,6 +13,7 @@ const api = {
   sendAdminCustomOrderMessage: vi.fn(),
   acceptCustomOrder: vi.fn(),
   proposeCustomOrderPrice: vi.fn(),
+  acceptCustomerOffer: vi.fn(),
   setCustomOrderStatus: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
@@ -22,6 +23,7 @@ vi.mock('../lib/adminApi', () => ({
   sendAdminCustomOrderMessage: (...a: unknown[]) => api.sendAdminCustomOrderMessage(...a),
   acceptCustomOrder: (...a: unknown[]) => api.acceptCustomOrder(...a),
   proposeCustomOrderPrice: (...a: unknown[]) => api.proposeCustomOrderPrice(...a),
+  acceptCustomerOffer: (...a: unknown[]) => api.acceptCustomerOffer(...a),
   setCustomOrderStatus: (...a: unknown[]) => api.setCustomOrderStatus(...a),
 }))
 
@@ -31,6 +33,7 @@ const co = (over: Partial<AdminCustomOrder> = {}): AdminCustomOrder => ({
   whatsapp_number: '0300 1234567',
   description: 'A jersey with a name',
   budget_paisa: 150000,
+  customer_offer_paisa: null,
   proposed_price_paisa: null,
   agreed_price_paisa: null,
   required_date: null,
@@ -167,4 +170,42 @@ it('closes the discussion once the request is finished but keeps the messages re
   expect(await screen.findByText(/Can you do blush pink/)).toBeInTheDocument()
   expect(screen.getByText(/discussion is closed/)).toBeInTheDocument()
   expect(screen.queryByLabelText('Write a message')).not.toBeInTheDocument()
+})
+
+it("shows the customer's offer and accepts it only after a pop-up", async () => {
+  api.getAdminCustomOrder.mockResolvedValue(co({ customer_offer_paisa: 600000 }))
+  api.acceptCustomerOffer.mockResolvedValue(
+    co({ status: 'ACCEPTED', customer_offer_paisa: null, agreed_price_paisa: 600000 }),
+  )
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Accept Rs 6,000' }))
+  expect(api.acceptCustomerOffer).not.toHaveBeenCalled()
+  expect(
+    screen.getByRole('alertdialog', { name: "Accept the customer's offer?" }),
+  ).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, accept' }))
+  expect(api.acceptCustomerOffer).toHaveBeenCalledWith('c1', 600000)
+  expect(await screen.findByText('Accepted at Rs 6,000')).toBeInTheDocument()
+})
+
+it('warns when the customer changed their offer before it was accepted', async () => {
+  api.getAdminCustomOrder.mockResolvedValue(co({ customer_offer_paisa: 600000 }))
+  api.acceptCustomerOffer.mockRejectedValue(new ApiError(409, 'x', { code: 'PRICE_CHANGED' }))
+  open()
+  await userEvent.click(await screen.findByRole('button', { name: 'Accept Rs 6,000' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, accept' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('changed their offer')
+})
+
+it('shows the reference picture itself on the request page', async () => {
+  api.getAdminCustomOrder.mockResolvedValue(
+    co({ reference_image_url: 'https://down.example/x?sig=1' }),
+  )
+  open()
+  const picture = await screen.findByRole('img', { name: 'Reference picture from Sara' })
+  expect(picture).toHaveAttribute('src', 'https://down.example/x?sig=1')
+  expect(screen.getByRole('link', { name: 'View reference picture' })).toHaveAttribute(
+    'href',
+    'https://down.example/x?sig=1',
+  )
 })

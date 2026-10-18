@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  acceptCustomerOffer,
   acceptCustomOrder,
   getAdminCustomOrder,
   getAdminCustomOrderMessages,
@@ -15,6 +16,7 @@ import { formatDate } from '../lib/orderStatus'
 import { Discussion } from '../pages/Discussion'
 import { StatusBadge } from '../pages/StatusBadge'
 import { CUSTOM_ORDER_TONE } from '../pages/statusColors'
+import { ConfirmDialog } from '../pages/ConfirmDialog'
 import { BackLink, buttonClass, FormError, inputClass } from '../pages/ui'
 import { useToast } from '../toast/context'
 import { CUSTOM_ORDER_LABELS, CUSTOM_ORDER_NEXT, DISCUSSION_OPEN } from './customOrderStatus'
@@ -33,6 +35,7 @@ export default function CustomOrderAdminPage() {
   const [version, setVersion] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [acceptingOffer, setAcceptingOffer] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -95,6 +98,28 @@ export default function CustomOrderAdminPage() {
     }
   }
 
+  async function onAcceptOffer() {
+    const price = order?.customer_offer_paisa
+    setAcceptingOffer(false)
+    if (price == null) return
+    setBusy(true)
+    setError(null)
+    try {
+      const updated = await acceptCustomerOffer(id, price)
+      setState((s) => (s ? { ...s, order: updated } : s))
+      refresh()
+      toast.show(`Accepted at ${formatPrice(price)}`)
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === 'PRICE_CHANGED'
+          ? 'The customer changed their offer. Reload the page to see the new price.'
+          : explain(err),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function send(body: string) {
     const created = await sendAdminCustomOrderMessage(id, body)
     setState((s) => (s ? { ...s, messages: [...s.messages, created] } : s))
@@ -129,17 +154,27 @@ export default function CustomOrderAdminPage() {
                     {order.required_date && <> · Needed by {formatDate(order.required_date)}</>}
                   </p>
                   {order.reference_image_url && (
-                    <p className="mt-2">
-                      <a
-                        href={order.reference_image_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-4"
-                      >
-                        View reference picture
-                      </a>{' '}
-                      <span className="text-sm text-muted">(link expires after an hour)</span>
-                    </p>
+                    <figure className="mt-3">
+                      <a href={order.reference_image_url} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={order.reference_image_url}
+                          alt={`Reference picture from ${order.name}`}
+                          className="max-h-96 w-full rounded-[14px] bg-cream-200 object-contain"
+                        />
+                      </a>
+                      <figcaption className="mt-1 text-sm text-muted">
+                        Reference picture.{' '}
+                        <a
+                          href={order.reference_image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline underline-offset-4"
+                        >
+                          View reference picture
+                        </a>{' '}
+                        (the link expires after an hour)
+                      </figcaption>
+                    </figure>
                   )}
                 </section>
 
@@ -185,6 +220,25 @@ export default function CustomOrderAdminPage() {
                       </dd>
                     </div>
                   </dl>
+                  {order.customer_offer_paisa !== null && order.status === 'IN_DISCUSSION' && (
+                    <div className="mt-3 rounded-[10px] bg-accent-tint p-3">
+                      <p>
+                        The customer offered{' '}
+                        <strong>{formatPrice(order.customer_offer_paisa)}</strong>.
+                      </p>
+                      <button
+                        type="button"
+                        className={`${buttonClass} mt-2`}
+                        disabled={busy}
+                        onClick={() => setAcceptingOffer(true)}
+                      >
+                        Accept {formatPrice(order.customer_offer_paisa)}
+                      </button>
+                      <p className="mt-2 text-sm text-bark">
+                        Or propose a different price below: that replaces their offer.
+                      </p>
+                    </div>
+                  )}
                   {order.proposed_price_paisa !== null && order.agreed_price_paisa === null && (
                     <p className="mt-3 rounded-[10px] bg-accent-tint p-3">
                       You proposed <strong>{formatPrice(order.proposed_price_paisa)}</strong>.
@@ -261,6 +315,20 @@ export default function CustomOrderAdminPage() {
           </div>
         )}
       </State>
+      <ConfirmDialog
+        open={acceptingOffer}
+        title="Accept the customer's offer?"
+        confirmLabel="Yes, accept"
+        cancelLabel="Not yet"
+        onCancel={() => setAcceptingOffer(false)}
+        onConfirm={() => void onAcceptOffer()}
+      >
+        <p>
+          The request is accepted at{' '}
+          {order?.customer_offer_paisa != null && formatPrice(order.customer_offer_paisa)} and the
+          customer is told. The price is then final.
+        </p>
+      </ConfirmDialog>
     </>
   )
 }

@@ -564,7 +564,7 @@ Customer deletion does not destroy the custom-order record (`ON DELETE SET NULL`
 
 The exact status enum will be finalized during custom-order implementation.
 
-`proposed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_proposed`) is the price the shop proposed in the discussion. `agreed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_agreed`) is the price both sides agreed: it is set together with the status `ACCEPTED`, by the customer's confirmation (for a guest request, by the admin recording what the guest agreed on WhatsApp). `budget_paisa` stays what the customer offered. Migrations `custom order discussion` (`d194a654f642`) and `custom order proposed price` (`433a196d7ae5`).
+`customer_offer_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_offer`) is the customer's own counter-offer, waiting for the shop; setting it clears the proposal and a new proposal clears it. `proposed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_proposed`) is the price the shop proposed in the discussion. `agreed_price_paisa BIGINT NULL` (check `>= 0`, `ck_custom_orders_agreed`) is the price both sides agreed: it is set together with the status `ACCEPTED`, by the customer's confirmation (for a guest request, by the admin recording what the guest agreed on WhatsApp). `budget_paisa` stays what the customer offered. Migrations `custom order discussion` (`d194a654f642`) `custom order proposed price` (`433a196d7ae5`) and `custom order customer offer` (`ec0f63ac4520`).
 
 ```text
 custom_order_messages
@@ -947,4 +947,13 @@ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 Visitors (with or without an account) who asked to hear about new pieces (`business-rules.md`, Newsletter). No foreign key: a subscriber need not be a customer, and a customer who is also on the list is emailed once. `unsubscribe_token` is a random secret (`secrets.token_urlsafe(24)`) used only in the unsubscribe link; unsubscribing **deletes** the row. Joining uses `INSERT ... ON CONFLICT (email) DO NOTHING`, so a repeat is a no-op. Migration `create newsletter subscribers` (revision `704352cdd7e1`).
+
+---
+
+# 30. Payment by transfer
+
+* `payment_method` has the extra value `TRANSFER` (migration `payment by transfer`, revision `b061159f49d0`; PostgreSQL cannot remove enum values, so a downgrade leaves it).
+* `payments` gets `proof_reference TEXT NULL` (the transaction number the customer typed), `proof_image_path TEXT NULL` (path `payment-proofs/{uuid}.{jpg|png|webp}` in the **private** `payment-proofs` bucket; the admin sees it through a short-lived signed link) and `proof_submitted_at TIMESTAMPTZ NULL`.
+* `business_settings` gets `transfer_instructions TEXT NULL`: where customers send the money; empty means the method is not offered.
+* The database function `expire_unpaid_online_orders()` now treats `TRANSFER` like `ONLINE` (unpaid, window passed, nothing paid). Sending proof sets `orders.payment_deadline_at` to NULL, so such an order is not picked up while the shop is checking; rejecting the proof sets a new deadline.
 

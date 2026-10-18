@@ -175,3 +175,13 @@ it('puts the total on the Place order button and shows payment choices as cards'
   await userEvent.click(screen.getByLabelText('Pay online'))
   expect(screen.getByLabelText('Pay online').closest('label')).toHaveClass('border-ink')
 })
+
+it('offers the transfer method with a short explanation when the shop accepts transfers', async () => {
+  api.getQuote.mockResolvedValue({ ...okQuote, payment_methods: ['COD', 'TRANSFER'] })
+  renderCheckout()
+  const transfer = await screen.findByLabelText(/Bank or wallet transfer/)
+  expect(transfer.closest('label')).toHaveTextContent(/hold your order for 30 minutes/)
+  expect(screen.getByLabelText('Cash on delivery')).toBeChecked()
+  await userEvent.click(transfer)
+  expect(transfer).toBeChecked()
+})

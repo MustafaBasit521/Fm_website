@@ -4,6 +4,7 @@ import { ApiError, cancelOrder, changeOrderAddress, getOrder, type Order } from 
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
 import { PayNowButton } from './PayNowButton'
+import { TransferPayment } from './TransferPayment'
 import { buttonClass, Field, FormError, BackLink } from './ui'
 import { OrderBreakdown } from './OrderBreakdown'
 import { StatusBadge } from './StatusBadge'
@@ -143,6 +144,8 @@ export default function OrderDetailPage() {
             <PayNowButton orderId={order.order_id} />
           </div>
         )}
+
+      <TransferPayment order={order} onUpdated={setOverride} />
 
       {order.status === 'CANCELLED' && (
         <div role="status" className="mt-4 rounded-[18px] border border-sand bg-paper p-4">
