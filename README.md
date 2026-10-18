@@ -128,6 +128,30 @@ fake gateway page choose **Pay successfully** or **Fail the payment**. After a f
 **Try paying again** within 30 minutes. Set the flag back to `false` and the provider to `none`
 afterwards (the fake gateway keeps its state in memory only).
 
+## Tell customers when their payment window expires
+
+Cancelling an unpaid order after 30 minutes already happens every minute inside the database (pg_cron). To also **tell the customer and the shop**, something must call the backend every few minutes:
+
+1. Create a long random secret and put it in the backend's environment as `CRON_SECRET` (never commit it).
+2. Call `POST https://YOUR-API/api/internal/expire-orders` with the header `X-Cron-Secret: <the secret>` every 5 minutes. Any of these works:
+   - **Supabase** (needs the `pg_net` extension; run once in the SQL editor, with your real URL and secret):
+
+     ```sql
+     create extension if not exists pg_net;
+     select cron.schedule('notify-expired-orders', '*/5 * * * *', $$
+       select net.http_post(
+         url := 'https://YOUR-API/api/internal/expire-orders',
+         headers := jsonb_build_object('X-Cron-Secret', 'YOUR-SECRET')
+       )
+     $$);
+     -- check: select * from cron.job; remove: select cron.unschedule('notify-expired-orders');
+     ```
+
+   - a free external scheduler such as cron-job.org (POST, the header above, every 5 minutes);
+   - Vercel Cron only if you accept a coarser schedule (the free plan runs once a day).
+
+The call is safe to repeat: each expired order is announced exactly once. Without `CRON_SECRET` the route answers 404.
+
 ## Pay by bank or wallet transfer
 
 Customers can pay by sending money to the shop's own JazzCash, Easypaisa or bank account (no gateway needed). One-time setup:
@@ -151,6 +175,30 @@ It checks the database and migrations, the pg_cron expiry job, the Supabase sign
 Storage buckets (existence, public/private, 5 MB limit, image types), the admin two-factor setting
 and the email provider. Lines marked `MANUAL` need a look in a dashboard (authenticator codes in
 Supabase, the verified domain in Resend).
+
+## Email without a domain: Gmail through SMTP
+
+If the shop has no domain yet, a **dedicated Gmail account** can send the shop's emails to anyone, for free (about 500 recipients a day; keep newsletters small). Mail really does come from Google, so it is not blocked.
+
+1. Create a Gmail account just for the shop (not a personal one), e.g. `bundleofloops.shop@gmail.com`.
+2. Google Account -> Security -> turn on **2-Step Verification**.
+3. Google Account -> Security -> search for **App passwords** -> create one named "Shop" -> copy the 16 letters (no spaces). Keep it secret; it replaces the real password.
+4. In `backend/.env` (git-ignored) set:
+
+   ```text
+   EMAIL_PROVIDER=smtp
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=465
+   SMTP_USERNAME=bundleofloops.shop@gmail.com
+   SMTP_PASSWORD=<the 16-letter app password>
+   EMAIL_FROM=Bundle of Loops <bundleofloops.shop@gmail.com>
+   ```
+
+   `EMAIL_FROM` must be the same Gmail address, otherwise Gmail rewrites it.
+5. Restart the backend and test with another person's address: `cd backend && .venv/bin/python -m app.tools.check_services --send-test friend@example.com`.
+6. **Signup emails** come from Supabase, not from this backend: Supabase dashboard -> Authentication -> Emails -> SMTP Settings -> enable custom SMTP with the same host, port 465, username, app password, sender email (the Gmail address) and sender name. Then switch "Confirm email" on again if you turned it off.
+
+When the shop gets a domain, move to Resend (next section) without changing anything else.
 
 ## Email (Resend)
 
@@ -211,7 +259,8 @@ depends on them.
 | `CORS_ORIGINS` | exactly your two site origins, e.g. `https://www.yourshop.com,https://admin.yourshop.com` |
 | `TRUST_PROXY_HEADERS` | `true` only if a trusted reverse proxy sets `X-Forwarded-For` (otherwise every visitor shares one rate-limit budget; the API logs a warning in production when this is off) |
 | `PAYMENT_PROVIDER`, `ONLINE_PAYMENTS_ENABLED` | `none` / `false` until a real gateway adapter exists (the fake gateway is refused in production) |
-| `EMAIL_PROVIDER` | `none` (default), `console` (development only, refused in production) or `resend` |
+| `EMAIL_PROVIDER` | `none` (default), `console` (development only, refused in production), `resend` or `smtp` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | for `smtp` (with `EMAIL_FROM`): the mail server and login; the password is a server-only secret |
 | `RESEND_API_KEY`, `EMAIL_FROM` | required for `resend`; server-only secret and the sender address |
 | `GLOBAL_RATE_LIMIT_PER_MINUTE`, `LOG_LEVEL` | defaults `600` and `INFO` are fine |
 

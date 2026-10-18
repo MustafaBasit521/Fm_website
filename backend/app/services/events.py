@@ -281,6 +281,38 @@ async def transfer_proof_rejected(session: AsyncSession, order: Order) -> None:
     )
 
 
+async def order_expired(session: AsyncSession, order: Order) -> None:
+    """An unpaid order's payment window ran out and the order was cancelled: tell the customer
+    (and the shop, in case the customer did pay and only forgot to send the details)."""
+    shop = await _shop_name(session)
+    ref = short_ref(order)
+    text = (
+        f"Order {ref} was cancelled because we did not receive the payment within 30 minutes. "
+        "The items went back to the shop. If you already paid, please contact us with your "
+        "payment details. You are welcome to order again any time: "
+        f"{get_settings().frontend_url}/shop"
+    )
+    _notify(
+        session, order.customer_id, NotificationType.ORDER_STATUS_CHANGED, "Order cancelled", text
+    )
+    queue_email(
+        session,
+        EmailMessage(
+            to=order.customer_email,
+            subject=f"Order {ref} was cancelled: payment not received",
+            body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
+        ),
+    )
+    await _alert_shop(
+        session,
+        f"Order {ref} expired without payment",
+        f"{order.customer_name}'s order {ref} ({format_price(order.total_amount_paisa)}) was "
+        "cancelled because no payment arrived within 30 minutes, and the stock was returned. If "
+        "the customer says they paid, contact them: their order cannot be reopened, but you can "
+        "refund or arrange a new order.",
+    )
+
+
 # ---- custom orders -------------------------------------------------------------------------
 
 

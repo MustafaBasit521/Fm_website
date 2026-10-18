@@ -1,4 +1,9 @@
+import asyncio
 import logging
+import smtplib
+import ssl
+from collections.abc import Callable
+from email.message import EmailMessage as MimeMessage
 from typing import Annotated
 
 import httpx
@@ -77,7 +82,62 @@ class ResendEmailProvider:
             raise EmailError(f"Resend refused the email ({res.status_code}): {res.text[:200]}")
 
 
+class SmtpEmailProvider:
+    """Sends through any SMTP server (for example Gmail: smtp.gmail.com, an App Password).
+
+    Port 465 opens a TLS connection straight away; any other port starts plain and upgrades with
+    STARTTLS before the login, so the password never travels unencrypted. The blocking smtplib
+    runs in a worker thread. The password is never logged or put in an error message."""
+
+    name = "smtp"
+
+    def __init__(
+        self,
+        settings: Settings,
+        connect: Callable[[str, int], smtplib.SMTP] | None = None,
+    ) -> None:
+        assert settings.smtp_host and settings.smtp_username and settings.smtp_password
+        assert settings.email_from  # all checked by Settings
+        self._host = settings.smtp_host
+        self._port = settings.smtp_port
+        self._user = settings.smtp_username
+        self._password = settings.smtp_password.get_secret_value()
+        self._from = settings.email_from
+        self._connect = connect  # tests inject a fake server; None = the real network
+
+    def _open(self) -> smtplib.SMTP:
+        if self._connect is not None:
+            return self._connect(self._host, self._port)
+        if self._port == 465:
+            return smtplib.SMTP_SSL(
+                self._host, self._port, timeout=15, context=ssl.create_default_context()
+            )
+        return smtplib.SMTP(self._host, self._port, timeout=15)
+
+    def _send_sync(self, message: EmailMessage) -> None:
+        mime = MimeMessage()
+        mime["From"] = self._from
+        mime["To"] = message.to
+        mime["Subject"] = message.subject
+        mime.set_content(message.body)
+        with self._open() as server:
+            if self._port != 465:
+                server.starttls(context=ssl.create_default_context())
+            server.login(self._user, self._password)
+            server.send_message(mime)
+
+    async def send(self, message: EmailMessage) -> None:
+        try:
+            await asyncio.to_thread(self._send_sync, message)
+        except smtplib.SMTPAuthenticationError as e:
+            raise EmailError(f"The mail server refused the login (code {e.smtp_code})") from e
+        except (smtplib.SMTPException, OSError) as e:
+            raise EmailError(f"The mail could not be sent ({type(e).__name__})") from e
+
+
 def build_email_provider(settings: Settings) -> EmailProvider:
+    if settings.email_provider == "smtp":
+        return SmtpEmailProvider(settings)
     if settings.email_provider == "resend":
         return ResendEmailProvider(settings)
     return ConsoleEmailProvider() if settings.email_provider == "console" else NullEmailProvider()

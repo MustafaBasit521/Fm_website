@@ -65,6 +65,10 @@ class Order(Base):
     payment_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set by the expiry function when an unpaid order's payment window ran out; the scheduled job
+    # then tells the customer (expiry_notified_at) exactly once.
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expiry_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancellation_charge_paisa: Mapped[int] = mapped_column(BigInteger, server_default="0")
     charge_waived: Mapped[bool] = mapped_column(Boolean, server_default=false())
 

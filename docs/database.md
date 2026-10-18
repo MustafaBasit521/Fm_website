@@ -957,3 +957,9 @@ Visitors (with or without an account) who asked to hear about new pieces (`busin
 * `business_settings` gets `transfer_instructions TEXT NULL`: where customers send the money; empty means the method is not offered.
 * The database function `expire_unpaid_online_orders()` now treats `TRANSFER` like `ONLINE` (unpaid, window passed, nothing paid). Sending proof sets `orders.payment_deadline_at` to NULL, so such an order is not picked up while the shop is checking; rejecting the proof sets a new deadline.
 
+---
+
+# 31. Order expiry notices
+
+`orders` gets `expired_at TIMESTAMPTZ NULL` (set by `expire_unpaid_online_orders()` together with the cancellation) and `expiry_notified_at TIMESTAMPTZ NULL` (set when the customer and shop were told). The scheduled job announces every order with `expired_at` set and `expiry_notified_at` empty, one order per transaction, so a repeated or overlapping run never announces an order twice. Orders that expired before the migration are marked as already announced (migration `order expiry notices`, revision `23b454d1a23a`).
+

@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # delivers to anyone once the domain is verified there (until then: "onboarding@resend.dev"
     # may send only to the account owner's own address, which is enough for testing).
     email_from: str | None = None
+    # "smtp": send through any SMTP server, e.g. a dedicated Gmail account with an App Password
+    # (smtp.gmail.com, port 465). EMAIL_FROM must then be that same address. Server-only secret.
+    smtp_host: str | None = None
+    smtp_port: int = 465  # 465 = TLS from the start; 587 (or others) = STARTTLS
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    # Secret for the scheduled job route (POST /api/internal/expire-orders). Unset = the route does
+    # not exist. Use a long random value and send it in the X-Cron-Secret header. Server-only.
+    cron_secret: SecretStr | None = None
     # Behind a reverse proxy (Vercel, nginx, ...) the client IP is in X-Forwarded-For. Enable only
     # when the app is really behind such a proxy, otherwise clients could spoof their IP.
     trust_proxy_headers: bool = False
@@ -87,8 +96,15 @@ class Settings(BaseSettings):
             raise ValueError("LOG_LEVEL must be DEBUG, INFO, WARNING or ERROR")
         if self.is_production and not self.admin_require_mfa:
             raise ValueError("ADMIN_REQUIRE_MFA cannot be turned off in production")
-        if self.email_provider not in ("none", "console", "resend"):
-            raise ValueError("EMAIL_PROVIDER must be 'none', 'console' or 'resend'")
+        if self.email_provider not in ("none", "console", "resend", "smtp"):
+            raise ValueError("EMAIL_PROVIDER must be 'none', 'console', 'resend' or 'smtp'")
+        if self.email_provider == "smtp" and not (
+            self.smtp_host and self.smtp_username and self.smtp_password and self.email_from
+        ):
+            raise ValueError(
+                "EMAIL_PROVIDER=smtp requires SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD "
+                "and EMAIL_FROM"
+            )
         if self.email_provider == "resend" and not (self.resend_api_key and self.email_from):
             raise ValueError("EMAIL_PROVIDER=resend requires RESEND_API_KEY and EMAIL_FROM")
         if self.email_provider == "console" and self.is_production:

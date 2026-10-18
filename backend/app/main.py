@@ -17,6 +17,7 @@ from app.api import (
     customers,
     engagement,
     health,
+    internal,
     orders,
     payments,
     wishlist,
@@ -98,6 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/api")
     app.include_router(admin_catalog.router, prefix="/api")
     app.include_router(admin_orders.router, prefix="/api")
+    app.include_router(internal.router, prefix="/api")
     if settings.payment_provider == "fake":  # dev-only simulator (refused in production)
         from app.api import dev_gateway
 

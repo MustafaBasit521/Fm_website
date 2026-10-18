@@ -319,6 +319,8 @@ If the 30-minute window expires without a successful payment:
 
 Expired unpaid online orders must be cleaned up automatically.
 
+**The customer is told (decided by the owner, UI polish phase):** when an unpaid online or transfer order expires, the customer gets an in-app notification (registered customers) and an email ("Order X was cancelled: payment not received", with how to order again and what to do if they already paid), and the shop gets an alert email in case the customer did pay and forgot to send the details. Each expired order is announced exactly once, by a scheduled call to the backend (`POST /api/internal/expire-orders`, protected by a secret) that also runs the expiry function itself.
+
 Expiry mechanism (decided): the database function `expire_unpaid_online_orders()` cancels expired unpaid online orders and returns their stock; it is scheduled every minute with Supabase pg_cron. The API also runs the same function just before reserving stock for a new order, so correctness does not depend on the schedule. Online payment stays disabled (`ONLINE_PAYMENTS_ENABLED=false`) until a payment gateway is integrated, so no customer places an order they cannot pay for.
 
 Late payment (decided): if a verified payment arrives after the window has closed — whether the expiry job has already cancelled the order or has not run yet — the order stays Cancelled and is never reopened. The payment is recorded as Paid and the full amount is refundable (no cancellation charge).
