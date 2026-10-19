@@ -67,6 +67,9 @@ refuses that setting in production). Also make sure `CORS_ORIGINS` in `backend/.
 
 ### Deploying the two sites
 
+Step-by-step guide for the free start (Supabase + Render + Vercel): **[docs/deployment.md](docs/deployment.md)**. The Render blueprint is `render.yaml`.
+
+
 `cd frontend && npm run build` produces two independent static sites: `dist/shop` (host it on your
 public domain, e.g. `www.yourshop.com`) and `dist/admin` (host it on its own domain, e.g.
 `admin.yourshop.com`). Both call the same API, so list **both** origins in `CORS_ORIGINS`. Giving

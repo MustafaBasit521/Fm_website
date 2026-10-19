@@ -1,0 +1,46 @@
+# Render "Blueprint" for the API (the two websites live on Vercel, see docs/deployment.md).
+# Values marked `sync: false` are secrets or addresses you type into Render's dashboard: they are
+# never stored in this file.
+services:
+  - type: web
+    name: bundle-of-loops-api
+    runtime: python
+    region: singapore # closest to the Supabase database (Tokyo) and Pakistan
+    plan: free # sleeps after 15 minutes without a request; "starter" never sleeps
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: APP_ENV
+        value: production
+      - key: TRUST_PROXY_HEADERS # Render's proxy sets X-Forwarded-For (rate limits need it)
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: EMAIL_PROVIDER
+        value: smtp
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "465"
+      - key: DATABASE_URL # postgresql+asyncpg://... (Supabase pooler address)
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: CORS_ORIGINS # both site addresses, comma separated, no trailing slash
+        sync: false
+      - key: FRONTEND_URL # the shop's address
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: CRON_SECRET
+        sync: false
