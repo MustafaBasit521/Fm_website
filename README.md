@@ -155,13 +155,15 @@ Cancelling an unpaid order after 30 minutes already happens every minute inside 
 
 The call is safe to repeat: each expired order is announced exactly once. Without `CRON_SECRET` the route answers 404.
 
-## Pay with Easypaisa or JazzCash (manual QR payment)
+## Pay with Easypaisa or JazzCash (no gateway needed)
 
-Customers can pay in advance by scanning the shop's own merchant QR code (no gateway needed). One-time setup:
+Customers can pay in advance into the shop's own wallet. At launch the customer pays, then messages the screenshot on WhatsApp, and you press **Mark as paid**. One-time setup:
 
-1. In Supabase, **Storage -> New bucket** named `payment-proofs`, **Public off**, 5 MB limit, types `image/jpeg, image/png, image/webp` (customers' receipt screenshots live here; the admin sees them through a temporary link). The QR codes themselves go into the existing public gallery bucket.
-2. In the admin, **Settings -> Easypaisa and JazzCash**: upload each wallet's QR code (and, if you like, the account details to show next to it). A wallet without a QR code is not offered.
-3. Day to day, open **Payments** in the admin: for every receipt, check your own Easypaisa/JazzCash merchant account, then **Verify** or **Reject** (a reason is required).
+1. In the admin, **Settings -> Contact**: fill in the shop's **WhatsApp number** (customers send the screenshot there).
+2. **Settings -> Easypaisa and JazzCash**: upload each wallet's QR code and/or type the account name and number. A wallet is offered at checkout when it has one of them and the WhatsApp number is set. You are emailed whenever these details change.
+3. Day to day, open the order (the orders list has an **Awaiting payment only** filter). When you see the full amount in your Easypaisa/JazzCash app, press **Mark as paid** and type the amount you received. Orders that are never paid are cancelled by you (the stock is returned); nothing expires by itself.
+
+The receipt-upload flow (the customer uploads a screenshot and transaction number, you verify or reject on a Payments page, 30-minute window) is built but switched off. To use it, set `MANUAL_RECEIPTS_ENABLED=true` on the backend and create the private Storage bucket `payment-proofs` (**Public off**, 5 MB, `image/jpeg, image/png, image/webp`). While it is off, its API routes answer `403 FEATURE_DISABLED`.
 
 Run `python -m app.tools.check_services` below to confirm the bucket.
 
@@ -262,6 +264,7 @@ depends on them.
 | `SUPABASE_SERVICE_KEY` | the secret key (server only) |
 | `CORS_ORIGINS` | exactly your two site origins, e.g. `https://www.yourshop.com,https://admin.yourshop.com` |
 | `TRUST_PROXY_HEADERS` | `true` only if a trusted reverse proxy sets `X-Forwarded-For` (otherwise every visitor shares one rate-limit budget; the API logs a warning in production when this is off) |
+| `MANUAL_RECEIPTS_ENABLED` | `false` (default): Easypaisa/JazzCash orders are paid by WhatsApp screenshot and "Mark as paid". `true` revives the receipt-upload flow |
 | `PAYMENT_PROVIDER`, `ONLINE_PAYMENTS_ENABLED` | `none` / `false` until a real gateway adapter exists (the fake gateway is refused in production) |
 | `EMAIL_PROVIDER` | `none` (default), `console` (development only, refused in production), `resend` or `smtp` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` | for `smtp` (with `EMAIL_FROM`): the mail server and login; the password is a server-only secret |

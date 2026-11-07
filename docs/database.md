@@ -415,6 +415,11 @@ amount_paisa BIGINT NOT NULL
 refunded_amount_paisa BIGINT NOT NULL DEFAULT 0
 provider_reference TEXT UNIQUE
 
+paid_marked_by UUID NULL        -- Easypaisa/JazzCash "Mark as paid": the admin (§32)
+paid_marked_at TIMESTAMPTZ NULL
+paid_reference TEXT NULL        -- optional wallet transaction number
+paid_note TEXT NULL
+
 created_at TIMESTAMPTZ
 updated_at TIMESTAMPTZ
 ```
@@ -426,6 +431,7 @@ amount_paisa >= 0
 refunded_amount_paisa >= 0
 refunded_amount_paisa <= amount_paisa
 UNIQUE(provider_reference)
+(paid_marked_by IS NULL) = (paid_marked_at IS NULL)
 ```
 
 `provider_reference` may remain NULL for COD payments. (PostgreSQL allows multiple NULLs under a UNIQUE constraint.)
@@ -434,7 +440,8 @@ Relationship:
 
 ```text
 orders 1 ──── N payments
-payments 1 ──── N payment_attempts   (Easypaisa / JazzCash submissions, see §30)
+payments 1 ──── N payment_attempts   (Easypaisa / JazzCash receipt flow, switched off at launch, see §30)
+payments 1 ──── N payment_refunds    (one row per recorded refund step, see §32)
 ```
 
 The implementation should decide whether multiple payment attempts are represented as multiple payment records or payment-attempt records. This should be finalized before provider-specific implementation.
@@ -951,7 +958,9 @@ Visitors (with or without an account) who asked to hear about new pieces (`busin
 
 ---
 
-# 30. Payment by transfer, then Easypaisa / JazzCash
+# 30. Payment by transfer, then Easypaisa / JazzCash (receipt flow)
+
+*The receipt flow is switched off at launch (`MANUAL_RECEIPTS_ENABLED=false`, business-rules §13); this schema stays in use only if it is switched on. See §32 for the launch behaviour.*
 
 * `payment_method` got the value `TRANSFER` (revision `b061159f49d0`) and then `EASYPAISA` and `JAZZCASH` (revision `5d3b8f1c2a47`; PostgreSQL cannot remove enum values, so a downgrade leaves them). `TRANSFER` is no longer offered.
 * New enums `payment_attempt_status` (`SUBMITTED`, `PAID`, `REJECTED`) and `payment_rejection_reason` (`INCORRECT_REFERENCE`, `AMOUNT_MISMATCH`, `NOT_RECEIVED`, `UNCLEAR_RECEIPT`, `DUPLICATE_REFERENCE`, `OTHER`).
@@ -962,6 +971,16 @@ Visitors (with or without an account) who asked to hear about new pieces (`busin
 * `payments` lost `proof_reference`, `proof_image_path` and `proof_submitted_at` (moved into attempts; the migration copied waiting details that had both a number and a screenshot).
 * `business_settings` lost `transfer_instructions` and gained `easypaisa_qr_path`, `easypaisa_details`, `jazzcash_qr_path`, `jazzcash_details`. The QR codes are meant for customers, so they live in the public gallery bucket under `payment-qr/`. A wallet is offered only while its QR path is set.
 * The database function `expire_unpaid_online_orders()` treats `TRANSFER`, `EASYPAISA` and `JAZZCASH` like `ONLINE` (unpaid, window passed, nothing paid). Sending details sets `orders.payment_deadline_at` to NULL, so such an order is not picked up while the shop is checking; rejecting sets a new deadline.
+
+---
+
+# 32. Simple wallet payments ("Mark as paid") and the refund history
+
+Migration `8e2a6c4b91d0` (after `5d3b8f1c2a47`). Nothing is dropped and no data changes.
+
+* `payments` gained `paid_marked_by` (UUID, the admin's Supabase user id from the verified token, no foreign key because admins live in the Auth schema), `paid_marked_at`, `paid_reference` (optional wallet transaction number) and `paid_note`. CHECK `ck_payments_marked_paid`: the admin and the time are both set or both empty. They are set by the "Mark as paid" admin action on Easypaisa/JazzCash payments, together with `status = PAID`.
+* New table **`payment_refunds`** (§11b): `refund_id` (PK), `payment_id` (FK `payments`, RESTRICT), `amount_paisa` (BIGINT, CHECK > 0), `wallet_reference` (TEXT, optional: the wallet transaction that sent the money back), `recorded_by` (UUID, the admin), `created_at`. Index on `payment_id`. One row per refund step, so a partial refund in two steps has two rows; `payments.refunded_amount_paisa` stays the running total. Refunds recorded before this migration have no rows.
+* Wallet orders created while the receipt flow is off have `orders.payment_deadline_at = NULL`, so `expire_unpaid_online_orders()` (which only looks at orders with a deadline) never touches them; the function itself is unchanged. They are cancelled by the admin, which calls `release_order_stock()`.
 
 ---
 

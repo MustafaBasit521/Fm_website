@@ -1,5 +1,8 @@
-"""Manual wallet payments (Easypaisa / JazzCash with the shop's QR codes): the customer sends a
-transaction number and a receipt, and only an admin can mark the payment as paid."""
+"""The Easypaisa / JazzCash RECEIPT flow (MANUAL_RECEIPTS_ENABLED): the customer sends a
+transaction number and a receipt, and only an admin can mark the payment as paid.
+
+The flow is switched off at launch (business-rules §13), so every test here runs with it switched
+on. The launch behaviour (flag off) is tested in test_wallet_simple.py."""
 
 import asyncio
 import uuid
@@ -10,6 +13,12 @@ from sqlalchemy import text
 from tests.conftest import auth
 from tests.test_checkout import place, stock_of
 from tests.test_orders_customer import set_status
+
+
+@pytest.fixture(autouse=True)
+def _receipt_flow_on(receipts_on):
+    """This whole file tests the receipt flow, so it needs the flag."""
+
 
 ADMIN = "/api/admin/orders"
 PAYMENTS = "/api/admin/payments"

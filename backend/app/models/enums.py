@@ -48,8 +48,6 @@ class PaymentMethod(enum.StrEnum):
 
 # Methods where the customer pays the shop directly and the admin checks the shop's account.
 MANUAL_PAYMENT_METHODS = (PaymentMethod.TRANSFER, PaymentMethod.EASYPAISA, PaymentMethod.JAZZCASH)
-# Methods with the 30-minute payment window (business-rules §13).
-WINDOWED_PAYMENT_METHODS = (PaymentMethod.ONLINE, *MANUAL_PAYMENT_METHODS)
 
 
 class PaymentAttemptStatus(enum.StrEnum):

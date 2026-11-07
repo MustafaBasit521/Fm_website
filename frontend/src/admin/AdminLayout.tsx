@@ -93,10 +93,15 @@ function Logo({ name }: { name: string }) {
   )
 }
 
-function NavGroups({ counts }: { counts: Record<Badge, number> }) {
+function NavGroups({ counts, receipts }: { counts: Record<Badge, number>; receipts: boolean }) {
+  // The Payments page (receipt queue) exists only while the receipt flow is switched on.
+  const groups = GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => receipts || i.to !== '/payments'),
+  }))
   return (
     <div className="flex flex-col gap-5">
-      {GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.title ?? 'main'} className="flex flex-col gap-1">
           {group.title && (
             <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-widest text-bark">
@@ -160,10 +165,12 @@ function AccountLinks({ signOut }: { signOut: () => Promise<void> }) {
 function MobileHeader({
   name,
   counts,
+  receipts,
   signOut,
 }: {
   name: string
   counts: Record<Badge, number>
+  receipts: boolean
   signOut: () => Promise<void>
 }) {
   const [open, setOpen] = useState(false)
@@ -188,7 +195,7 @@ function MobileHeader({
       </button>
       <Drawer open={open} onClose={() => setOpen(false)} title="Menu" side="left">
         <nav aria-label="Admin menu" className="flex flex-col gap-6">
-          <NavGroups counts={counts} />
+          <NavGroups counts={counts} receipts={receipts} />
           <AccountLinks signOut={signOut} />
         </nav>
       </Drawer>
@@ -200,6 +207,7 @@ export default function AdminLayout() {
   const { signOut } = useAuth()
   const { pathname } = useLocation()
   const [name, setName] = useState('Bundle of Loops')
+  const [receipts, setReceipts] = useState(false) // the receipt flow (Payments page) is on?
   const [counts, setCounts] = useState<Record<Badge, number>>({
     orders: 0,
     payments: 0,
@@ -209,7 +217,10 @@ export default function AdminLayout() {
 
   useEffect(() => {
     getPublicSettings()
-      .then((s) => s.business_name && setName(s.business_name))
+      .then((s) => {
+        if (s.business_name) setName(s.business_name)
+        setReceipts(s.wallet_receipts_enabled === true)
+      })
       .catch(() => {}) // the default name is fine
   }, [])
 
@@ -237,14 +248,20 @@ export default function AdminLayout() {
       >
         Skip to content
       </a>
-      <MobileHeader key={pathname} name={name} counts={counts} signOut={signOut} />
+      <MobileHeader
+        key={pathname}
+        name={name}
+        counts={counts}
+        receipts={receipts}
+        signOut={signOut}
+      />
       <nav
         aria-label="Admin"
         className="hidden border-r border-sand bg-cream-200 p-4 md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:overflow-y-auto"
       >
         <Logo name={name} />
         <div className="mt-6">
-          <NavGroups counts={counts} />
+          <NavGroups counts={counts} receipts={receipts} />
         </div>
         <div className="mt-auto pt-6">
           <AccountLinks signOut={signOut} />

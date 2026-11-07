@@ -128,9 +128,10 @@ Frontend:
 Support:
 
 * Cash on Delivery
-* Online payment through a Pakistani payment gateway
+* Easypaisa / JazzCash paid into the shop's own wallet and marked as paid by the admin (launch behaviour, `docs/business-rules.md` §13)
+* Online payment through a Pakistani payment gateway (planned once the shop has customers)
 
-The exact payment provider should be selected and documented before provider-specific implementation.
+The exact payment provider should be selected and documented before provider-specific implementation. Features that are built but not part of the launch (the receipt-upload flow, the gateway) are switched off by configuration flags and their API routes refuse while off.
 
 ## Email
 

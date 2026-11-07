@@ -125,6 +125,9 @@ class Payment(Base):
         CheckConstraint("amount_paisa >= 0", name="ck_payments_amount_nonneg"),
         CheckConstraint("refunded_amount_paisa >= 0", name="ck_payments_refunded_nonneg"),
         CheckConstraint("refunded_amount_paisa <= amount_paisa", name="ck_payments_refund_cap"),
+        CheckConstraint(
+            "(paid_marked_by IS NULL) = (paid_marked_at IS NULL)", name="ck_payments_marked_paid"
+        ),
         Index("ix_payments_order_id", "order_id"),
     )
 
@@ -135,12 +138,22 @@ class Payment(Base):
     amount_paisa: Mapped[int] = mapped_column(BigInteger)
     refunded_amount_paisa: Mapped[int] = mapped_column(BigInteger, server_default="0")
     provider_reference: Mapped[str | None] = mapped_column(Text, unique=True)
+    # Easypaisa / JazzCash "Mark as paid" (business-rules §13): the admin saw the money in the
+    # shop's own wallet app. Who and when come from the verified token and the database clock;
+    # the wallet's transaction number and a note are optional.
+    paid_marked_by: Mapped[uuid.UUID | None] = mapped_column()
+    paid_marked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paid_reference: Mapped[str | None] = mapped_column(Text)
+    paid_note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     order: Mapped[Order] = relationship(back_populates="payments")
+    refunds: Mapped[list["PaymentRefund"]] = relationship(
+        back_populates="payment", order_by="PaymentRefund.created_at"
+    )
     # Easypaisa / JazzCash: every time the customer sent a transaction number and a receipt.
     attempts: Mapped[list["PaymentAttempt"]] = relationship(
         back_populates="payment", order_by="PaymentAttempt.created_at"
@@ -150,6 +163,30 @@ class Payment(Base):
     def open_attempt(self) -> "PaymentAttempt | None":
         """The submission the admin has not decided yet."""
         return next((a for a in self.attempts if a.status == PaymentAttemptStatus.SUBMITTED), None)
+
+
+class PaymentRefund(Base):
+    """database.md §11b. One row per recorded refund step (a partial refund is several rows), so
+    a dispute can be traced: how much, who recorded it, and the wallet transaction that sent the
+    money back (Easypaisa / JazzCash refunds are made by the shop itself)."""
+
+    __tablename__ = "payment_refunds"
+    __table_args__ = (
+        CheckConstraint("amount_paisa > 0", name="ck_payment_refunds_amount_positive"),
+        Index("ix_payment_refunds_payment_id", "payment_id"),
+    )
+
+    refund_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    payment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("payments.payment_id", ondelete="RESTRICT")
+    )
+    amount_paisa: Mapped[int] = mapped_column(BigInteger)
+    wallet_reference: Mapped[str | None] = mapped_column(Text)
+    # The admin (Supabase Auth user id, from the verified token) who recorded it.
+    recorded_by: Mapped[uuid.UUID | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    payment: Mapped[Payment] = relationship(back_populates="refunds")
 
 
 class PaymentAttempt(Base):

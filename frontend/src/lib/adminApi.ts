@@ -90,8 +90,21 @@ export interface AdminPayment {
   refunded_amount_paisa: number
   provider_reference: string | null
   created_at: string
-  /** Easypaisa / JazzCash: every submission, oldest first. */
+  /** Easypaisa / JazzCash: every submission, oldest first (receipt flow only). */
   attempts?: PaymentAttempt[]
+  /** Easypaisa / JazzCash "Mark as paid": who, when, and the optional wallet number and note. */
+  paid_marked_by?: string | null
+  paid_marked_at?: string | null
+  paid_reference?: string | null
+  paid_note?: string | null
+  /** Every recorded refund step. */
+  refunds?: {
+    refund_id: string
+    amount_paisa: number
+    wallet_reference: string | null
+    recorded_by: string | null
+    created_at: string
+  }[]
 }
 
 export interface AdminOrder extends Order {
@@ -101,7 +114,13 @@ export interface AdminOrder extends Order {
 }
 
 export const getAdminOrders = (
-  filters: { status?: string; payment_method?: string; search?: string; page?: number },
+  filters: {
+    status?: string
+    payment_method?: string
+    awaiting_payment?: boolean
+    search?: string
+    page?: number
+  },
   signal?: AbortSignal,
 ) => apiGet<Page<AdminOrderSummary>>(`/admin/orders${qs({ ...filters, page_size: 20 })}`, signal)
 export const getAdminOrder = (orderId: string, signal?: AbortSignal) =>
@@ -110,11 +129,25 @@ export const setOrderStatus = (orderId: string, status: string) =>
   apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/status`, { status })
 export const cancelAdminOrder = (orderId: string, waiveCharge: boolean) =>
   apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/cancel`, { waive_charge: waiveCharge })
-export const refundOrder = (orderId: string, amountPaisa: number | null) =>
-  apiPost<AdminOrder>(
-    `/admin/orders/${id(orderId)}/refund`,
-    amountPaisa === null ? {} : { amount_paisa: amountPaisa },
-  )
+export const refundOrder = (
+  orderId: string,
+  amountPaisa: number | null,
+  walletReference?: string | null,
+) =>
+  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/refund`, {
+    ...(amountPaisa === null ? {} : { amount_paisa: amountPaisa }),
+    ...(walletReference ? { wallet_reference: walletReference } : {}),
+  })
+/** Easypaisa / JazzCash: the admin saw the full amount in the shop's wallet app. */
+export const markOrderPaid = (
+  orderId: string,
+  data: { amount_paisa: number; reference?: string | null; note?: string | null },
+) =>
+  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/mark-paid`, {
+    amount_paisa: data.amount_paisa,
+    ...(data.reference ? { reference: data.reference } : {}),
+    ...(data.note ? { note: data.note } : {}),
+  })
 export const confirmCodPayment = (orderId: string) =>
   apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/confirm-cod-payment`, {})
 // ---- products and categories --------------------------------------------------------------

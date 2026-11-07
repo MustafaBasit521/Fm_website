@@ -14,7 +14,6 @@ from app.core.config import get_settings
 from app.core.storage import SupabaseStorage
 from app.models.catalog import ProductImage
 from app.models.enums import (
-    WINDOWED_PAYMENT_METHODS,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
@@ -145,6 +144,7 @@ def to_admin_summary(order: Order) -> AdminOrderSummary:
 _LOAD = (
     selectinload(Order.items),
     selectinload(Order.payments).selectinload(Payment.attempts),
+    selectinload(Order.payments).selectinload(Payment.refunds),
 )
 
 
@@ -317,6 +317,7 @@ async def list_admin_orders(
     *,
     order_status: OrderStatus | None,
     payment_method: PaymentMethod | None,
+    awaiting_payment: bool = False,
     search: str | None,
     page: int,
     page_size: int,
@@ -324,6 +325,16 @@ async def list_admin_orders(
     conditions: list[ColumnElement[bool]] = []
     if order_status:
         conditions.append(Order.status == order_status)
+    if awaiting_payment:
+        # an open order whose money (online or wallet, not cash on delivery) has not arrived
+        conditions.append(Order.status == OrderStatus.PENDING)
+        conditions.append(
+            exists().where(
+                Payment.order_id == Order.order_id,
+                Payment.status == PaymentStatus.PENDING,
+                Payment.method != PaymentMethod.COD,
+            )
+        )
     if payment_method:
         conditions.append(
             exists().where(Payment.order_id == Order.order_id, Payment.method == payment_method)
@@ -374,11 +385,11 @@ async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: Ord
     payment = _current_payment(order)
     if (
         target == OrderStatus.CONFIRMED
-        and payment.method in WINDOWED_PAYMENT_METHODS
+        and payment.method != PaymentMethod.COD
         and payment.status != PaymentStatus.PAID
     ):
-        # business-rules §13: an online or transfer order is never confirmed before its payment is
-        # verified (by the provider, or by the admin for a transfer).
+        # business-rules §13: an online or wallet order is never confirmed before its payment is
+        # verified (by the provider, or by the admin: "Mark as paid" / the receipt queue).
         raise _problem(
             status.HTTP_409_CONFLICT,
             "PAYMENT_NOT_VERIFIED",

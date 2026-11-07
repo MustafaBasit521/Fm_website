@@ -13,6 +13,7 @@ const api = {
   setOrderStatus: vi.fn(),
   cancelAdminOrder: vi.fn(),
   refundOrder: vi.fn(),
+  markOrderPaid: vi.fn(),
   confirmCodPayment: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
@@ -22,6 +23,7 @@ vi.mock('../lib/adminApi', () => ({
   setOrderStatus: (...a: unknown[]) => api.setOrderStatus(...a),
   cancelAdminOrder: (...a: unknown[]) => api.cancelAdminOrder(...a),
   refundOrder: (...a: unknown[]) => api.refundOrder(...a),
+  markOrderPaid: (...a: unknown[]) => api.markOrderPaid(...a),
   confirmCodPayment: (...a: unknown[]) => api.confirmCodPayment(...a),
 }))
 
@@ -172,12 +174,13 @@ it.each([
   expect(api.setOrderStatus).toHaveBeenCalledWith('o1', target)
 })
 
-it('explains why an unpaid online order cannot be confirmed', async () => {
+it('offers no "Confirm order" for an order whose payment has not arrived', async () => {
+  // the server refuses it anyway (PAYMENT_NOT_VERIFIED); the button would only mislead
   api.getAdminOrder.mockResolvedValue(order({ payment_method: 'ONLINE' }))
-  api.setOrderStatus.mockRejectedValue(new ApiError(409, 'x', { code: 'PAYMENT_NOT_VERIFIED' }))
   renderDetail()
-  await userEvent.click(await screen.findByRole('button', { name: 'Confirm order' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('only after its payment is verified')
+  await screen.findByText('2 × Sunflower')
+  expect(screen.queryByRole('button', { name: 'Confirm order' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Cancel order' })).toBeInTheDocument()
 })
 
 it('offers no next step once delivered or cancelled', async () => {
@@ -251,7 +254,7 @@ it('refunds what is owed, in full or in part', async () => {
   expect(await screen.findByText('Rs 1,350.50')).toBeInTheDocument()
   await userEvent.type(screen.getByLabelText(/Amount in Rs/), '1000')
   await userEvent.click(screen.getByRole('button', { name: 'Refund' }))
-  expect(api.refundOrder).toHaveBeenCalledWith('o1', 100000)
+  expect(api.refundOrder).toHaveBeenCalledWith('o1', 100000, null)
   expect(await screen.findByText('Rs 350.50')).toBeInTheDocument()
 })
 
@@ -275,7 +278,7 @@ it('refunds everything owed when the amount is left empty and rejects bad amount
   expect(api.refundOrder).not.toHaveBeenCalled()
   await userEvent.clear(screen.getByLabelText(/Amount in Rs/))
   await userEvent.click(screen.getByRole('button', { name: 'Refund' }))
-  expect(api.refundOrder).toHaveBeenCalledWith('o1', null)
+  expect(api.refundOrder).toHaveBeenCalledWith('o1', null, null)
   expect(await screen.findByText('No actions left.')).toBeInTheDocument()
 })
 
@@ -427,4 +430,154 @@ it('still offers "Confirm cash received" for a delivered cash order that is not 
   renderDetail()
   expect(await screen.findByRole('button', { name: 'Confirm cash received' })).toBeInTheDocument()
   expect(screen.queryByText('No actions left.')).not.toBeInTheDocument()
+})
+
+// ---- Easypaisa / JazzCash: "Mark as paid" ---------------------------------------------------
+
+const unpaidWallet = (over: Partial<AdminOrder> = {}) =>
+  order({
+    payment_method: 'EASYPAISA',
+    payments: [
+      {
+        payment_id: 'pay1',
+        method: 'EASYPAISA',
+        status: 'PENDING',
+        amount_paisa: 270100,
+        refunded_amount_paisa: 0,
+        provider_reference: null,
+        created_at: '2026-03-05T10:00:00Z',
+      },
+    ],
+    ...over,
+  })
+
+it('marks a wallet order as paid only after the admin types the amount they received', async () => {
+  api.getAdminOrder.mockResolvedValue(unpaidWallet())
+  api.markOrderPaid.mockResolvedValue(unpaidWallet({ status: 'CONFIRMED', payment_status: 'PAID' }))
+  renderDetail()
+  expect(await screen.findByText(/does not expire/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Confirm order' })).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Mark as paid' }))
+  expect(api.markOrderPaid).not.toHaveBeenCalled() // a pop-up asks first
+  // the amount is required and must be a real amount
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, mark as paid' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Type the amount you received')
+  await userEvent.type(screen.getByLabelText('Amount you received, in Rs'), '2701')
+  await userEvent.type(screen.getByLabelText(/Wallet transaction number/), 'TX-998877')
+  await userEvent.type(screen.getByLabelText(/Note/), 'Paid at noon')
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, mark as paid' }))
+  expect(api.markOrderPaid).toHaveBeenCalledWith('o1', {
+    amount_paisa: 270100,
+    reference: 'TX-998877',
+    note: 'Paid at noon',
+  })
+  expect(await screen.findByRole('button', { name: 'Start preparing' })).toBeInTheDocument()
+})
+
+it("shows the server's answer when the amount is wrong", async () => {
+  api.getAdminOrder.mockResolvedValue(unpaidWallet())
+  api.markOrderPaid.mockRejectedValue(new ApiError(422, 'x', { code: 'AMOUNT_MISMATCH' }))
+  renderDetail()
+  await userEvent.click(await screen.findByRole('button', { name: 'Mark as paid' }))
+  await userEvent.type(screen.getByLabelText('Amount you received, in Rs'), '2000')
+  await userEvent.click(screen.getByRole('button', { name: 'Yes, mark as paid' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('exactly the order total')
+})
+
+it('lets the admin record money that arrived after the order was cancelled', async () => {
+  api.getAdminOrder.mockResolvedValue(unpaidWallet({ status: 'CANCELLED' }))
+  renderDetail()
+  expect(await screen.findByRole('button', { name: 'Mark as paid' })).toBeInTheDocument()
+  expect(screen.getByText(/money arrived/)).toBeInTheDocument()
+})
+
+it('offers no "Mark as paid" for cash on delivery or an already paid wallet order', async () => {
+  api.getAdminOrder.mockResolvedValue(order())
+  const { unmount } = renderDetail()
+  await screen.findByText('2 × Sunflower')
+  expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
+  unmount()
+  api.getAdminOrder.mockResolvedValue(
+    unpaidWallet({
+      status: 'CONFIRMED',
+      payment_status: 'PAID',
+      payments: [
+        {
+          payment_id: 'pay1',
+          method: 'EASYPAISA',
+          status: 'PAID',
+          amount_paisa: 270100,
+          refunded_amount_paisa: 0,
+          provider_reference: null,
+          created_at: '2026-03-05T10:00:00Z',
+          paid_marked_at: '2026-03-05T11:00:00Z',
+          paid_reference: 'TX-998877',
+        },
+      ],
+    }),
+  )
+  renderDetail()
+  expect(await screen.findByText(/Marked as paid/)).toHaveTextContent('TX-998877')
+  expect(screen.queryByRole('button', { name: 'Mark as paid' })).not.toBeInTheDocument()
+})
+
+it('records the wallet transaction number of a refund and shows the refund history', async () => {
+  const cancelled = unpaidWallet({
+    status: 'CANCELLED',
+    payment_status: 'PAID',
+    refund_due_paisa: 270100,
+  })
+  api.getAdminOrder.mockResolvedValue(cancelled)
+  api.refundOrder.mockResolvedValue({
+    ...cancelled,
+    refund_due_paisa: 0,
+    payments: [
+      {
+        ...cancelled.payments[0],
+        status: 'REFUNDED',
+        refunds: [
+          {
+            refund_id: 'r1',
+            amount_paisa: 270100,
+            wallet_reference: 'RF-123456',
+            recorded_by: 'a1',
+            created_at: '2026-03-06T10:00:00Z',
+          },
+        ],
+      },
+    ],
+  })
+  renderDetail()
+  await userEvent.type(
+    await screen.findByLabelText(/Transaction number of the refund/),
+    'RF-123456',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Refund' }))
+  expect(api.refundOrder).toHaveBeenCalledWith('o1', null, 'RF-123456')
+  expect(await screen.findByText(/Refunded Rs 2,701/)).toHaveTextContent('RF-123456')
+})
+
+it('rejects a malformed refund transaction number before asking the server', async () => {
+  api.getAdminOrder.mockResolvedValue(
+    unpaidWallet({ status: 'CANCELLED', payment_status: 'PAID', refund_due_paisa: 270100 }),
+  )
+  renderDetail()
+  await userEvent.type(
+    await screen.findByLabelText(/Transaction number of the refund/),
+    'no spaces!',
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Refund' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('6 to 40 letters')
+  expect(api.refundOrder).not.toHaveBeenCalled()
+})
+
+it('can list only the orders awaiting payment', async () => {
+  api.getAdminOrders.mockResolvedValue(page([summary()]))
+  renderList()
+  await screen.findByText('Ayesha Khan')
+  await userEvent.click(screen.getByLabelText('Awaiting payment only'))
+  expect(api.getAdminOrders).toHaveBeenLastCalledWith(
+    expect.objectContaining({ awaiting_payment: true }),
+    expect.anything(),
+  )
 })

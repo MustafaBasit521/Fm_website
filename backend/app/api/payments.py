@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import AuthUser, get_optional_user
 from app.core.config import Settings, get_settings
 from app.core.db import get_session
+from app.core.features import require_manual_receipts, require_online_payments
 from app.core.payments.base import PaymentProvider, WebhookError
 from app.core.payments.registry import get_payment_provider
 from app.core.rate_limit import rate_limit
@@ -32,7 +33,7 @@ MaybeUser = Annotated[AuthUser | None, Depends(get_optional_user)]
 @router.post(
     "/orders/{order_id}/pay",
     response_model=InitiatePayment,
-    dependencies=[Depends(rate_limit("pay", 20, 3600))],
+    dependencies=[Depends(require_online_payments), Depends(rate_limit("pay", 20, 3600))],
 )
 async def pay(order_id: uuid.UUID, session: Session, provider: Provider, settings: AppSettings):
     """Start paying for an online order. Redirect the customer to `redirect_url`."""
@@ -42,20 +43,28 @@ async def pay(order_id: uuid.UUID, session: Session, provider: Provider, setting
 @router.post(
     "/orders/{order_id}/payment/refresh",
     response_model=PaymentStatusRead,
-    dependencies=[Depends(rate_limit("payment-refresh", 60, 60))],
+    dependencies=[
+        Depends(require_online_payments),
+        Depends(rate_limit("payment-refresh", 60, 60)),
+    ],
 )
 async def refresh(order_id: uuid.UUID, session: Session, provider: Provider):
     """The customer returned from the gateway: verify with the provider and report the status."""
     return await service.refresh_payment(session, provider, order_id)
 
 
-# Easypaisa / JazzCash: the customer scans the shop's QR code, pays, and then sends the
-# transaction number and a screenshot of the receipt.
+# Easypaisa / JazzCash receipt flow (MANUAL_RECEIPTS_ENABLED, off at launch): the customer scans
+# the shop's QR code, pays, and then sends the transaction number and a screenshot of the receipt.
+# Switched off, these routes answer 403 FEATURE_DISABLED. The same holds for the gateway routes
+# above and below (ONLINE_PAYMENTS_ENABLED).
 # Like paying online, these routes are public (guests too) and use the unguessable order id.
 @router.post(
     "/orders/{order_id}/payment-proof/upload-url",
     response_model=UploadTarget,
-    dependencies=[Depends(rate_limit("proof-upload", 10, 3600))],
+    dependencies=[
+        Depends(require_manual_receipts),
+        Depends(rate_limit("proof-upload", 10, 3600)),
+    ],
 )
 async def proof_upload_url(
     order_id: uuid.UUID,
@@ -79,7 +88,7 @@ async def proof_upload_url(
 @router.post(
     "/orders/{order_id}/payment-proof",
     response_model=OrderRead,
-    dependencies=[Depends(rate_limit("proof", 20, 3600))],
+    dependencies=[Depends(require_manual_receipts), Depends(rate_limit("proof", 20, 3600))],
 )
 async def send_payment_proof(
     order_id: uuid.UUID, data: PaymentSubmit, session: Session, user: MaybeUser
@@ -89,13 +98,17 @@ async def send_payment_proof(
     return orders_service.to_read(await service.submit_payment(session, order_id, data, user))
 
 
-@router.get("/orders/{order_id}/payment-attempts", response_model=list[PaymentAttemptRead])
+@router.get(
+    "/orders/{order_id}/payment-attempts",
+    response_model=list[PaymentAttemptRead],
+    dependencies=[Depends(require_manual_receipts)],
+)
 async def payment_history(order_id: uuid.UUID, session: Session, user: MaybeUser):
     """Every submission for this order, oldest first (rejected ones keep their reason)."""
     return await service.customer_history(session, order_id, user)
 
 
-@router.post("/payments/webhook/{provider_name}")
+@router.post("/payments/webhook/{provider_name}", dependencies=[Depends(require_online_payments)])
 async def webhook(
     provider_name: str,
     request: Request,

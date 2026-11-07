@@ -30,6 +30,7 @@ from app.schemas.admin import (
     LowStockProduct,
     SettingsUpdate,
 )
+from app.services import events
 from app.services import orders as orders_service
 
 LOW_STOCK_THRESHOLD = 3  # a technical default for the "running low" list
@@ -216,8 +217,23 @@ async def get_settings_row(session: AsyncSession) -> BusinessSettings:
     return row
 
 
+# What customers pay to: a change here is announced to the shop by email (audit P12).
+_WALLET_FIELDS = {
+    "easypaisa_qr_path": "Easypaisa QR code",
+    "easypaisa_details": "Easypaisa account details",
+    "jazzcash_qr_path": "JazzCash QR code",
+    "jazzcash_details": "JazzCash account details",
+}
+
+
 async def update_settings(session: AsyncSession, data: SettingsUpdate) -> BusinessSettings:
     row = await get_settings_row(session)
+    old_email = row.email  # the address before this save
+    changed = [
+        label
+        for field, label in _WALLET_FIELDS.items()
+        if field in data.model_fields_set and getattr(data, field) != getattr(row, field)
+    ]
     for field in data.model_fields_set:
         value = getattr(data, field)
         if field == "delivery_fee_paisa" and value is None:
@@ -227,6 +243,9 @@ async def update_settings(session: AsyncSession, data: SettingsUpdate) -> Busine
         if field == "social_links":
             value = value or {}
         setattr(row, field, value)
+    if changed:
+        recipients = [e for e in (old_email, row.email) if e]
+        await events.wallet_settings_changed(session, recipients, changed)
     await session.commit()
     await session.refresh(row)
     return row

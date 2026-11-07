@@ -537,3 +537,26 @@ The owner supplied the shop's Instagram logo (a 201 x 190 screenshot of a round 
 **Found on the way:** the new CHECK "reason OTHER needs a note" let a missing note through (NULL passes a CHECK) until a test caught it; `ConfirmDialog` restarted its focus handling on every render, so typing in a field inside it lost focus after each letter.
 
 **Limits:** the admin can no longer mark a wallet order paid without a submission. Nothing is checked automatically against Easypaisa/JazzCash: the provider-specific part is isolated so an API check could be added later.
+
+## Audit (8 November 2026)
+
+**Request (owner):** an audit report of the issues in the current system, payment system included, kept out of GitHub.
+
+**Done:** a code review of the payment flow, authentication, rate limiting, configuration and deployment files; three payment problems proved with throw-away tests (deleted afterwards); `pip-audit` and `npm audit` runs. The report is `docs/private/audit-report.md`; its folder is in `.gitignore` because it describes weaknesses. Nothing in the code was changed by the audit, so the findings are open work (order of work is at the end of the report).
+
+## Simplified launch payments (8 November 2026)
+
+**Request (owner):** the receipt-upload flow was too complex for launch and the audit found many problems in it (P1-P5, P8-P11, P13). New launch behaviour: COD default; Easypaisa/JazzCash orders are created normally and the customer is shown the wallet number/QR, the exact amount and the order number, sends the payment, then WhatsApps the screenshot; the admin presses "Mark as paid". No upload, no submission, no deadline, no expiry. Keep the old flow and the gateway code but switch them off by flags, with the API refusing, not just the UI hiding.
+
+**Decisions (owner: "do all you recommended"):** money arriving after a cancellation can be marked as paid (order stays cancelled, refundable in full); with the receipt flow on, "Mark as paid" is refused; the admin types the amount received and the server compares it with the total; refunds keep one record per step in a new `payment_refunds` table; the settings-change alert goes to the old and the new shop address; a wallet is offered with a QR code or account details **and** a WhatsApp number. (The optional warning for a reused wallet number was not chosen.)
+
+**Done:**
+* Flag `MANUAL_RECEIPTS_ENABLED` (default off) and `app/core/features.py`: the receipt routes (customer and admin) and the gateway routes (`pay`, `refresh`, webhook) answer `403 FEATURE_DISABLED` while off. The old gateway test that expected a 503 now expects this clearer answer.
+* Checkout: a wallet order has a deadline only while the receipt flow is on; the wallet is offered by the rule above; "not Confirmed unless Paid" now covers every non-COD method.
+* `payments.mark_wallet_paid`: order row lock first, amount must equal the server total, Paid + Confirmed (or Paid on a cancelled order), who/when/reference/note stored, customer told once; a receipt left open from the old flow is closed with it.
+* Refunds: `wallet_reference` and one `payment_refunds` row per step with the admin. Settings: alert email when a QR code or details change. Orders list: `awaiting_payment` filter.
+* Migration `8e2a6c4b91d0` (4 nullable columns + CHECK on `payments`, new table `payment_refunds`), written and tested on the test database, **not applied to Supabase**.
+* Frontend: `WalletPayment` has two modes chosen by the server (`wallet_receipts_enabled`): WhatsApp mode (no form) and the old receipt mode; checkout wording; admin order page ("Mark as paid" pop-up with typed amount, refund reference, payment history); orders filter; the Payments menu entry is shown only when the flag is on; settings wording.
+* Tests: `tests/test_wallet_simple.py` (25 cases: COD unchanged, no deadline/expiry, mark-as-paid success, 5 concurrent clicks give one success, no token / customer / admin without the second factor refused, wrong amount refused, plain confirm refused, cancel releases stock, late money, refund trace, awaiting filter, flag-off routes refuse, settings alert). The old receipt tests run with the flag switched on (fixture `receipts_on`).
+
+**Audit items:** resolved P5 (typed amount), P6 (refund reference), P12 (alert); P1 (money after cancellation) now has a path; the receipt-flow items (P2, P3, P8-P11, P13) are dormant while the flag is off. P4 (a wrong amount leaves no record) and the G-items are unchanged. Anyone can place wallet orders that hold stock until the admin cancels them (same as COD).

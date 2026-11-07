@@ -13,7 +13,7 @@ from app.models.engagement import (
     Review,
 )
 from app.models.newsletter import NewsletterSubscriber
-from app.models.orders import Order, OrderItem, Payment, PaymentAttempt
+from app.models.orders import Order, OrderItem, Payment, PaymentAttempt, PaymentRefund
 
 __all__ = [
     "AdminAuditLog",
@@ -31,6 +31,7 @@ __all__ = [
     "OrderItem",
     "Payment",
     "PaymentAttempt",
+    "PaymentRefund",
     "Product",
     "ProductImage",
     "Review",

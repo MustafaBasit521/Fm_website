@@ -21,3 +21,6 @@ coverage/
 
 # local design reference, not for the repository
 bundleofloops.pdf
+
+# private reports (security audit etc.), kept on this machine only
+docs/private/

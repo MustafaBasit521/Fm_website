@@ -48,6 +48,8 @@ class Quote(BaseModel):
     delivery_fee_paisa: int
     total_paisa: int
     payment_methods: list[PaymentMethod]
+    # Is the Easypaisa / JazzCash receipt flow on? Only changes the wording shown at checkout.
+    wallet_receipts_enabled: bool = False
     can_checkout: bool
 
 

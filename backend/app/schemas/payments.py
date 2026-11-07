@@ -43,6 +43,47 @@ class PaymentSubmit(BaseModel):
         return v
 
 
+def clean_reference(v: str | None) -> str | None:
+    """An optional wallet transaction number: blank means none."""
+    if v is None:
+        return None
+    v = v.strip()
+    if not v:
+        return None
+    if not REFERENCE.match(v):
+        raise ValueError("the transaction number must be 6 to 40 letters, digits or dashes")
+    return v
+
+
+class MarkPaid(BaseModel):
+    """The admin saw the money in the shop's own wallet app (business-rules §13). The amount
+    they typed must equal the order total held by the server."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amount_paisa: int = Field(ge=1)
+    reference: str | None = Field(default=None, max_length=100)
+    note: str | None = Field(default=None, max_length=300)
+
+    _reference = field_validator("reference")(clean_reference)
+
+    @field_validator("note")
+    @classmethod
+    def _clean_note(cls, v: str | None) -> str | None:
+        v = v.strip() if v else None
+        return v or None
+
+
+class PaymentRefundRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    refund_id: uuid.UUID
+    amount_paisa: int
+    wallet_reference: str | None
+    recorded_by: uuid.UUID | None
+    created_at: datetime
+
+
 class PaymentAttemptRead(BaseModel):
     """What the customer sees about one of their submissions."""
 

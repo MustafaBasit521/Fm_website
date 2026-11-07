@@ -325,22 +325,43 @@ Expiry mechanism (decided): the database function `expire_unpaid_online_orders()
 
 Late payment (decided): if a verified payment arrives after the window has closed — whether the expiry job has already cancelled the order or has not run yet — the order stays Cancelled and is never reopened. The payment is recorded as Paid and the full amount is refundable (no cancellation charge).
 
-## Easypaisa and JazzCash orders (decided by the owner, manual QR payment phase)
+## Easypaisa and JazzCash orders (decided by the owner)
 
-The shop has no payment-gateway account (an Instagram business without NTN or business bank account), so customers may **pay in advance with Easypaisa or JazzCash** by scanning the shop's own merchant QR code. There is no gateway, no webhook and no automatic check: **only an admin can mark such a payment as paid**, after looking at the shop's own wallet account. A customer's screenshot never marks anything as paid. This replaces the earlier generic "bank or wallet transfer" method (its enum value stays for old rows but is no longer offered).
+The shop has no payment-gateway account (an Instagram business without NTN or business bank account), so customers may **pay in advance with Easypaisa or JazzCash** into the shop's own wallet. There is no gateway, no webhook and no automatic check: **only an admin can mark such a payment as paid**, after looking at the shop's own wallet app. A customer's message or screenshot never marks anything as paid. A real gateway (Safepay or PayFast) is planned once the shop has customers. This replaces the earlier generic "bank or wallet transfer" method (its enum value stays for old rows but is no longer offered).
 
-* **Offering:** each wallet is offered at checkout only while the admin has uploaded its QR code (Settings -> Easypaisa and JazzCash). The admin may also write account details to show next to the QR code. Removing the QR code switches that wallet off. Cash on Delivery is always offered.
-* **Placing:** the order is created like an online order: Pending, payment Pending, stock or capacity reserved, and the same **30-minute window** (`payment_deadline_at`). The confirmation page and the order page show the QR code, the amount to pay, the order number, instructions and the form.
+### Launch behaviour (simplified, decided by the owner, 8 November 2026)
+
+The receipt-upload flow became too complex for a small shop (see the audit findings in `docs/private/`), so at launch it is **switched off** (`MANUAL_RECEIPTS_ENABLED=false`, the default) and wallet orders work like this:
+
+* **Offering:** a wallet is offered at checkout when the admin has set up where to pay (a **QR code, account details, or both**, Settings -> Easypaisa and JazzCash) **and** the shop's **WhatsApp number** is filled in (customers send the screenshot there). Removing both switches the wallet off. Cash on Delivery is always offered and stays the default.
+* **Placing:** the order is created normally: Pending, payment Pending, stock or capacity reserved exactly like COD. There is **no payment deadline** and **no automatic expiry**.
+* **Customer:** the confirmation page (and the order page) shows the wallet's QR code and/or account details, the exact amount, and the order number to write in the payment note. It tells the customer: "Send the payment, then message us the screenshot on WhatsApp. We will confirm your order once we receive it." and offers a WhatsApp link to the shop's number with the order number and amount already typed. There is no receipt upload, no transaction-number form and no submission step.
+* **Admin "Mark as paid":** on an Easypaisa/JazzCash order whose payment is Pending, the admin opens a pop-up that shows the order total, asks them to confirm they saw that amount in their own wallet app, and requires them to **type the amount they received**. It must equal the order total held by the server, otherwise it is refused. An optional wallet transaction number (6 to 40 letters, digits or dashes) and a note can be stored. On success the payment is **Paid** and the order **Confirmed**, the customer is told, and the admin id and time are stored on the payment. It runs under the order's row lock, so a double click or two admins at once give exactly one success (the other gets "already recorded"). Like every admin route it needs the admin role and the second factor, and it is written to the audit log.
+* **An order is never Confirmed unless its payment is Paid** for every method except Cash on Delivery; a plain "Confirm order" status change is refused for an unpaid online or wallet order.
+* **Money that arrives after the order was cancelled** can still be marked as paid: the order stays Cancelled (it is never reopened), the payment is recorded as Paid, and the whole amount is refundable (the same late-payment rule as for online payments above).
+* **Unpaid orders:** stock and capacity stay reserved while the order is active. Nothing cancels them automatically: the admin cancels an unpaid order with the normal cancel action, which releases the stock. To find them the admin orders list can be filtered to **"Awaiting payment"** (Pending orders whose online or wallet payment has not arrived).
+* **Refunds:** the shop returns the money itself from its own account and the admin only records it (same limits as §22). The admin may add the **wallet transaction number of the refund** (optional, 6 to 40 letters, digits or dashes). Every refund step is kept as its own record with the amount, the admin and the time, so a dispute can be traced.
+* **Security:** whenever the QR code or the account details of either wallet are changed in Settings, an **email alert** goes to the shop's email address as it was *before* the change (and to the new one if it was changed in the same save). The audit-log entry stays.
+
+### The receipt flow (built, switched off by default)
+
+Switch it on with `MANUAL_RECEIPTS_ENABLED=true`. It stays in the code so it can be revived. While it is off, its API routes (receipt upload link, sending details, a customer's attempt history and everything under `/api/admin/payments`) **refuse with 403 and the code `FEATURE_DISABLED`**; the pages and the Payments menu entry are hidden. With the flag on, "Mark as paid" is refused (`USE_PAYMENTS_QUEUE`): payments are then accepted only on the Payments page. The flow, as decided in the manual QR payment phase:
+
+* **Offering:** a wallet needs its QR code (the WhatsApp number is not required).
+* **Placing:** like an online order, with the same **30-minute window** (`payment_deadline_at`).
 * **Submitting:** the customer must send **both** the wallet's transaction number (6 to 40 letters, digits or dashes) **and** a screenshot of the receipt (JPG, PNG or WebP, up to 5 MB, into the private `payment-proofs` bucket). Guests can do this too (the unguessable order id is the capability); for a registered customer's order only that customer can submit or read the history. The expected amount is always the order total held by the server.
-* **Duplicate numbers:** a transaction number that backs another submission which was not rejected (on this or any other order, case-insensitive) is refused with a clear message. The number of a rejected submission can be sent again.
-* **One at a time:** while a submission is waiting for the admin the customer cannot send another. **Submitting stops the clock** (`payment_deadline_at` becomes empty): the shop needs time to look, and the order does not expire meanwhile. The payment stays Pending. The shop gets an alert email and the customer a confirmation.
-* **Verifying (admin):** the admin opens the **Payments** page, looks at the transaction number and receipt, **checks the real merchant account**, then chooses "Verify payment": the submission becomes Paid, the payment Paid and the order Confirmed, the customer is told, and the admin id and time are stored. It works once only (a second try, or two admins at the same moment, gets a clear "already reviewed" answer). It is refused if the order was cancelled meanwhile or its total changed.
-* **Rejecting (admin):** a **reason is mandatory**: incorrect transaction number, amount mismatch, payment not received, invalid or unclear receipt, duplicate transaction number, or other (then the admin must write the reason; a note may be added to any reason). The submission becomes Rejected with the admin id and time, the order stays Pending and out of preparation, the customer is told the reason (notification and email) and gets a **fresh 30 minutes** to send corrected details.
-* **History:** every submission is kept. A corrected submission is a new record; rejected ones stay visible to the admin and, with their reason, to the customer. Customers never see admin ids.
-* If no valid details arrive within the window, the order expires like any unpaid online order: Cancelled and the stock returned (the same database function). If someone pays after that, it must be sorted out with the shop directly; nothing is reopened.
-* The order cannot be confirmed by a plain status change before its payment is verified. The admin can no longer confirm a wallet payment without a submission (to be able to verify, the customer must have sent a transaction number and receipt).
-* **Refunds**: the shop returns the money itself from its own account and the admin only records it (same limits as §22: never more than paid minus any cancellation charge minus what was already refunded; partial refunds allowed). No provider is called.
+* **Duplicate numbers:** a transaction number that backs another submission which was not rejected (on this or any other order, case-insensitive) is refused. The number of a rejected submission can be sent again.
+* **One at a time:** while a submission is waiting for the admin the customer cannot send another. **Submitting stops the clock** (`payment_deadline_at` becomes empty). The payment stays Pending. The shop gets an alert email and the customer a confirmation.
+* **Verifying (admin):** on the **Payments** page the admin checks the real merchant account, then "Verify payment": the submission becomes Paid, the payment Paid and the order Confirmed, once only. It is refused if the order was cancelled meanwhile or its total changed.
+* **Rejecting (admin):** a **reason is mandatory** (incorrect transaction number, amount mismatch, payment not received, invalid or unclear receipt, duplicate transaction number, or other with a written reason). The order stays Pending, the customer is told the reason and gets a **fresh 30 minutes**.
+* **History:** every submission is kept; a corrected submission is a new record. Customers never see admin ids.
+* If no valid details arrive within the window, the order expires like any unpaid online order (Cancelled, stock returned).
 * The payment status of the order stays separate from the submission status (Submitted, Paid, Rejected).
+
+### Known limits of the launch behaviour
+
+* An unpaid wallet order holds its stock until the admin cancels it, and anyone can place such orders (10 per hour per address). Cash on Delivery orders already behave the same way.
+* If a customer pays a wrong amount, the admin simply does not mark it as paid and sorts it out with the customer (WhatsApp); nothing is recorded for that money.
 
 ## COD orders
 
@@ -494,7 +515,7 @@ Payment methods:
 
 * COD
 * ONLINE
-* EASYPAISA and JAZZCASH (money sent to the shop's own wallet, checked by the admin: see §13). `TRANSFER` is the retired first version of this.
+* EASYPAISA and JAZZCASH (money sent to the shop's own wallet, marked as paid by the admin: see §13). `TRANSFER` is the retired first version of this.
 
 Payment status:
 
@@ -557,7 +578,7 @@ If admin waives the charge:
 
 The refunded amount is recorded on the payment and can never exceed the original payment amount.
 
-Refunds are started by the admin, only for cancelled orders, and never exceed what is still owed (paid − cancellation charge − already refunded). The admin may refund in several steps (partial refunds). The payment becomes Refunded when the whole payment has been returned; if a cancellation charge is kept it stays Partially Refunded. The provider is called with an idempotency key, so a repeated request cannot refund twice, and if the provider fails nothing is changed and the refund can be retried.
+Refunds are started by the admin, only for cancelled orders (an optional wallet transaction number can be stored for Easypaisa/JazzCash refunds, and every refund step is kept as its own record), and never exceed what is still owed (paid − cancellation charge − already refunded). The admin may refund in several steps (partial refunds). The payment becomes Refunded when the whole payment has been returned; if a cancellation charge is kept it stays Partially Refunded. The provider is called with an idempotency key, so a repeated request cannot refund twice, and if the provider fails nothing is changed and the refund can be retried.
 
 Payment state may become:
 
@@ -831,7 +852,7 @@ Admin can configure business information such as:
 * delivery fee
 * social links
 
-Decided: the settings screen offers exactly these fields and nothing else (the mockup's holiday mode and payment-method switches are not part of the MVP rules). The delivery fee is entered in rupees and stored in paisa (0 to Rs 100,000) and applies to new quotes and orders only; existing orders keep the fee they were placed with. Social links are `https://` addresses only (at most ten), because they become links on the storefront. The shop details (name, email, phone, WhatsApp, address, delivery information, fee, social links) are readable by everyone through `GET /api/settings` and shown on the contact page; the business email is also where the shop's alert emails go.
+Decided: the settings screen offers exactly these fields (plus the Easypaisa and JazzCash QR codes and account details, §13) and nothing else (the mockup's holiday mode and payment-method switches are not part of the MVP rules). The delivery fee is entered in rupees and stored in paisa (0 to Rs 100,000) and applies to new quotes and orders only; existing orders keep the fee they were placed with. Social links are `https://` addresses only (at most ten), because they become links on the storefront. The shop details (name, email, phone, WhatsApp, address, delivery information, fee, social links) are readable by everyone through `GET /api/settings` and shown on the contact page; the business email is also where the shop's alert emails go.
 
 ---
 

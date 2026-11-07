@@ -87,6 +87,9 @@ class SettingsRead(BaseModel):
     easypaisa_details: str | None = None
     jazzcash_qr_url: str | None = None
     jazzcash_details: str | None = None
+    # Is the receipt-upload flow switched on (MANUAL_RECEIPTS_ENABLED)? The UI shows the form and
+    # the Payments page only then; the server refuses those routes anyway.
+    wallet_receipts_enabled: bool = False
 
 
 class AdminSettingsRead(SettingsRead):

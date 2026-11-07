@@ -94,6 +94,28 @@ async def _shop_name(session: AsyncSession) -> str:
     return name or DEFAULT_SHOP_NAME
 
 
+async def wallet_settings_changed(
+    session: AsyncSession, recipients: list[str], changed: list[str]
+) -> None:
+    """Security alert (audit P12): the wallet QR code or account details were changed. Sent to the
+    shop address as it was BEFORE the change and to the new one, so a thief who also swaps the
+    address in the same save cannot silence it."""
+    shop = await _shop_name(session)
+    what = "\n".join(f"- {name}" for name in changed)
+    body = (
+        f"The payment details shown to customers at checkout were just changed in the admin "
+        f"settings:\n\n{what}\n\nIf this was you, no action is needed. If it was not, someone "
+        "else may have access to the admin account: change the password and review the activity "
+        "log immediately, because customers' money could be sent to another account."
+        f"\n\n- {shop}"
+    )
+    for to in dict.fromkeys(recipients):  # no duplicates, order kept
+        queue_email(
+            session,
+            EmailMessage(to=to, subject=f"[{shop}] Payment details were changed", body=body),
+        )
+
+
 async def _business_email(session: AsyncSession) -> str | None:
     return await session.scalar(
         select(BusinessSettings.email).order_by(BusinessSettings.updated_at.desc()).limit(1)
@@ -197,8 +219,8 @@ async def payment_received(session: AsyncSession, order: Order, *, late: bool = 
     total = format_price(order.total_amount_paisa)
     if late:
         text = (
-            f"We received your payment of {total} for order {ref}, but the 30-minute payment "
-            "window had already passed and the order was cancelled. We will refund you in full."
+            f"We received your payment of {total} for order {ref}, but the order had already "
+            "been cancelled. We will refund you in full."
         )
     else:
         text = f"We received your payment of {total} for order {ref}. Thank you!"

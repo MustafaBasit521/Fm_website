@@ -1,11 +1,11 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.schemas.checkout import OrderRead
-from app.schemas.payments import PaymentAttemptRead
+from app.schemas.payments import PaymentAttemptRead, PaymentRefundRead, clean_reference
 
 
 class OrderSummary(BaseModel):
@@ -38,6 +38,12 @@ class PaymentRead(BaseModel):
     provider_reference: str | None
     created_at: datetime
     attempts: list[PaymentAttemptRead] = []
+    # Easypaisa / JazzCash "Mark as paid" (admin view only) and the recorded refund steps.
+    paid_marked_by: uuid.UUID | None = None
+    paid_marked_at: datetime | None = None
+    paid_reference: str | None = None
+    paid_note: str | None = None
+    refunds: list[PaymentRefundRead] = []
 
 
 class AdminOrderRead(OrderRead):
@@ -61,6 +67,11 @@ class RefundRequest(BaseModel):
 
     # Omit to refund everything that is still owed (paid - charge - already refunded).
     amount_paisa: int | None = Field(default=None, ge=1)
+    # Easypaisa / JazzCash: the wallet transaction that sent the money back, so a dispute can be
+    # traced (optional).
+    wallet_reference: str | None = Field(default=None, max_length=100)
+
+    _wallet_reference = field_validator("wallet_reference")(clean_reference)
 
 
 class StatusChange(BaseModel):

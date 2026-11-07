@@ -11,8 +11,10 @@ SECRET = "x" * 40
 
 
 @pytest.fixture
-def cron_on(client):
-    base = get_settings()
+def cron_on(client, receipts_on):
+    # these tests expire wallet orders, which have the 30-minute window only while the receipt
+    # flow is on (business-rules §13)
+    base = client.app.dependency_overrides[get_settings]()
     client.app.dependency_overrides[get_settings] = lambda: Settings(
         **{**base.model_dump(), "cron_secret": SECRET}, _env_file=None
     )

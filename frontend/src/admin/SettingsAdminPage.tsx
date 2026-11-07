@@ -174,9 +174,9 @@ export default function SettingsAdminPage() {
               <section aria-label="Wallet payments" className={`${cardClass} p-4 md:p-6`}>
                 <h2 className="font-serif text-2xl">Easypaisa and JazzCash</h2>
                 <p className="mt-1 text-sm text-bark">
-                  Upload your merchant QR code for each wallet. A wallet is offered at checkout only
-                  while it has a QR code; remove the QR code to switch it off (cash on delivery
-                  always stays).
+                  {settings.wallet_receipts_enabled
+                    ? 'Upload your merchant QR code for each wallet. A wallet is offered at checkout only while it has a QR code; remove the QR code to switch it off (cash on delivery always stays).'
+                    : 'Show customers where to pay: a QR code, an account number, or both. A wallet is offered at checkout when it has one of them and your WhatsApp number is filled in above, because customers send the payment screenshot there. Remove both to switch the wallet off (cash on delivery always stays). You are emailed whenever these details change.'}
                 </p>
                 <div className="mt-4 grid gap-6 md:grid-cols-2">
                   {WALLETS.map(({ key, name }) => {
@@ -213,7 +213,7 @@ export default function SettingsAdminPage() {
                             htmlFor={`${key}_details`}
                             className="text-sm font-medium text-bark"
                           >
-                            Account details shown next to the QR code (optional)
+                            Account name and number shown to customers
                           </label>
                           <textarea
                             id={`${key}_details`}

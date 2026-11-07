@@ -275,13 +275,24 @@ def make_product(client, admin_h, category_id):
 
 
 @pytest.fixture
+def receipts_on(client):
+    """Switch the Easypaisa / JazzCash receipt flow on (MANUAL_RECEIPTS_ENABLED, off by default)."""
+    from app.core.config import Settings
+
+    base = client.app.dependency_overrides.get(get_settings, get_settings)()
+    client.app.dependency_overrides[get_settings] = lambda: Settings(
+        **{**base.model_dump(), "manual_receipts_enabled": True}, _env_file=None
+    )
+
+
+@pytest.fixture
 def online_enabled(client):
     """Turn online payments on with a fake gateway; returns that gateway so tests can drive it."""
     from app.core.config import Settings
     from app.core.payments.fake import FakeProvider
     from app.core.payments.registry import get_optional_payment_provider, get_payment_provider
 
-    base = get_settings()
+    base = client.app.dependency_overrides.get(get_settings, get_settings)()
     provider = FakeProvider(webhook_secret="test-secret", frontend_url="http://front.test")
     client.app.dependency_overrides[get_settings] = lambda: Settings(
         **{

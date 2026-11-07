@@ -38,6 +38,12 @@ Updating documentation does **not** mean a decision is implemented or tested.
 | PostgreSQL ENUMs for controlled state values | Yes | Yes (`database.md` §3) | Yes (all enums in `database.md` §3, incl. custom_order_status, notification_type/status) | Yes |
 | Explicit FK delete behavior | Yes | Yes (`database.md` §21) | Yes (all tables) | Yes (cascade/restrict/set-null tests) |
 | Signed-URL image upload flow | Yes | Yes (`CLAUDE.md` §10) | Yes (product images, gallery, private custom-order references) | Yes against mocked Storage; real Supabase Storage calls not yet verified |
+| Launch payment behaviour: COD default; Easypaisa/JazzCash paid into the shop's wallet, customer WhatsApps the screenshot, admin "Mark as paid" (typed amount must equal the total, optional wallet number and note, who/when stored, row lock, MFA, audit log) | Yes (owner, 8 Nov 2026; `business-rules.md` §13) | Yes (`database.md` §32) | Yes (migration `8e2a6c4b91d0` written, **not yet applied to Supabase**; `POST /api/admin/orders/{id}/mark-paid`; customer and admin screens) | Yes (`tests/test_wallet_simple.py`, 25 cases; frontend tests) |
+| No payment deadline and no automatic expiry for launch-mode wallet orders; stock stays reserved until the admin cancels; admin list filter "Awaiting payment" | Yes | Yes (no `payment_deadline_at`, so the SQL expiry function skips them) | Yes | Yes |
+| Late money for a cancelled wallet order can be marked as paid (order stays Cancelled, refundable in full) | Yes | Yes | Yes | Yes |
+| Refund history with optional wallet transaction number (`payment_refunds`) | Yes | Yes (`database.md` §11b, §32) | Yes | Yes |
+| Email alert (to the old and the new shop address) when a wallet QR code or details change | Yes | Yes | Yes | Yes |
+| Receipt flow (upload, attempts, Payments queue) and the gateway/webhook routes switched off by flags (`MANUAL_RECEIPTS_ENABLED`, `ONLINE_PAYMENTS_ENABLED`, default off); routes refuse with 403 `FEATURE_DISABLED` | Yes | Yes (`app/core/features.py`) | Yes | Yes (flag-off route tests; the old receipt tests run with the flag on) |
 
 ---
 
@@ -465,7 +471,7 @@ Implementation notes (admin security):
 
 # Current Next Step
 
-0. **Apply migration `5d3b8f1c2a47` to Supabase** (the new payment tables) before the backend goes live, then upload the QR codes in the admin settings.
+0. **Apply migration `8e2a6c4b91d0` to Supabase** (after `5d3b8f1c2a47`, which is already there): `make migrate`. It only adds columns and the `payment_refunds` table. Then, in the admin settings, fill in the WhatsApp number and the Easypaisa/JazzCash QR code or account number. The private `payment-proofs` bucket is needed only if the receipt flow is switched on.
 1. **Deploy**: the two Vercel projects exist (`bundle-of-loops-shop`, `bundle-of-loops-admin`, linked to GitHub, root directories set, public variables set). Still to do: create the API on Render named exactly `bundle-of-loops-api` (it asks for a card to verify the account even for the free instance), set `CORS_ORIGINS` and `FRONTEND_URL`, the Supabase login URLs, and schedule the expiry call (`docs/deployment.md`).
 2. **Check the real services by hand** (list in `docs/qa-report.md`): real sign-up, login and authenticator codes, uploads to the four Storage buckets (including `payment-proofs`), emails to someone else's address, a real phone.
 3. **Before real customers**: a domain (owner's name) with Resend for customer emails, a backend plan that does not sleep, backups.

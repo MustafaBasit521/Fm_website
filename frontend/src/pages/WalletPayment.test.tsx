@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ApiError, type Order, type PaymentAttempt } from '../lib/api'
@@ -51,9 +51,12 @@ const order = (over: Partial<Order> = {}): Order =>
     ...over,
   }) as Order
 
-const show = (o: Order, onUpdated = vi.fn()) => {
+// The page decides what to show from the public settings, so wait for them before looking.
+const show = async (o: Order, onUpdated = vi.fn()) => {
   const { wrap } = makeAuth()
-  render(wrap(<WalletPayment order={o} onUpdated={onUpdated} />))
+  await act(async () => {
+    render(wrap(<WalletPayment order={o} onUpdated={onUpdated} />))
+  })
   return onUpdated
 }
 const receipt = () => new File(['x'], 'pay.png', { type: 'image/png' })
@@ -70,11 +73,13 @@ beforeEach(() => {
     easypaisa_details: 'Sara Ahmed 0300 1234567',
     jazzcash_qr_url: 'https://img.example/payment-qr/jc.png',
     jazzcash_details: null,
+    whatsapp: '0300 1234567',
+    wallet_receipts_enabled: true, // the receipt flow; the launch behaviour is tested below
   })
 })
 
 it('shows the QR code, amount, order number, instructions and the form', async () => {
-  show(order())
+  await show(order())
   expect(screen.getByRole('heading', { name: /Pay Rs 2,701 with Easypaisa/ })).toBeInTheDocument()
   expect(screen.getByText('ABCDEF12')).toBeInTheDocument() // the order number
   expect(await screen.findByRole('img', { name: /Easypaisa QR code/ })).toHaveAttribute(
@@ -87,7 +92,7 @@ it('shows the QR code, amount, order number, instructions and the form', async (
 })
 
 it('shows the JazzCash QR code for a JazzCash order', async () => {
-  show(order({ payment_method: 'JAZZCASH' }))
+  await show(order({ payment_method: 'JAZZCASH' }))
   expect(await screen.findByRole('img', { name: /JazzCash QR code/ })).toHaveAttribute(
     'src',
     'https://img.example/payment-qr/jc.png',
@@ -99,8 +104,11 @@ it.each([
   ['online order', order({ payment_method: 'ONLINE' })],
   ['paid order without details', order({ payment_status: 'PAID' })],
   ['cancelled order without details', order({ status: 'CANCELLED' })],
-])('shows nothing for a %s', (_name, o) => {
-  const { container } = render(<WalletPayment order={o} onUpdated={vi.fn()} />)
+])('shows nothing for a %s', async (_name, o) => {
+  let container!: HTMLElement
+  await act(async () => {
+    container = render(<WalletPayment order={o} onUpdated={vi.fn()} />).container
+  })
   expect(container).toBeEmptyDOMElement()
 })
 
@@ -113,7 +121,7 @@ it('uploads the receipt straight to the private bucket, then sends the number an
   })
   const updated = order({ proof_submitted_at: '2026-03-05T10:05:00Z' })
   api.sendPaymentProof.mockResolvedValue(updated)
-  const onUpdated = show(order())
+  const onUpdated = await show(order())
   await userEvent.type(screen.getByLabelText(/Transaction number/), '  TX-998877 ')
   const file = receipt()
   await userEvent.upload(screen.getByLabelText(/Screenshot of the receipt/i), file)
@@ -134,7 +142,7 @@ it('uploads the receipt straight to the private bucket, then sends the number an
 })
 
 it('needs BOTH a valid number and a receipt picture', async () => {
-  show(order())
+  await show(order())
   await userEvent.click(screen.getByRole('button', { name: /I have paid/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent('transaction number')
   await userEvent.type(screen.getByLabelText(/Transaction number/), 'TX-998877')
@@ -152,7 +160,7 @@ it('needs BOTH a valid number and a receipt picture', async () => {
 })
 
 it('rejects a number with spaces or too few characters before asking the server', async () => {
-  show(order())
+  await show(order())
   await fill('12 34')
   await userEvent.click(screen.getByRole('button', { name: /I have paid/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent('transaction number')
@@ -173,21 +181,21 @@ it.each([
     bucket: 'payment-proofs',
   })
   api.sendPaymentProof.mockRejectedValue(new ApiError(status, 'x', { code }))
-  show(order())
+  await show(order())
   await fill()
   await userEvent.click(screen.getByRole('button', { name: /I have paid/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent(text)
 })
 
-it('after sending, tells the customer the shop is checking and shows the number', () => {
-  show(order({ proof_submitted_at: '2026-03-05T10:05:00Z', payment_attempts: [attempt()] }))
+it('after sending, tells the customer the shop is checking and shows the number', async () => {
+  await show(order({ proof_submitted_at: '2026-03-05T10:05:00Z', payment_attempts: [attempt()] }))
   expect(screen.getByRole('status')).toHaveTextContent(/will check its Easypaisa account/)
   expect(screen.getByText('TX-998877')).toBeInTheDocument()
   expect(screen.queryByLabelText(/Transaction number/)).not.toBeInTheDocument()
 })
 
 it('explains why a payment was rejected and offers corrected details', async () => {
-  show(
+  await show(
     order({
       payment_attempts: [
         attempt({
@@ -205,8 +213,8 @@ it('explains why a payment was rejected and offers corrected details', async () 
   expect(screen.getByLabelText(/Transaction number/)).toBeInTheDocument()
 })
 
-it('shows the written reason when the shop chose "Other"', () => {
-  show(
+it('shows the written reason when the shop chose "Other"', async () => {
+  await show(
     order({
       payment_attempts: [
         attempt({ status: 'REJECTED', rejection_reason: 'OTHER', rejection_note: 'Wrong account' }),
@@ -216,8 +224,8 @@ it('shows the written reason when the shop chose "Other"', () => {
   expect(screen.getByRole('alert')).toHaveTextContent('Wrong account')
 })
 
-it('shows the verified transaction once the payment is settled', () => {
-  show(
+it('shows the verified transaction once the payment is settled', async () => {
+  await show(
     order({
       status: 'CONFIRMED',
       payment_status: 'PAID',
@@ -226,4 +234,76 @@ it('shows the verified transaction once the payment is settled', () => {
   )
   expect(screen.getByText('TX-998877')).toBeInTheDocument()
   expect(screen.getByText(/verified by the shop/)).toBeInTheDocument()
+})
+
+// ---- launch mode: pay, then send the screenshot on WhatsApp (receipt flow switched off) --------
+
+const launchSettings = (over: Record<string, unknown> = {}) =>
+  api.getPublicSettings.mockResolvedValue({
+    easypaisa_qr_url: 'https://img.example/payment-qr/ep.png',
+    easypaisa_details: 'Sara Ahmed 0300 1234567',
+    jazzcash_qr_url: null,
+    jazzcash_details: null,
+    whatsapp: '0300 7654321',
+    wallet_receipts_enabled: false,
+    ...over,
+  })
+
+it('launch mode: shows the account, the exact amount, the order number and the WhatsApp step', async () => {
+  launchSettings()
+  await show(order({ payment_deadline_at: null }))
+  expect(screen.getByRole('heading', { name: /Pay Rs 2,701 with Easypaisa/ })).toBeInTheDocument()
+  expect(screen.getByText('ABCDEF12')).toBeInTheDocument()
+  expect(screen.getByRole('img', { name: /Easypaisa QR code/ })).toBeInTheDocument()
+  expect(screen.getByText('Sara Ahmed 0300 1234567')).toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Send the payment, then message us the screenshot on WhatsApp. We will confirm your order once we receive it.',
+  )
+  const link = screen.getByRole('link', { name: 'Send the screenshot on WhatsApp' })
+  expect(link).toHaveAttribute(
+    'href',
+    expect.stringMatching(/^https:\/\/wa\.me\/923007654321\?text=/),
+  )
+  expect(decodeURIComponent(link.getAttribute('href')!)).toContain('order ABCDEF12')
+  expect(decodeURIComponent(link.getAttribute('href')!)).toContain('Rs 2,701')
+  expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+})
+
+it('launch mode: has no receipt form, no deadline text and never calls the receipt API', async () => {
+  launchSettings()
+  await show(order({ payment_deadline_at: null }))
+  expect(screen.queryByLabelText(/Transaction number/)).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/Screenshot of the receipt/i)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.queryByText(/30 minutes|before \d/)).not.toBeInTheDocument()
+  expect(api.getProofUploadTarget).not.toHaveBeenCalled()
+  expect(api.sendPaymentProof).not.toHaveBeenCalled()
+})
+
+it('launch mode: tells the customer when the shop confirmed the payment', async () => {
+  launchSettings()
+  await show(order({ status: 'CONFIRMED', payment_status: 'PAID' }))
+  expect(screen.getByText(/Easypaisa payment received/)).toBeInTheDocument()
+  expect(screen.queryByRole('link')).not.toBeInTheDocument()
+})
+
+it('launch mode: shows nothing for a cancelled order', async () => {
+  launchSettings()
+  const { container } = await (async () => {
+    let c!: HTMLElement
+    await act(async () => {
+      c = render(
+        <WalletPayment order={order({ status: 'CANCELLED' })} onUpdated={vi.fn()} />,
+      ).container
+    })
+    return { container: c }
+  })()
+  expect(container).toBeEmptyDOMElement()
+})
+
+it('launch mode: still explains what to do when the shop details cannot be loaded', async () => {
+  api.getPublicSettings.mockRejectedValue(new Error('down'))
+  await show(order())
+  expect(screen.getByText(/account details could not be loaded/)).toBeInTheDocument()
+  expect(screen.queryByRole('link')).not.toBeInTheDocument() // no WhatsApp number known
 })

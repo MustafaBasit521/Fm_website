@@ -176,13 +176,25 @@ it('puts the total on the Place order button and shows payment choices as cards'
   expect(screen.getByLabelText('Pay online').closest('label')).toHaveClass('border-ink')
 })
 
-it('offers Easypaisa and JazzCash with a short explanation when the shop has their QR codes', async () => {
+it('offers Easypaisa and JazzCash with a short explanation (pay, then WhatsApp the screenshot)', async () => {
   api.getQuote.mockResolvedValue({ ...okQuote, payment_methods: ['COD', 'EASYPAISA', 'JAZZCASH'] })
   renderCheckout()
   const transfer = await screen.findByLabelText(/Easypaisa/)
   expect(screen.getByLabelText(/JazzCash/)).toBeInTheDocument()
-  expect(transfer.closest('label')).toHaveTextContent(/hold your order for 30 minutes/)
+  expect(transfer.closest('label')).toHaveTextContent(/message us the screenshot on WhatsApp/)
+  expect(transfer.closest('label')).not.toHaveTextContent(/30 minutes/)
   expect(screen.getByLabelText('Cash on delivery')).toBeChecked()
   await userEvent.click(transfer)
   expect(transfer).toBeChecked()
+})
+
+it('explains the receipt flow instead when the website takes the receipts', async () => {
+  api.getQuote.mockResolvedValue({
+    ...okQuote,
+    payment_methods: ['COD', 'EASYPAISA'],
+    wallet_receipts_enabled: true,
+  })
+  renderCheckout()
+  const wallet = await screen.findByLabelText(/Easypaisa/)
+  expect(wallet.closest('label')).toHaveTextContent(/hold your order for 30 minutes/)
 })

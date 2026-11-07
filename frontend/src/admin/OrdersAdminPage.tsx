@@ -14,11 +14,16 @@ const STATUSES = ['', 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERE
 export default function OrdersAdminPage() {
   const [status, setStatus] = useState('')
   const [method, setMethod] = useState('')
+  const [awaiting, setAwaiting] = useState(false)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const { data, loading, failed } = useLoad(
-    (s) => getAdminOrders({ status, payment_method: method, search, page }, s),
-    [status, method, search, page],
+    (s) =>
+      getAdminOrders(
+        { status, payment_method: method, awaiting_payment: awaiting || undefined, search, page },
+        s,
+      ),
+    [status, method, awaiting, search, page],
   )
 
   return (
@@ -29,7 +34,7 @@ export default function OrdersAdminPage() {
       />
       <form
         role="search"
-        className="mt-5 grid gap-3 sm:grid-cols-3"
+        className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
         onSubmit={(e) => e.preventDefault()}
       >
         <div className="flex flex-col gap-1">
@@ -71,6 +76,19 @@ export default function OrdersAdminPage() {
             <option value="JAZZCASH">JazzCash</option>
             <option value="ONLINE">Online</option>
           </select>
+        </div>
+        <div className="flex items-end">
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-bark">
+            <input
+              type="checkbox"
+              checked={awaiting}
+              onChange={(e) => {
+                setAwaiting(e.target.checked)
+                setPage(1)
+              }}
+            />
+            Awaiting payment only
+          </label>
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="o-search" className="text-sm font-medium text-bark">

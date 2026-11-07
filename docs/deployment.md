@@ -122,7 +122,7 @@ Every 5 minutes it cancels expired unpaid orders, tells the customers once, and 
 2. The shop opens, shows products, and a **Cash on Delivery** test order can be placed; the shop owner's email receives the alert.
 3. The admin opens at its own address, log in, set up the authenticator code (QR code) the first time, and see the dashboard.
 4. Upload one product picture, one gallery picture, and send one custom-order request with a photo (needs the buckets in the README).
-5. Upload an Easypaisa QR code in Settings, place an Easypaisa order, send a transaction number and a receipt, and verify it on the admin's Payments page.
+5. Fill in the WhatsApp number and an Easypaisa QR code or account number in Settings, place an Easypaisa order, check that the confirmation page shows the account and the WhatsApp link, then press **Mark as paid** on the admin order page. (The private `payment-proofs` bucket is needed only if `MANUAL_RECEIPTS_ENABLED=true`.)
 6. Run `python -m app.tools.check_services` locally with the production values if you want one more summary.
 7. Check the browser console of both sites: there must be no blocked-by-CSP errors (if there are, the address in `vercel.json` or `CORS_ORIGINS` is wrong).
 

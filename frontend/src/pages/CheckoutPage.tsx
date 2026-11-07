@@ -311,9 +311,9 @@ export default function CheckoutPage() {
                     {methodName(m)}
                     {isWalletMethod(m) && (
                       <span className="block text-sm text-bark">
-                        After you place the order you will see the shop&apos;s {methodName(m)} QR
-                        code. Pay, then send us the transaction number and a screenshot of the
-                        receipt. We hold your order for 30 minutes.
+                        {quote.wallet_receipts_enabled
+                          ? `After you place the order you will see the shop's ${methodName(m)} QR code. Pay, then send us the transaction number and a screenshot of the receipt. We hold your order for 30 minutes.`
+                          : `After you place the order you will see where to send the payment. Pay with ${methodName(m)}, then message us the screenshot on WhatsApp. We confirm your order once we receive it.`}
                       </span>
                     )}
                   </span>

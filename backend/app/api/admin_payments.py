@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import AuthUser, require_admin
 from app.core.db import get_session
+from app.core.features import require_manual_receipts
 from app.core.storage import StorageNotConfiguredError, SupabaseStorage, get_storage
 from app.models.enums import PaymentAttemptStatus
 from app.schemas.catalog import Page
@@ -17,8 +18,12 @@ from app.schemas.payments import AdminPaymentAttempt, PaymentReject, ReceiptLink
 from app.services import catalog as catalog_service
 from app.services import payments as service
 
+# The admin check comes first, so a visitor gets 401/403 and only an admin learns that the receipt
+# flow is switched off (MANUAL_RECEIPTS_ENABLED).
 router = APIRouter(
-    prefix="/admin/payments", tags=["admin-payments"], dependencies=[Depends(require_admin)]
+    prefix="/admin/payments",
+    tags=["admin-payments"],
+    dependencies=[Depends(require_admin), Depends(require_manual_receipts)],
 )
 
 Session = Annotated[AsyncSession, Depends(get_session)]

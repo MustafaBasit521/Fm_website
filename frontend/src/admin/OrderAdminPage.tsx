@@ -4,6 +4,7 @@ import {
   cancelAdminOrder,
   confirmCodPayment,
   getAdminOrder,
+  markOrderPaid,
   refundOrder,
   setOrderStatus,
   type AdminOrder,
@@ -12,6 +13,7 @@ import { ApiError } from '../lib/api'
 import { formatPrice, parseRupeesToPaisa } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
 import { isWalletMethod, methodName, REJECTION_LABELS } from '../lib/paymentText'
+import { ConfirmDialog } from '../pages/ConfirmDialog'
 import { BackLink, buttonClass, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { Badge, ConfirmButton, PageTitle, State, cardClass } from './ui'
@@ -39,7 +41,13 @@ const ERRORS: Record<string, string> = {
   REFUND_FAILED:
     'The payment provider could not process the refund. Nothing was changed; try again.',
   PAYMENT_PROVIDER_UNAVAILABLE: 'The payment service is unavailable right now.',
+  AMOUNT_MISMATCH:
+    'The amount must be exactly the order total. If the customer sent a different amount, do not mark this as paid: contact them first.',
+  USE_PAYMENTS_QUEUE: 'Payments are checked on the Payments page. Open the receipt there.',
+  ORDER_NOT_OPEN: 'This order is no longer waiting for payment. Reload the page.',
+  NOT_A_MANUAL_PAYMENT: 'Only Easypaisa and JazzCash orders can be marked as paid.',
 }
+const REFERENCE = /^[A-Za-z0-9-]{6,40}$/
 
 export default function OrderAdminPage() {
   const { id = '' } = useParams()
@@ -49,8 +57,25 @@ export default function OrderAdminPage() {
   const [busy, setBusy] = useState(false)
   const [waive, setWaive] = useState(false)
   const [refundAmount, setRefundAmount] = useState('')
+  const [refundRef, setRefundRef] = useState('')
+  const [paying, setPaying] = useState(false) // the "Mark as paid" pop-up
+  const [paidAmount, setPaidAmount] = useState('')
+  const [paidRef, setPaidRef] = useState('')
+  const [paidNote, setPaidNote] = useState('')
 
   const order = override?.order_id === id ? override : data
+  // Easypaisa / JazzCash money not yet recorded (also after a cancellation: late payment)
+  const walletUnpaid =
+    order !== undefined &&
+    order !== null &&
+    order.payments.some((p) => isWalletMethod(p.method) && p.status === 'PENDING')
+  const payable = walletUnpaid && order !== null && ['PENDING', 'CANCELLED'].includes(order.status)
+  // an online or wallet order cannot be confirmed by hand before the money is recorded
+  const awaitingMoney =
+    order !== undefined &&
+    order !== null &&
+    order.payment_method !== 'COD' &&
+    order.payment_status !== 'PAID'
 
   async function act(fn: () => Promise<AdminOrder>) {
     setBusy(true)
@@ -76,8 +101,35 @@ export default function OrderAdminPage() {
       if (amount === null || amount === 0)
         return setError('Enter the refund amount in Rs, like 500 or 500.50.')
     }
-    await act(() => refundOrder(id, amount))
-    setRefundAmount('')
+    const reference = refundRef.trim()
+    if (reference && !REFERENCE.test(reference))
+      return setError('The wallet transaction number is 6 to 40 letters, digits or dashes.')
+    if (await act(() => refundOrder(id, amount, reference || null))) {
+      setRefundAmount('')
+      setRefundRef('')
+    }
+  }
+
+  function openPaid() {
+    setPaidAmount('')
+    setPaidRef('')
+    setPaidNote('')
+    setError(null)
+    setPaying(true)
+  }
+
+  async function onMarkPaid() {
+    const amount = parseRupeesToPaisa(paidAmount)
+    if (amount === null || amount === 0)
+      return setError('Type the amount you received in Rs, like 2701 or 2701.50.')
+    const reference = paidRef.trim()
+    if (reference && !REFERENCE.test(reference))
+      return setError('The transaction number is 6 to 40 letters, digits or dashes.')
+    // the server compares the amount with the order total; it alone decides
+    const ok = await act(() =>
+      markOrderPaid(id, { amount_paisa: amount, reference: reference || null, note: paidNote }),
+    )
+    if (ok) setPaying(false)
   }
 
   return (
@@ -95,13 +147,12 @@ export default function OrderAdminPage() {
               <p className="mt-2 flex flex-wrap items-center gap-2">
                 <StatusBadge status={order.status} />
                 <Badge>
-                  {order.payment_method === 'COD' ? 'Cash on delivery' : 'Online'} ·{' '}
-                  {paymentStatusLabel(order.payment_status)}
+                  {methodName(order.payment_method)} · {paymentStatusLabel(order.payment_status)}
                 </Badge>
               </p>
             </header>
 
-            <FormError message={error} />
+            <FormError message={paying ? null : error} />
 
             <section aria-label="Progress" className={`${cardClass} p-4`}>
               {order.status === 'CANCELLED' ? (
@@ -196,6 +247,19 @@ export default function OrderAdminPage() {
                         {paymentStatusLabel(p.status)} — {formatPrice(p.amount_paisa)}
                         {p.refunded_amount_paisa > 0 &&
                           ` (refunded ${formatPrice(p.refunded_amount_paisa)})`}
+                        {p.paid_marked_at && (
+                          <span className="block text-sm text-bark">
+                            Marked as paid {formatDate(p.paid_marked_at)}
+                            {p.paid_reference ? ` · transaction ${p.paid_reference}` : ''}
+                            {p.paid_note ? ` · ${p.paid_note}` : ''}
+                          </span>
+                        )}
+                        {(p.refunds ?? []).map((r) => (
+                          <span key={r.refund_id} className="block text-sm text-bark">
+                            Refunded {formatPrice(r.amount_paisa)} on {formatDate(r.created_at)}
+                            {r.wallet_reference ? ` · transaction ${r.wallet_reference}` : ''}
+                          </span>
+                        ))}
                       </li>
                     ))}
                   </ul>
@@ -232,11 +296,9 @@ export default function OrderAdminPage() {
                       p.attempts?.some((a) => a.status === 'SUBMITTED'),
                     ) && (
                       <p className="mt-4 rounded-[10px] bg-cream-100 p-3">
-                        Waiting for the customer to send the transaction number and receipt
                         {order.payment_deadline_at
-                          ? ` (until ${new Date(order.payment_deadline_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })})`
-                          : ''}
-                        .
+                          ? `Waiting for the customer to send the transaction number and receipt (until ${new Date(order.payment_deadline_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}).`
+                          : 'Waiting for the payment. The customer sends the screenshot on WhatsApp. When you see the full amount in your wallet app, press "Mark as paid". This order does not expire: cancel it yourself if the customer does not pay.'}
                       </p>
                     )}
                 </section>
@@ -248,7 +310,24 @@ export default function OrderAdminPage() {
                   className={`${cardClass} flex flex-col gap-3 p-4 md:p-5`}
                 >
                   <h2 className="font-serif text-2xl">Actions</h2>
-                  {NEXT[order.status] && (
+                  {payable && (
+                    <div>
+                      <button
+                        type="button"
+                        className={buttonClass}
+                        disabled={busy}
+                        onClick={openPaid}
+                      >
+                        Mark as paid
+                      </button>
+                      <p className="mt-1 text-sm text-bark">
+                        {order.status === 'CANCELLED'
+                          ? 'The order was cancelled but the money arrived. It is recorded as paid and can be refunded in full.'
+                          : 'Press this only after you saw the full amount in your wallet app.'}
+                      </p>
+                    </div>
+                  )}
+                  {NEXT[order.status] && !awaitingMoney && (
                     <div>
                       <button
                         type="button"
@@ -320,6 +399,20 @@ export default function OrderAdminPage() {
                           onChange={(e) => setRefundAmount(e.target.value)}
                         />
                       </div>
+                      {order.payments.some((p) => isWalletMethod(p.method)) && (
+                        <div className="flex flex-col gap-1 sm:w-64">
+                          <label htmlFor="refund-ref" className="text-sm font-medium text-bark">
+                            Transaction number of the refund in your wallet app (optional)
+                          </label>
+                          <input
+                            id="refund-ref"
+                            className={inputClass}
+                            maxLength={40}
+                            value={refundRef}
+                            onChange={(e) => setRefundRef(e.target.value)}
+                          />
+                        </div>
+                      )}
                       <div>
                         <button
                           type="button"
@@ -372,6 +465,64 @@ export default function OrderAdminPage() {
           </div>
         )}
       </State>
+
+      <ConfirmDialog
+        open={paying}
+        title="Did you receive the money?"
+        confirmLabel="Yes, mark as paid"
+        cancelLabel="Not yet"
+        busy={busy}
+        onCancel={() => setPaying(false)}
+        onConfirm={() => void onMarkPaid()}
+      >
+        {order && (
+          <>
+            <p>
+              Open your {methodName(order.payment_method)} app and look for{' '}
+              <strong>{formatPrice(order.total_amount_paisa)}</strong> for order{' '}
+              <strong>{order.order_id.slice(0, 8).toUpperCase()}</strong>. Only continue if you can
+              see the full amount there.
+            </p>
+            <div className="mt-3 flex flex-col gap-1">
+              <label htmlFor="paid-amount" className="text-sm font-medium text-bark">
+                Amount you received, in Rs
+              </label>
+              <input
+                id="paid-amount"
+                className={inputClass}
+                inputMode="decimal"
+                value={paidAmount}
+                onChange={(e) => setPaidAmount(e.target.value)}
+              />
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <label htmlFor="paid-ref" className="text-sm font-medium text-bark">
+                Wallet transaction number (optional)
+              </label>
+              <input
+                id="paid-ref"
+                className={inputClass}
+                maxLength={40}
+                value={paidRef}
+                onChange={(e) => setPaidRef(e.target.value)}
+              />
+            </div>
+            <div className="mt-3 flex flex-col gap-1">
+              <label htmlFor="paid-note" className="text-sm font-medium text-bark">
+                Note (optional)
+              </label>
+              <input
+                id="paid-note"
+                className={inputClass}
+                maxLength={300}
+                value={paidNote}
+                onChange={(e) => setPaidNote(e.target.value)}
+              />
+            </div>
+            <FormError message={error} />
+          </>
+        )}
+      </ConfirmDialog>
     </>
   )
 }

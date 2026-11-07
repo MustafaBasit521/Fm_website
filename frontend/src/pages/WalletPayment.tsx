@@ -11,6 +11,7 @@ import {
 import { formatPrice } from '../lib/money'
 import { isWalletMethod, methodName, REJECTION_LABELS } from '../lib/paymentText'
 import { supabase } from '../lib/supabase'
+import { waDigits, waLink } from '../lib/whatsapp'
 import { useToast } from '../toast/context'
 import { buttonClass, Field, FilePicker, FormError } from './ui'
 
@@ -32,10 +33,20 @@ function rejectionText(a: PaymentAttempt): string {
   return a.rejection_note ? `${label}: ${a.rejection_note}` : label
 }
 
-/** Paying an Easypaisa or JazzCash order: shows the shop's QR code, the amount and the order
- *  number, takes the transaction number and a receipt screenshot, and then waits for the shop to
- *  check its own account. A rejected payment shows why and lets the customer send corrected
- *  details. Renders nothing for orders that are not paid this way. */
+function qrAndDetails(order: Order, settings: BusinessSettings | null) {
+  const easypaisa = order.payment_method === 'EASYPAISA'
+  return {
+    qr: (easypaisa ? settings?.easypaisa_qr_url : settings?.jazzcash_qr_url) ?? null,
+    details: (easypaisa ? settings?.easypaisa_details : settings?.jazzcash_details) ?? null,
+  }
+}
+
+/** Paying an Easypaisa or JazzCash order. Renders nothing for orders that are not paid this way.
+ *
+ *  The backend decides how (`wallet_receipts_enabled` in the public settings). At launch the
+ *  customer pays the shop's wallet and messages the screenshot on WhatsApp, and the shop marks the
+ *  order paid. With the receipt flow switched on, the page takes the transaction number and the
+ *  screenshot itself. */
 export function WalletPayment({
   order,
   onUpdated,
@@ -43,18 +54,107 @@ export function WalletPayment({
   order: Order
   onUpdated: (order: Order) => void
 }) {
-  const toast = useToast()
-  const [settings, setSettings] = useState<BusinessSettings | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // undefined = still loading, null = could not be loaded
+  const [settings, setSettings] = useState<BusinessSettings | null | undefined>(undefined)
 
   useEffect(() => {
     getPublicSettings()
       .then(setSettings)
-      .catch(() => {}) // the QR code is also on the shop's other channels; the form still works
+      .catch(() => setSettings(null)) // the page still tells the customer to contact the shop
   }, [])
 
-  if (!isWalletMethod(order.payment_method)) return null
+  if (!isWalletMethod(order.payment_method) || settings === undefined) return null
+  if (settings?.wallet_receipts_enabled) {
+    return <ReceiptPayment order={order} onUpdated={onUpdated} settings={settings} />
+  }
+  return <WhatsAppPayment order={order} settings={settings} />
+}
+
+/** Launch mode: pay, then send the screenshot on WhatsApp. There is no form and no deadline. */
+function WhatsAppPayment({ order, settings }: { order: Order; settings: BusinessSettings | null }) {
+  const wallet = methodName(order.payment_method)
+  const { qr, details } = qrAndDetails(order, settings)
+  const amount = formatPrice(order.total_amount_paisa)
+  const number = orderNumber(order)
+
+  if (order.payment_status === 'PAID') {
+    return (
+      <section aria-label="Payment" className="mt-4 rounded-[18px] border border-sand bg-paper p-5">
+        <h2 className="font-serif text-2xl">{wallet} payment received</h2>
+        <p className="mt-1 text-bark">The shop has confirmed your payment. Thank you!</p>
+      </section>
+    )
+  }
+  if (order.status !== 'PENDING' || order.payment_status !== 'PENDING') return null
+
+  const digits = waDigits(settings?.whatsapp)
+  const message = `Hello, I paid ${amount} by ${wallet} for order ${number}. Here is my payment screenshot.`
+  return (
+    <section
+      aria-label={`Pay with ${wallet}`}
+      className="mt-4 flex flex-col gap-4 rounded-[18px] border border-sand bg-paper p-5"
+    >
+      <div>
+        <h2 className="font-serif text-2xl">
+          Pay {amount} with {wallet}
+        </h2>
+        <p className="mt-1 text-bark">
+          Send exactly <strong>{amount}</strong> and write the order number{' '}
+          <strong>{number}</strong> in the payment note.
+        </p>
+      </div>
+      {qr ? (
+        <img
+          src={qr}
+          alt={`${wallet} QR code of the shop`}
+          className="mx-auto h-auto w-full max-w-64 rounded-[10px] border border-sand bg-white p-2"
+        />
+      ) : null}
+      {details && (
+        <p className="whitespace-pre-line rounded-[10px] bg-cream-100 p-4 font-medium">{details}</p>
+      )}
+      {!qr && !details && (
+        <p className="rounded-[10px] bg-cream-100 p-4 text-bark">
+          The {wallet} account details could not be loaded. Please contact the shop.
+        </p>
+      )}
+      <p role="status" className="rounded-[10px] bg-accent-tint p-4">
+        Send the payment, then message us the screenshot on WhatsApp. We will confirm your order
+        once we receive it.
+      </p>
+      {digits && (
+        <div>
+          <a
+            href={waLink(digits, message)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonClass}
+          >
+            Send the screenshot on WhatsApp
+          </a>
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** Receipt flow (MANUAL_RECEIPTS_ENABLED): shows the shop's QR code, the amount and the order
+ *  number, takes the transaction number and a receipt screenshot, and then waits for the shop to
+ *  check its own account. A rejected payment shows why and lets the customer send corrected
+ *  details. */
+function ReceiptPayment({
+  order,
+  onUpdated,
+  settings,
+}: {
+  order: Order
+  onUpdated: (order: Order) => void
+  settings: BusinessSettings
+}) {
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const attempts = order.payment_attempts ?? []
   const wallet = methodName(order.payment_method)
   const open = attempts.find((a) => a.status === 'SUBMITTED')
@@ -94,10 +194,7 @@ export function WalletPayment({
     )
   }
 
-  const qr =
-    order.payment_method === 'EASYPAISA' ? settings?.easypaisa_qr_url : settings?.jazzcash_qr_url
-  const details =
-    order.payment_method === 'EASYPAISA' ? settings?.easypaisa_details : settings?.jazzcash_details
+  const { qr, details } = qrAndDetails(order, settings)
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()

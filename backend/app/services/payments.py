@@ -25,10 +25,11 @@ from app.models.enums import (
     PaymentMethod,
     PaymentStatus,
 )
-from app.models.orders import Order, Payment, PaymentAttempt
+from app.models.orders import Order, Payment, PaymentAttempt, PaymentRefund
 from app.schemas.orders import InitiatePayment, PaymentStatusRead
 from app.schemas.payments import (
     AdminPaymentAttempt,
+    MarkPaid,
     PaymentAttemptRead,
     PaymentReject,
     PaymentSubmit,
@@ -250,6 +251,9 @@ async def refund_order(
     provider: PaymentProvider | None,
     order_id: uuid.UUID,
     amount_paisa: int | None,
+    *,
+    admin_id: uuid.UUID,
+    wallet_reference: str | None = None,
 ) -> Order:
     """Refund (all or part of) what a cancelled, paid online order still owes the customer.
 
@@ -307,6 +311,16 @@ async def refund_order(
     # here the admin only records that it did.
 
     payment.refunded_amount_paisa += amount
+    # One history row per step: how much, who recorded it, and the wallet transaction that sent
+    # the money back (database.md §11b).
+    session.add(
+        PaymentRefund(
+            payment_id=payment.payment_id,
+            amount_paisa=amount,
+            wallet_reference=wallet_reference,
+            recorded_by=admin_id,
+        )
+    )
     payment.status = (
         PaymentStatus.REFUNDED
         if payment.refunded_amount_paisa >= payment.amount_paisa
@@ -320,7 +334,74 @@ def webhook_headers(raw: Any) -> dict[str, str]:
     return {k.lower(): v for k, v in raw.items()}
 
 
-# ---- payment by transfer (the shop's own account; the admin checks the proof) ---------------
+# ---- Easypaisa / JazzCash: "Mark as paid" (launch mode) -------------------------------------
+
+
+async def mark_wallet_paid(
+    session: AsyncSession,
+    settings: Settings,
+    order_id: uuid.UUID,
+    admin_id: uuid.UUID,
+    data: MarkPaid,
+) -> Order:
+    """The admin saw the full amount in the shop's own wallet app (business-rules §13).
+
+    Everything happens under the order row lock, so a double click or two admins at once give
+    exactly one success: the second one finds the payment already Paid. The amount the admin
+    typed must equal the order total held by the server. A paid order becomes Confirmed; an
+    order that was already cancelled stays cancelled and its payment is simply recorded as Paid,
+    which makes it refundable in full (the same late-payment rule as an online payment)."""
+    if settings.manual_receipts_enabled:
+        # With the receipt flow on, the Payments queue is the only way to accept a payment.
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "USE_PAYMENTS_QUEUE",
+            "Payments are checked on the Payments page. Open the customer's receipt there.",
+        )
+    order = await orders_service.load_order(session, order_id, lock=True)
+    payment = _manual_payment(order)
+    if payment.status != PaymentStatus.PENDING:
+        raise _problem(
+            status.HTTP_409_CONFLICT, "ALREADY_PAID", "This payment was already recorded"
+        )
+    if order.status not in (OrderStatus.PENDING, OrderStatus.CANCELLED):
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "ORDER_NOT_OPEN",
+            "This order is not waiting for payment",
+        )
+    if data.amount_paisa != order.total_amount_paisa:
+        raise _problem(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "AMOUNT_MISMATCH",
+            "The amount must be exactly the order total. If the customer sent a different "
+            "amount, do not mark this as paid: contact them first.",
+        )
+    late = order.status == OrderStatus.CANCELLED
+    payment.status = PaymentStatus.PAID
+    payment.paid_marked_by = admin_id
+    payment.paid_marked_at = func.now()
+    payment.paid_reference = data.reference
+    payment.paid_note = data.note
+    order.payment_deadline_at = None
+    open_attempt = payment.open_attempt
+    if open_attempt is not None:
+        # a receipt sent while the receipt flow was on: close it together with the payment
+        open_attempt.status = PaymentAttemptStatus.PAID
+        open_attempt.reviewed_by = admin_id
+        open_attempt.reviewed_at = func.now()
+    if late:
+        await events.payment_received(session, order, late=True)
+    else:
+        order.status = OrderStatus.CONFIRMED
+        await session.flush()
+        await events.payment_received(session, order)
+        await events.order_status_changed(session, order, OrderStatus.CONFIRMED)
+    await session.commit()
+    return await orders_service.load_order(session, order_id, lock=False)
+
+
+# ---- Easypaisa / JazzCash receipt flow (MANUAL_RECEIPTS_ENABLED; the admin checks the proof) --
 
 
 def _manual_payment(order: Order) -> Payment:

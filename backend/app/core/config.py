@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     payment_provider: str = "none"
     # Shared secret used to verify webhook signatures (server-only).
     payment_webhook_secret: SecretStr | None = None
+    # Easypaisa / JazzCash receipt flow (customer uploads a screenshot and a transaction number,
+    # the admin verifies or rejects it on the Payments page, 30-minute window). OFF for the launch:
+    # wallet orders are then paid by messaging the shop on WhatsApp and the admin uses "Mark as
+    # paid" (business-rules §13). The code stays so the flow can be switched back on.
+    manual_receipts_enabled: bool = False
     # Where the browser returns after paying (the storefront origin).
     frontend_url: str = "http://localhost:5173"
     # "none" = emails are not sent. "console" only logs them (development; refused in production).

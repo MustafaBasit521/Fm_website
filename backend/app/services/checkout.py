@@ -19,7 +19,7 @@ from app.models.catalog import Product
 from app.models.customer_data import Address
 from app.models.enums import (
     ACTIVE_ORDER_STATUSES,
-    WINDOWED_PAYMENT_METHODS,
+    MANUAL_PAYMENT_METHODS,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
@@ -52,7 +52,7 @@ def _problem(status_code: int, code: str, message: str, **extra: Any) -> HTTPExc
 def payment_methods(
     settings: Settings, *, easypaisa: bool = False, jazzcash: bool = False
 ) -> list[PaymentMethod]:
-    """`easypaisa` / `jazzcash`: the shop has uploaded that wallet's QR code, so it accepts it."""
+    """`easypaisa` / `jazzcash`: the shop has set that wallet up (see `wallet_flags`)."""
     methods = [PaymentMethod.COD]
     if settings.online_payments_enabled:
         methods.append(PaymentMethod.ONLINE)
@@ -63,16 +63,44 @@ def payment_methods(
     return methods
 
 
-async def wallet_flags(session: AsyncSession) -> dict[str, bool]:
-    """Which wallets are switched on (a QR code exists), as keyword arguments."""
+async def wallet_flags(session: AsyncSession, settings: Settings) -> dict[str, bool]:
+    """Which wallets the shop accepts, as keyword arguments.
+
+    Launch mode (receipt flow off): the customer pays and then sends the screenshot on WhatsApp,
+    so a wallet is offered only when the shop has shown where to pay (a QR code OR account
+    details) AND has given a WhatsApp number to send the screenshot to. With the receipt flow
+    on, the website takes the receipt itself, so the QR code alone is enough (as before)."""
     row = (
         await session.execute(
-            select(BusinessSettings.easypaisa_qr_path, BusinessSettings.jazzcash_qr_path)
+            select(
+                BusinessSettings.easypaisa_qr_path,
+                BusinessSettings.easypaisa_details,
+                BusinessSettings.jazzcash_qr_path,
+                BusinessSettings.jazzcash_details,
+                BusinessSettings.whatsapp,
+            )
             .order_by(BusinessSettings.updated_at.desc())
             .limit(1)
         )
     ).one_or_none()
-    return {"easypaisa": bool(row and row[0]), "jazzcash": bool(row and row[1])}
+    if row is None:
+        return {"easypaisa": False, "jazzcash": False}
+    easypaisa_qr, easypaisa_details, jazzcash_qr, jazzcash_details, whatsapp = row
+    if settings.manual_receipts_enabled:
+        return {"easypaisa": bool(easypaisa_qr), "jazzcash": bool(jazzcash_qr)}
+    has_whatsapp = bool(whatsapp and whatsapp.strip())
+    return {
+        "easypaisa": has_whatsapp and bool(easypaisa_qr or easypaisa_details),
+        "jazzcash": has_whatsapp and bool(jazzcash_qr or jazzcash_details),
+    }
+
+
+def has_payment_window(method: PaymentMethod, settings: Settings) -> bool:
+    """business-rules §13: online orders always have the 30-minute window; wallet orders have it
+    only while the receipt flow is on. At launch they have none and are cancelled by the admin."""
+    if method == PaymentMethod.ONLINE:
+        return True
+    return method in MANUAL_PAYMENT_METHODS and settings.manual_receipts_enabled
 
 
 def merge_lines(items: list[CartLine]) -> dict[uuid.UUID, int]:
@@ -200,7 +228,8 @@ async def quote(session: AsyncSession, items: list[CartLine], settings: Settings
         subtotal_paisa=subtotal,
         delivery_fee_paisa=fee,
         total_paisa=total,
-        payment_methods=payment_methods(settings, **await wallet_flags(session)),
+        payment_methods=payment_methods(settings, **await wallet_flags(session, settings)),
+        wallet_receipts_enabled=settings.manual_receipts_enabled,
         can_checkout=ok and bool(lines),
     )
 
@@ -285,7 +314,8 @@ async def expire_unpaid_orders(session: AsyncSession) -> int:
 async def create_order(
     session: AsyncSession, user: AuthUser | None, data: OrderCreate, settings: Settings
 ) -> OrderRead:
-    if data.payment_method not in payment_methods(settings, **await wallet_flags(session)):
+    offered = payment_methods(settings, **await wallet_flags(session, settings))
+    if data.payment_method not in offered:
         raise _problem(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "PAYMENT_METHOD_UNAVAILABLE",
@@ -341,8 +371,9 @@ async def create_order(
             if line.product.availability_type == ProductAvailability.READY_TO_SHIP:
                 line.product.stock_quantity -= line.quantity
 
-        # Online and wallet orders have the 30-minute window (business-rules §13); COD has none.
-        windowed = data.payment_method in WINDOWED_PAYMENT_METHODS
+        # Online orders (and wallet orders while the receipt flow is on) have the 30-minute window;
+        # COD and launch-mode wallet orders have none (business-rules §13).
+        windowed = has_payment_window(data.payment_method, settings)
         order = Order(
             customer_id=user.id if user else None,
             customer_name=data.contact.name,

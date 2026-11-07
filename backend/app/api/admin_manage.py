@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
+from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.core.storage import SupabaseStorage, get_storage, require_storage
 from app.schemas.admin import (
@@ -27,12 +28,13 @@ from app.services import catalog as catalog_service
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 Storage = Annotated[SupabaseStorage, Depends(get_storage)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 StorageRW = Annotated[SupabaseStorage, Depends(require_storage)]
 
 admin = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
-def _settings_read(row, storage: SupabaseStorage) -> SettingsRead:
+def _settings_read(row, storage: SupabaseStorage, settings: Settings) -> SettingsRead:
     def qr(path: str | None) -> str | None:
         return storage.public_url(path, storage.gallery_bucket) if path else None
 
@@ -49,6 +51,7 @@ def _settings_read(row, storage: SupabaseStorage) -> SettingsRead:
         easypaisa_details=row.easypaisa_details,
         jazzcash_qr_url=qr(row.jazzcash_qr_path),
         jazzcash_details=row.jazzcash_details,
+        wallet_receipts_enabled=settings.manual_receipts_enabled,
     )
 
 
@@ -95,15 +98,21 @@ async def audit_log(
 
 
 @admin.get("/settings", response_model=AdminSettingsRead)
-async def get_settings(session: Session, storage: Storage):
+async def get_settings_route(session: Session, storage: Storage, settings: AppSettings):
     row = await service.get_settings_row(session)
-    return AdminSettingsRead(**_settings_read(row, storage).model_dump(), updated_at=row.updated_at)
+    return AdminSettingsRead(
+        **_settings_read(row, storage, settings).model_dump(), updated_at=row.updated_at
+    )
 
 
 @admin.patch("/settings", response_model=AdminSettingsRead)
-async def update_settings(data: SettingsUpdate, session: Session, storage: Storage):
+async def update_settings(
+    data: SettingsUpdate, session: Session, storage: Storage, settings: AppSettings
+):
     row = await service.update_settings(session, data)
-    return AdminSettingsRead(**_settings_read(row, storage).model_dump(), updated_at=row.updated_at)
+    return AdminSettingsRead(
+        **_settings_read(row, storage, settings).model_dump(), updated_at=row.updated_at
+    )
 
 
 @admin.post("/settings/payment-qr/upload-url", response_model=UploadTarget)
@@ -124,6 +133,6 @@ public = APIRouter(tags=["settings"])
 
 
 @public.get("/settings", response_model=SettingsRead)
-async def public_settings(session: Session, storage: Storage):
+async def public_settings(session: Session, storage: Storage, settings: AppSettings):
     """Shop contact details and delivery fee for the storefront (all of it is public by nature)."""
-    return _settings_read(await service.get_settings_row(session), storage)
+    return _settings_read(await service.get_settings_row(session), storage, settings)

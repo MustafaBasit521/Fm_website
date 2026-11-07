@@ -74,11 +74,18 @@ def test_settings_refuse_unsafe_payment_configuration():
     assert ok.payment_provider == "fake"
 
 
-async def test_payment_routes_are_unavailable_without_a_provider(client, make_product):
+async def test_gateway_routes_refuse_while_online_payments_are_off(client, make_product):
+    """Switched off means refused by the API, not just hidden in the UI."""
     a = await make_product(stock_quantity=2)
     r = await place(client, [(a["product_id"], 1)])  # COD
-    assert (await pay(client, r.json()["order_id"])).status_code == 503
-    assert (await client.post("/api/payments/webhook/fake", content=b"{}")).status_code == 503
+    oid = r.json()["order_id"]
+    for response in (
+        await pay(client, oid),
+        await client.post(f"/api/orders/{oid}/payment/refresh"),
+        await client.post("/api/payments/webhook/fake", content=b"{}"),
+    ):
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
 
 
 async def test_dev_gateway_router_is_absent_by_default(client):

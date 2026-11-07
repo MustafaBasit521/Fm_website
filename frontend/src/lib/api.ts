@@ -204,6 +204,8 @@ export interface Quote {
   delivery_fee_paisa: number
   total_paisa: number
   payment_methods: PaymentMethod[]
+  /** Receipt flow on? Only changes the wording at checkout. */
+  wallet_receipts_enabled?: boolean
   can_checkout: boolean
 }
 
@@ -519,6 +521,8 @@ export interface BusinessSettings {
   easypaisa_details?: string | null
   jazzcash_qr_url?: string | null
   jazzcash_details?: string | null
+  /** Is the receipt-upload flow on? Off at launch: the customer sends the screenshot on WhatsApp. */
+  wallet_receipts_enabled?: boolean
 }
 
 // The shop details rarely change and are needed by the header, footer and several pages: fetch
