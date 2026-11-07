@@ -2,31 +2,9 @@
 
 ## Current Phase
 
-### Phase 0 — Architecture and Requirements
+**Phases 1 to 10 are implemented and tested, the UI polish and the quality-assurance phase are done (see `docs/qa-report.md`). The project is in the first deployment (Supabase + Render + Vercel, see `docs/deployment.md`).**
 
-Status:
-
-**Completed**
-
-The following have been decided:
-
-* frontend stack
-* backend stack
-* database
-* authentication
-* storage
-* architecture
-* core business rules
-* order lifecycle
-* payment states
-* cancellation rules
-* inventory behavior
-* made-to-order capacity
-* Lahore-only delivery
-* wishlist model
-* review eligibility
-* admin scope
-* MVP scope boundaries
+Phase 0 (architecture and requirements) was completed first; everything it decided is recorded under "Finalized Decisions" below.
 
 ---
 
@@ -486,9 +464,9 @@ Implementation notes (admin security):
 
 # Current Next Step
 
-Start with **Phase 1 — Foundation**.
-
-Do not implement business features before the basic project structure, database connection, migrations, testing, and development tooling are working.
+1. **Deploy**: create the API on Render (it asks for a card to verify the account even for the free instance), then the two Vercel projects (`deploy/shop`, `deploy/admin`), replace `API_DOMAIN` in both `vercel.json` files, set `CORS_ORIGINS` and the Supabase login URLs, schedule the expiry call (`docs/deployment.md`).
+2. **Check the real services by hand** (list in `docs/qa-report.md`): real sign-up, login and authenticator codes, uploads to the four Storage buckets (including `payment-proofs`), emails to someone else's address, a real phone.
+3. **Before real customers**: a domain (owner's name) with Resend for customer emails, a backend plan that does not sleep, backups.
 
 ---
 
