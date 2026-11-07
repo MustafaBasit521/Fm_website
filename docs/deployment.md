@@ -10,23 +10,52 @@ The system has three parts. Do them **in this order**, because each step needs a
 
 Never paste a secret key into chat, into GitHub or into a file in this repository. Secrets are typed only into the Render or Vercel dashboards.
 
-## Step 1: the API on Render
+## Step 1: the API on Render (by hand, no Blueprint needed)
 
-1. Render dashboard -> **New** -> **Blueprint** -> connect the GitHub repository `MustafaBasit521/Fm_website`. Render reads `render.yaml` and proposes the service `bundle-of-loops-api` (region Singapore, free plan).
-2. It asks for the values marked `sync: false`. Type them in (copy them from your `backend/.env`, never from chat):
+Render's "Blueprint" feature asks for a payment method, so create the service by hand instead (the free web service does not need one; if Render asks for a card anyway, stop and tell the developer).
 
-   | Name | Value |
+1. Open <https://dashboard.render.com> and sign in with GitHub.
+2. Click **New +** -> **Web Service** -> **Build and deploy from a Git repository** -> **Next**.
+3. If the repository is not listed, click **Configure account** (GitHub opens), allow Render to access the repository `Fm_website`, come back and select it -> **Connect**.
+4. Fill in the form exactly:
+
+   | Field | Value |
    |---|---|
-   | `DATABASE_URL` | the same `postgresql+asyncpg://...` address you use locally (the Supabase pooler address) |
-   | `SUPABASE_URL` | `https://<your-project>.supabase.co` |
-   | `SUPABASE_SERVICE_KEY` | the Supabase **secret** key (server only) |
-   | `CORS_ORIGINS` | leave a placeholder for now, fill in at step 3 |
-   | `FRONTEND_URL` | placeholder for now, fill in at step 3 |
-   | `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM` | the shop's Gmail address, its **App Password**, and `Bundle of Loops <that gmail address>` (see the README, "Email without a domain") |
-   | `CRON_SECRET` | a long random value (for example 40 random letters and digits) |
+   | Name | `bundle-of-loops-api` (this becomes part of the address) |
+   | Region | **Singapore (Southeast Asia)** |
+   | Branch | `main` |
+   | Root Directory | `backend` |
+   | Runtime / Language | **Python 3** |
+   | Build Command | `pip install -r requirements.txt` |
+   | Start Command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"` |
+   | Instance Type | **Free** |
 
-3. Create the service and wait for "Live". Note its address, e.g. `https://bundle-of-loops-api.onrender.com`.
-4. Open `https://<that address>/api/health`: it must answer `{"status":"ok"}`.
+5. Scroll to **Environment Variables** and add these one by one (**Add Environment Variable**). Copy the secret values from your `backend/.env` file on your computer, never from chat:
+
+   | Key | Value |
+   |---|---|
+   | `PYTHON_VERSION` | `3.12.8` |
+   | `APP_ENV` | `production` |
+   | `TRUST_PROXY_HEADERS` | `true` |
+   | `LOG_LEVEL` | `INFO` |
+   | `DATABASE_URL` | the same `postgresql+asyncpg://...` address as in `backend/.env` |
+   | `SUPABASE_URL` | `https://<your-project>.supabase.co` |
+   | `SUPABASE_SERVICE_KEY` | the Supabase **secret** key from `backend/.env` |
+   | `EMAIL_PROVIDER` | `smtp` |
+   | `SMTP_HOST` | `smtp.gmail.com` |
+   | `SMTP_PORT` | `465` |
+   | `SMTP_USERNAME` | the shop's Gmail address |
+   | `SMTP_PASSWORD` | the Gmail **App Password** (README, "Email without a domain") |
+   | `EMAIL_FROM` | `Bundle of Loops <the same Gmail address>` |
+   | `CRON_SECRET` | a long random value, 40 or more random letters and digits (keep a copy: step 5 needs it) |
+   | `CORS_ORIGINS` | `http://localhost:5173` for now (changed in step 3) |
+   | `FRONTEND_URL` | `http://localhost:5173` for now (changed in step 3) |
+
+6. Open **Advanced** and set **Health Check Path** to `/api/health`.
+7. Click **Create Web Service**. The first build takes a few minutes; wait until the log says the service is **Live**.
+8. Copy the address shown at the top (like `https://bundle-of-loops-api.onrender.com`) and open `<address>/api/health` in the browser. It must show `{"status":"ok"}`.
+
+(`render.yaml` in the repository describes the same service for a Blueprint; you do not need it.)
 
 The free plan sleeps after 15 minutes without a request (the first request then takes about 30 to 60 seconds). Step 5 keeps it awake. The `starter` plan never sleeps.
 
