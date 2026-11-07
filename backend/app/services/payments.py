@@ -12,13 +12,27 @@ from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import AuthUser
 from app.core.config import Settings
 from app.core.payments.base import PaymentProvider, ProviderError, ProviderStatus
-from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
-from app.models.orders import Order, Payment
-from app.schemas.orders import InitiatePayment, PaymentProofCreate, PaymentStatusRead
+from app.models.enums import (
+    MANUAL_PAYMENT_METHODS,
+    OrderStatus,
+    PaymentAttemptStatus,
+    PaymentMethod,
+    PaymentStatus,
+)
+from app.models.orders import Order, Payment, PaymentAttempt
+from app.schemas.orders import InitiatePayment, PaymentStatusRead
+from app.schemas.payments import (
+    AdminPaymentAttempt,
+    PaymentAttemptRead,
+    PaymentReject,
+    PaymentSubmit,
+)
 from app.services import checkout as checkout_service
 from app.services import events
 from app.services import orders as orders_service
@@ -255,7 +269,7 @@ async def refund_order(
         raise _problem(
             status.HTTP_409_CONFLICT, "NOT_CANCELLED", "Only cancelled orders can be refunded"
         )
-    manual = payment is not None and payment.method == PaymentMethod.TRANSFER
+    manual = payment is not None and payment.method in MANUAL_PAYMENT_METHODS
     if payment is None or not (
         manual or (payment.method == PaymentMethod.ONLINE and payment.provider_reference)
     ):
@@ -309,28 +323,50 @@ def webhook_headers(raw: Any) -> dict[str, str]:
 # ---- payment by transfer (the shop's own account; the admin checks the proof) ---------------
 
 
-def _transfer_payment(order: Order) -> Payment:
-    payment = next((p for p in order.payments if p.method == PaymentMethod.TRANSFER), None)
+def _manual_payment(order: Order) -> Payment:
+    payment = next((p for p in order.payments if p.method in MANUAL_PAYMENT_METHODS), None)
     if payment is None:
         raise _problem(
-            status.HTTP_409_CONFLICT, "NOT_A_TRANSFER", "This order is not paid by transfer"
+            status.HTTP_409_CONFLICT,
+            "NOT_A_MANUAL_PAYMENT",
+            "This order is not paid by Easypaisa or JazzCash",
         )
     return payment
 
 
-async def submit_transfer_proof(
-    session: AsyncSession, order_id: uuid.UUID, data: PaymentProofCreate
+def ensure_owner(order: Order, user: AuthUser | None) -> None:
+    """A registered customer's order can only be touched by that customer. A guest order has no
+    account, so its unguessable id is the capability (the same as paying online). A 404, not a
+    403, so the answer does not confirm that the order exists."""
+    if order.customer_id is not None and (user is None or user.id != order.customer_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
+
+
+def _normalize(reference: str) -> str:
+    return reference.strip().lower()
+
+
+async def submit_payment(
+    session: AsyncSession, order_id: uuid.UUID, data: PaymentSubmit, user: AuthUser | None
 ) -> Order:
-    """The customer says they sent the money. This stops the 30-minute clock (the shop needs time
-    to check) and tells the shop. The payment stays Pending until the admin confirms it."""
+    """The customer says they sent the money and gives the transaction number and the receipt.
+    This stops the 30-minute clock (the shop needs time to check) and tells the shop. The
+    payment stays Pending until an admin verifies it; nothing here ever marks it Paid."""
     order = await orders_service.load_order(session, order_id, lock=True)
-    payment = _transfer_payment(order)
+    ensure_owner(order, user)
+    payment = _manual_payment(order)
     if order.status != OrderStatus.PENDING or payment.status != PaymentStatus.PENDING:
         raise _problem(
             status.HTTP_409_CONFLICT,
             "PAYMENT_CLOSED",
             "This order can no longer receive payment details. If you already paid, please "
             "contact the shop.",
+        )
+    if payment.open_attempt is not None:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "ALREADY_SUBMITTED",
+            "Your payment details are already with the shop, which is checking them.",
         )
     if await _deadline_passed(session, order):
         raise _problem(
@@ -339,69 +375,218 @@ async def submit_transfer_proof(
             "The 30 minutes for this payment have passed. If you already paid, please contact the "
             "shop.",
         )
-    payment.proof_reference = data.reference
-    payment.proof_image_path = data.image_path
-    payment.proof_submitted_at = func.now()
+    used = await session.scalar(
+        select(PaymentAttempt.attempt_id)
+        .where(
+            func.lower(PaymentAttempt.transaction_reference) == _normalize(data.reference),
+            PaymentAttempt.status != PaymentAttemptStatus.REJECTED,
+        )
+        .limit(1)
+    )
+    if used is not None:
+        raise _duplicate_reference()
+    attempt = PaymentAttempt(
+        payment_id=payment.payment_id,
+        order_id=order.order_id,
+        # what is due is the server's total, never a number from the browser
+        amount_paisa=order.total_amount_paisa,
+        transaction_reference=data.reference,
+        receipt_path=data.image_path,
+    )
+    session.add(attempt)
     order.payment_deadline_at = None  # the shop is checking: the order does not expire meanwhile
-    await session.flush()
-    await session.refresh(payment)
-    await events.transfer_proof_received(session, order)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        # a second customer using the same number at the very same moment
+        await session.rollback()
+        if "uq_payment_attempts_reference" in str(exc.orig):
+            raise _duplicate_reference() from None
+        raise _problem(
+            status.HTTP_409_CONFLICT, "ALREADY_SUBMITTED", "These details were already sent."
+        ) from None
+    await events.payment_proof_received(session, order, attempt)
     await session.commit()
     return await orders_service.load_order(session, order_id, lock=False)
 
 
-async def confirm_transfer(session: AsyncSession, order_id: uuid.UUID) -> Order:
-    """The admin saw the money in the shop's account: the payment is Paid and the order is
-    Confirmed (business-rules §13, the same outcome as a verified online payment)."""
+def _duplicate_reference() -> HTTPException:
+    return _problem(
+        status.HTTP_409_CONFLICT,
+        "DUPLICATE_REFERENCE",
+        "This transaction number was already used. Please check it, or contact the shop.",
+    )
+
+
+async def _lock_attempt(
+    session: AsyncSession, attempt_id: uuid.UUID
+) -> tuple[Order, Payment, PaymentAttempt]:
+    """Lock the order first (the same order every other payment change uses), then read the
+    attempt: two admins verifying at the same moment queue up, and the second one sees the result
+    of the first."""
+    order_id = await session.scalar(
+        select(PaymentAttempt.order_id).where(PaymentAttempt.attempt_id == attempt_id)
+    )
+    if order_id is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
     order = await orders_service.load_order(session, order_id, lock=True)
-    payment = _transfer_payment(order)
-    if payment.status != PaymentStatus.PENDING:
-        raise _problem(status.HTTP_409_CONFLICT, "ALREADY_PAID", "Payment was already recorded")
-    if order.status != OrderStatus.PENDING:
+    payment = _manual_payment(order)
+    attempt = next((a for a in payment.attempts if a.attempt_id == attempt_id), None)
+    if attempt is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
+    if attempt.status != PaymentAttemptStatus.SUBMITTED:
         raise _problem(
             status.HTTP_409_CONFLICT,
-            "INVALID_TRANSITION",
-            "Only a pending order can be confirmed by receiving its payment",
+            "ALREADY_REVIEWED",
+            "This payment was already verified or rejected",
         )
+    if order.status != OrderStatus.PENDING or payment.status != PaymentStatus.PENDING:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "ORDER_NOT_OPEN",
+            "The order is no longer waiting for this payment (it may have been cancelled)",
+        )
+    return order, payment, attempt
+
+
+async def verify_attempt(
+    session: AsyncSession, attempt_id: uuid.UUID, admin_id: uuid.UUID
+) -> PaymentAttempt:
+    """The admin saw the money in the shop's wallet account: the payment is Paid and the order is
+    Confirmed (business-rules §13, the same outcome as a verified online payment)."""
+    order, payment, attempt = await _lock_attempt(session, attempt_id)
+    if attempt.amount_paisa != order.total_amount_paisa:
+        raise _problem(
+            status.HTTP_409_CONFLICT,
+            "AMOUNT_CHANGED",
+            "The order total changed after this payment was sent. Reject it and ask the "
+            "customer to pay again.",
+        )
+    now = func.now()
+    attempt.status = PaymentAttemptStatus.PAID
+    attempt.reviewed_by = admin_id
+    attempt.reviewed_at = now
     payment.status = PaymentStatus.PAID
     order.status = OrderStatus.CONFIRMED
     order.payment_deadline_at = None
+    await session.flush()
     await events.payment_received(session, order)
     await events.order_status_changed(session, order, OrderStatus.CONFIRMED)
     await session.commit()
-    return await orders_service.load_order(session, order_id, lock=False)
+    await session.refresh(attempt)
+    return attempt
 
 
-async def reject_transfer_proof(session: AsyncSession, order_id: uuid.UUID) -> Order:
-    """The admin could not find the money: the proof is cleared and the customer gets a fresh
-    30 minutes to send correct details."""
-    order = await orders_service.load_order(session, order_id, lock=True)
-    payment = _transfer_payment(order)
+async def reject_attempt(
+    session: AsyncSession, attempt_id: uuid.UUID, admin_id: uuid.UUID, data: PaymentReject
+) -> PaymentAttempt:
+    """The admin could not accept the payment: the reason is saved, the order stays out of
+    preparation, and the customer gets a fresh 30 minutes to send a corrected attempt."""
+    order, _payment, attempt = await _lock_attempt(session, attempt_id)
+    attempt.status = PaymentAttemptStatus.REJECTED
+    attempt.rejection_reason = data.reason
+    attempt.rejection_note = data.note
+    attempt.reviewed_by = admin_id
+    attempt.reviewed_at = func.now()
+    order.payment_deadline_at = func.now() + checkout_service.PAYMENT_WINDOW
+    await session.flush()
+    await events.payment_attempt_rejected(session, order, attempt)
+    await session.commit()
+    await session.refresh(attempt)
+    return attempt
+
+
+async def ensure_proof_can_be_sent(
+    session: AsyncSession, order_id: uuid.UUID, user: AuthUser | None
+) -> None:
+    """A signed upload is handed out only for an open Easypaisa / JazzCash order that is waiting
+    for details (so the bucket cannot be used by anyone who merely guesses an address)."""
+    order = await orders_service.load_order(session, order_id, lock=False)
+    ensure_owner(order, user)
+    payment = _manual_payment(order)
     if (
         order.status != OrderStatus.PENDING
         or payment.status != PaymentStatus.PENDING
-        or payment.proof_submitted_at is None
+        or payment.open_attempt is not None
     ):
-        raise _problem(
-            status.HTTP_409_CONFLICT,
-            "NO_PROOF",
-            "There are no payment details waiting to be checked",
-        )
-    payment.proof_reference = None
-    payment.proof_image_path = None
-    payment.proof_submitted_at = None
-    order.payment_deadline_at = func.now() + checkout_service.PAYMENT_WINDOW
-    await events.transfer_proof_rejected(session, order)
-    await session.commit()
-    return await orders_service.load_order(session, order_id, lock=False)
-
-
-async def ensure_proof_can_be_sent(session: AsyncSession, order_id: uuid.UUID) -> None:
-    """A signed upload is handed out only for an open transfer order (so the bucket cannot be
-    used by anyone who merely guesses an address)."""
-    order = await orders_service.load_order(session, order_id, lock=False)
-    payment = _transfer_payment(order)
-    if order.status != OrderStatus.PENDING or payment.status != PaymentStatus.PENDING:
         raise _problem(
             status.HTTP_409_CONFLICT, "PAYMENT_CLOSED", "This order can no longer receive payment"
         )
+
+
+# ---- admin queue ---------------------------------------------------------------------------
+
+
+async def list_attempts(
+    session: AsyncSession,
+    *,
+    attempt_status: PaymentAttemptStatus | None,
+    page: int,
+    page_size: int,
+) -> tuple[list[AdminPaymentAttempt], int]:
+    where = [PaymentAttempt.status == attempt_status] if attempt_status else []
+    total = await session.scalar(select(func.count()).select_from(PaymentAttempt).where(*where))
+    # the queue is worked oldest first; finished decisions show the newest first
+    sort = (
+        PaymentAttempt.created_at.asc()
+        if attempt_status == PaymentAttemptStatus.SUBMITTED
+        else PaymentAttempt.created_at.desc()
+    )
+    rows = await session.execute(
+        select(PaymentAttempt, Order, Payment)
+        .join(Order, Order.order_id == PaymentAttempt.order_id)
+        .join(Payment, Payment.payment_id == PaymentAttempt.payment_id)
+        .where(*where)
+        .order_by(sort)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return [to_admin_attempt(a, o, p) for a, o, p in rows.all()], total or 0
+
+
+def to_admin_attempt(
+    attempt: PaymentAttempt, order: Order, payment: Payment
+) -> AdminPaymentAttempt:
+    return AdminPaymentAttempt(
+        **PaymentAttemptRead.model_validate(attempt).model_dump(),
+        payment_id=payment.payment_id,
+        order_id=order.order_id,
+        order_status=order.status,
+        method=payment.method,
+        order_total_paisa=order.total_amount_paisa,
+        customer_name=order.customer_name,
+        customer_email=order.customer_email,
+        customer_phone=order.customer_phone,
+        reviewed_by=attempt.reviewed_by,
+    )
+
+
+async def customer_history(
+    session: AsyncSession, order_id: uuid.UUID, user: AuthUser | None
+) -> list[PaymentAttempt]:
+    order = await orders_service.load_order(session, order_id, lock=False)
+    ensure_owner(order, user)
+    return [a for p in order.payments for a in p.attempts]
+
+
+async def get_attempt(session: AsyncSession, attempt_id: uuid.UUID) -> AdminPaymentAttempt:
+    row = (
+        await session.execute(
+            select(PaymentAttempt, Order, Payment)
+            .join(Order, Order.order_id == PaymentAttempt.order_id)
+            .join(Payment, Payment.payment_id == PaymentAttempt.payment_id)
+            .where(PaymentAttempt.attempt_id == attempt_id)
+        )
+    ).one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
+    return to_admin_attempt(*row)
+
+
+async def receipt_path(session: AsyncSession, attempt_id: uuid.UUID) -> str:
+    path = await session.scalar(
+        select(PaymentAttempt.receipt_path).where(PaymentAttempt.attempt_id == attempt_id)
+    )
+    if path is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
+    return path

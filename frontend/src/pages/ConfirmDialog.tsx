@@ -30,6 +30,13 @@ export function ConfirmDialog({
   onCancel: () => void
 }) {
   const panel = useRef<HTMLDivElement>(null)
+  // The latest onCancel, read when a key is pressed. The effect below must depend on `open` only:
+  // a parent that passes a new function on every render (typing in a field inside the dialog)
+  // would otherwise restart it and pull the focus back to the Cancel button on each keystroke.
+  const cancel = useRef(onCancel)
+  useEffect(() => {
+    cancel.current = onCancel
+  })
 
   useEffect(() => {
     if (!open) return
@@ -39,7 +46,7 @@ export function ConfirmDialog({
     panel.current?.querySelector<HTMLElement>('[data-cancel]')?.focus()
 
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') return onCancel()
+      if (e.key === 'Escape') return cancel.current()
       if (e.key !== 'Tab' || !panel.current) return
       const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
       if (items.length === 0) return
@@ -59,7 +66,7 @@ export function ConfirmDialog({
       document.body.style.overflow = previousOverflow
       opener?.focus?.()
     }
-  }, [open, onCancel])
+  }, [open])
 
   if (!open) return null
   return (

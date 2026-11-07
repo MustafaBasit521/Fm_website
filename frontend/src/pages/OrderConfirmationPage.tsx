@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { loadLastOrder, saveLastOrder } from '../lib/lastOrder'
+import { isWalletMethod } from '../lib/paymentText'
 import { OrderBreakdown } from './OrderBreakdown'
 import { PayNowButton } from './PayNowButton'
-import { TransferPayment } from './TransferPayment'
+import { WalletPayment } from './WalletPayment'
 import { primaryButtonClass } from './ui'
 
 export default function OrderConfirmationPage() {
@@ -34,7 +35,7 @@ export default function OrderConfirmationPage() {
       <p className="mt-2 text-muted">
         {order.payment_method === 'COD'
           ? 'You will pay cash on delivery.'
-          : order.payment_method === 'TRANSFER' && order.status !== 'PENDING'
+          : isWalletMethod(order.payment_method) && order.status !== 'PENDING'
             ? 'Your payment is confirmed.'
             : 'Your order is waiting for payment.'}{' '}
         A confirmation will be sent to {order.customer_email}.
@@ -53,7 +54,7 @@ export default function OrderConfirmationPage() {
         </div>
       )}
 
-      <TransferPayment
+      <WalletPayment
         order={order}
         onUpdated={(updated) => {
           saveLastOrder(updated)

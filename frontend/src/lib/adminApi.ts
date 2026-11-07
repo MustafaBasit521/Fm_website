@@ -14,6 +14,9 @@ import {
   type CustomOrderStatus,
   type Order,
   type Page,
+  type PaymentAttempt,
+  type PaymentMethod,
+  type RejectionReason,
   type ProductDetail,
   type Review,
   type UploadTarget,
@@ -54,7 +57,7 @@ export const getAuditLog = (page: number, signal?: AbortSignal) =>
 export interface AdminOrderSummary {
   order_id: string
   status: string
-  payment_method: 'COD' | 'ONLINE'
+  payment_method: PaymentMethod
   payment_status: string
   total_amount_paisa: number
   item_count: number
@@ -67,6 +70,7 @@ export interface AdminOrderSummary {
 export interface Dashboard {
   orders_by_status: Record<string, number>
   orders_needing_action: number
+  payments_to_check?: number
   new_messages: number
   new_custom_orders: number
   low_stock_threshold: number
@@ -80,14 +84,14 @@ export const getDashboard = (signal?: AbortSignal) => apiGet<Dashboard>('/admin/
 
 export interface AdminPayment {
   payment_id: string
-  method: 'COD' | 'ONLINE' | 'TRANSFER'
+  method: PaymentMethod
   status: string
   amount_paisa: number
   refunded_amount_paisa: number
   provider_reference: string | null
-  proof_reference?: string | null
-  proof_submitted_at?: string | null
   created_at: string
+  /** Easypaisa / JazzCash: every submission, oldest first. */
+  attempts?: PaymentAttempt[]
 }
 
 export interface AdminOrder extends Order {
@@ -294,14 +298,51 @@ export const deleteAdminReview = (reviewId: string) => apiDelete(`/admin/reviews
 
 export const getAdminSettings = (signal?: AbortSignal) =>
   apiGet<BusinessSettings & { updated_at: string }>('/admin/settings', signal)
-export const updateAdminSettings = (data: Partial<BusinessSettings>) =>
+export const updateAdminSettings = (data: SettingsUpdate) =>
   apiPatch<BusinessSettings & { updated_at: string }>('/admin/settings', data)
-export const confirmTransferPayment = (orderId: string) =>
-  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/confirm-transfer`, {})
-export const rejectTransferProof = (orderId: string) =>
-  apiPost<AdminOrder>(`/admin/orders/${id(orderId)}/reject-transfer-proof`, {})
-export const getPaymentProofImage = (orderId: string, signal?: AbortSignal) =>
-  apiGet<{ url: string | null }>(`/admin/orders/${id(orderId)}/payment-proof-image`, signal)
+export interface SettingsUpdate {
+  business_name?: string | null
+  email?: string | null
+  phone?: string | null
+  whatsapp?: string | null
+  address?: string | null
+  delivery_information?: string | null
+  delivery_fee_paisa?: number
+  social_links?: Record<string, string>
+  /** Paths of QR codes already uploaded (null removes the wallet). */
+  easypaisa_qr_path?: string | null
+  easypaisa_details?: string | null
+  jazzcash_qr_path?: string | null
+  jazzcash_details?: string | null
+}
+export const getPaymentQrUploadTarget = (contentType: string) =>
+  apiPost<UploadTarget>('/admin/settings/payment-qr/upload-url', { content_type: contentType })
+
+// ---- payment checks (Easypaisa / JazzCash) ------------------------------------------------
+
+export interface AdminPaymentAttempt extends PaymentAttempt {
+  payment_id: string
+  order_id: string
+  order_status: string
+  method: PaymentMethod
+  order_total_paisa: number
+  customer_name: string
+  customer_email: string
+  customer_phone: string | null
+  reviewed_by: string | null
+}
+
+export const getAdminPayments = (
+  filters: { status?: string; page?: number },
+  signal?: AbortSignal,
+) =>
+  apiGet<Page<AdminPaymentAttempt>>(`/admin/payments${qs({ ...filters, page_size: 20 })}`, signal)
+export const getPaymentReceipt = (attemptId: string, signal?: AbortSignal) =>
+  apiGet<{ url: string | null }>(`/admin/payments/${id(attemptId)}/receipt`, signal)
+export const verifyPayment = (attemptId: string) =>
+  apiPost<AdminPaymentAttempt>(`/admin/payments/${id(attemptId)}/verify`, {})
+export const rejectPayment = (attemptId: string, reason: RejectionReason, note: string | null) =>
+  apiPost<AdminPaymentAttempt>(`/admin/payments/${id(attemptId)}/reject`, { reason, note })
 export const getPublicSettings = (signal?: AbortSignal) =>
   apiGet<BusinessSettings>('/settings', signal)
 

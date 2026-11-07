@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import AuthUser, get_optional_user
 from app.core.config import Settings, get_settings
 from app.core.db import get_session
 from app.core.payments.base import PaymentProvider, WebhookError
@@ -12,7 +13,8 @@ from app.core.rate_limit import rate_limit
 from app.core.storage import SupabaseStorage, require_storage
 from app.schemas.checkout import OrderRead
 from app.schemas.engagement import IMAGE_TYPES, UploadRequest, UploadTarget
-from app.schemas.orders import InitiatePayment, PaymentProofCreate, PaymentStatusRead
+from app.schemas.orders import InitiatePayment, PaymentStatusRead
+from app.schemas.payments import PaymentAttemptRead, PaymentSubmit
 from app.services import orders as orders_service
 from app.services import payments as service
 
@@ -21,6 +23,7 @@ router = APIRouter(tags=["payments"])
 Session = Annotated[AsyncSession, Depends(get_session)]
 Provider = Annotated[PaymentProvider, Depends(get_payment_provider)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
+MaybeUser = Annotated[AuthUser | None, Depends(get_optional_user)]
 
 
 # These two routes are public so guests can pay too. The (unguessable) order id is the
@@ -46,7 +49,8 @@ async def refresh(order_id: uuid.UUID, session: Session, provider: Provider):
     return await service.refresh_payment(session, provider, order_id)
 
 
-# Payment by transfer: the customer sends money to the shop's own account and then sends proof.
+# Easypaisa / JazzCash: the customer scans the shop's QR code, pays, and then sends the
+# transaction number and a screenshot of the receipt.
 # Like paying online, these routes are public (guests too) and use the unguessable order id.
 @router.post(
     "/orders/{order_id}/payment-proof/upload-url",
@@ -58,9 +62,10 @@ async def proof_upload_url(
     data: UploadRequest,
     session: Session,
     storage: Annotated[SupabaseStorage, Depends(require_storage)],
+    user: MaybeUser,
 ):
     """A signed upload URL for ONE screenshot in the PRIVATE payment-proofs bucket."""
-    await service.ensure_proof_can_be_sent(session, order_id)
+    await service.ensure_proof_can_be_sent(session, order_id, user)
     path = f"payment-proofs/{uuid.uuid4().hex}.{IMAGE_TYPES[data.content_type]}"
     signed = await storage.create_signed_upload(path, storage.payment_proofs_bucket)
     return UploadTarget(
@@ -76,9 +81,18 @@ async def proof_upload_url(
     response_model=OrderRead,
     dependencies=[Depends(rate_limit("proof", 20, 3600))],
 )
-async def send_payment_proof(order_id: uuid.UUID, data: PaymentProofCreate, session: Session):
-    """The customer says they sent the money (a transaction number, a screenshot, or both)."""
-    return orders_service.to_read(await service.submit_transfer_proof(session, order_id, data))
+async def send_payment_proof(
+    order_id: uuid.UUID, data: PaymentSubmit, session: Session, user: MaybeUser
+):
+    """The customer says they sent the money: the transaction number AND the receipt screenshot.
+    A rejected payment can be corrected by sending new details."""
+    return orders_service.to_read(await service.submit_payment(session, order_id, data, user))
+
+
+@router.get("/orders/{order_id}/payment-attempts", response_model=list[PaymentAttemptRead])
+async def payment_history(order_id: uuid.UUID, session: Session, user: MaybeUser):
+    """Every submission for this order, oldest first (rejected ones keep their reason)."""
+    return await service.customer_history(session, order_id, user)
 
 
 @router.post("/payments/webhook/{provider_name}")

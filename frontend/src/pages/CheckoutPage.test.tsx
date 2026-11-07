@@ -176,10 +176,11 @@ it('puts the total on the Place order button and shows payment choices as cards'
   expect(screen.getByLabelText('Pay online').closest('label')).toHaveClass('border-ink')
 })
 
-it('offers the transfer method with a short explanation when the shop accepts transfers', async () => {
-  api.getQuote.mockResolvedValue({ ...okQuote, payment_methods: ['COD', 'TRANSFER'] })
+it('offers Easypaisa and JazzCash with a short explanation when the shop has their QR codes', async () => {
+  api.getQuote.mockResolvedValue({ ...okQuote, payment_methods: ['COD', 'EASYPAISA', 'JAZZCASH'] })
   renderCheckout()
-  const transfer = await screen.findByLabelText(/Bank or wallet transfer/)
+  const transfer = await screen.findByLabelText(/Easypaisa/)
+  expect(screen.getByLabelText(/JazzCash/)).toBeInTheDocument()
   expect(transfer.closest('label')).toHaveTextContent(/hold your order for 30 minutes/)
   expect(screen.getByLabelText('Cash on delivery')).toBeChecked()
   await userEvent.click(transfer)

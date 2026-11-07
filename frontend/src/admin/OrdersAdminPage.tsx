@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { getAdminOrders } from '../lib/adminApi'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel, statusLabel } from '../lib/orderStatus'
+import { isWalletMethod, methodName } from '../lib/paymentText'
 import { inputClass } from './styles'
 import { Chevron, PageTitle, Pager, State, cardClass, rowLinkClass } from './ui'
 import { useLoad } from './useLoad'
@@ -66,6 +67,8 @@ export default function OrdersAdminPage() {
           >
             <option value="">All</option>
             <option value="COD">Cash on delivery</option>
+            <option value="EASYPAISA">Easypaisa</option>
+            <option value="JAZZCASH">JazzCash</option>
             <option value="ONLINE">Online</option>
           </select>
         </div>
@@ -130,7 +133,9 @@ export default function OrdersAdminPage() {
                         <span className="text-sm">
                           {o.payment_method === 'COD'
                             ? 'Cash on delivery'
-                            : paymentStatusLabel(o.payment_status)}
+                            : isWalletMethod(o.payment_method)
+                              ? `${methodName(o.payment_method)}: ${paymentStatusLabel(o.payment_status)}`
+                              : paymentStatusLabel(o.payment_status)}
                         </span>
                         <span>
                           <StatusBadge status={o.status} />

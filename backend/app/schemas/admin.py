@@ -15,6 +15,7 @@ from app.schemas.orders import AdminOrderSummary
 
 MAX_DELIVERY_FEE_PAISA = 10_000_000  # Rs 100,000: a sanity cap against typos
 _SOCIAL_KEY = re.compile(r"^[a-z0-9_]{1,30}$")
+QR_PATH = re.compile(r"^payment-qr/[0-9a-f]{32}\.(jpg|png|webp)$")
 
 
 # ---- dashboard -----------------------------------------------------------------------------
@@ -31,6 +32,8 @@ class DashboardSummary(BaseModel):
     # Orders waiting for the admin: Pending cash-on-delivery orders (to confirm) and Confirmed
     # orders (to start preparing). Online orders awaiting payment are not "action needed".
     orders_needing_action: int
+    # Easypaisa / JazzCash receipts the customer sent that nobody has verified or rejected yet.
+    payments_to_check: int = 0
     new_messages: int
     new_custom_orders: int
     low_stock_threshold: int
@@ -79,7 +82,11 @@ class SettingsRead(BaseModel):
     delivery_information: str | None
     delivery_fee_paisa: int
     social_links: dict[str, str]
-    transfer_instructions: str | None = None
+    # Manual wallet payments: the QR codes the shop uploaded (a wallet with no QR is not offered).
+    easypaisa_qr_url: str | None = None
+    easypaisa_details: str | None = None
+    jazzcash_qr_url: str | None = None
+    jazzcash_details: str | None = None
 
 
 class AdminSettingsRead(SettingsRead):
@@ -106,11 +113,26 @@ class SettingsUpdate(BaseModel):
     delivery_information: str | None = Field(default=None, max_length=2000)
     delivery_fee_paisa: int | None = Field(default=None, ge=0, le=MAX_DELIVERY_FEE_PAISA)
     social_links: dict[str, str] | None = None
-    transfer_instructions: str | None = Field(default=None, max_length=1000)
+    # Paths of QR codes already uploaded to the public bucket (null removes the wallet).
+    easypaisa_qr_path: str | None = Field(default=None, max_length=300)
+    easypaisa_details: str | None = Field(default=None, max_length=500)
+    jazzcash_qr_path: str | None = Field(default=None, max_length=300)
+    jazzcash_details: str | None = Field(default=None, max_length=500)
 
     _blank = field_validator(
-        "business_name", "address", "delivery_information", "transfer_instructions"
+        "business_name",
+        "address",
+        "delivery_information",
+        "easypaisa_details",
+        "jazzcash_details",
     )(_blank_to_none)
+
+    @field_validator("easypaisa_qr_path", "jazzcash_qr_path")
+    @classmethod
+    def _qr_path(cls, v: str | None) -> str | None:
+        if v is not None and not QR_PATH.match(v):
+            raise ValueError("invalid image path")
+        return v
 
     @field_validator("email")
     @classmethod

@@ -155,12 +155,13 @@ Cancelling an unpaid order after 30 minutes already happens every minute inside 
 
 The call is safe to repeat: each expired order is announced exactly once. Without `CRON_SECRET` the route answers 404.
 
-## Pay by bank or wallet transfer
+## Pay with Easypaisa or JazzCash (manual QR payment)
 
-Customers can pay by sending money to the shop's own JazzCash, Easypaisa or bank account (no gateway needed). One-time setup:
+Customers can pay in advance by scanning the shop's own merchant QR code (no gateway needed). One-time setup:
 
-1. In Supabase, **Storage -> New bucket** named `payment-proofs`, **Public off**, 5 MB limit, types `image/jpeg, image/png, image/webp` (customers' payment screenshots live here; the admin sees them through a temporary link).
-2. In the admin, **Settings -> Payment by transfer**: write where customers should send the money (account names and numbers). Saving an empty box switches the method off.
+1. In Supabase, **Storage -> New bucket** named `payment-proofs`, **Public off**, 5 MB limit, types `image/jpeg, image/png, image/webp` (customers' receipt screenshots live here; the admin sees them through a temporary link). The QR codes themselves go into the existing public gallery bucket.
+2. In the admin, **Settings -> Easypaisa and JazzCash**: upload each wallet's QR code (and, if you like, the account details to show next to it). A wallet without a QR code is not offered.
+3. Day to day, open **Payments** in the admin: for every receipt, check your own Easypaisa/JazzCash merchant account, then **Verify** or **Reject** (a reason is required).
 
 Run `python -m app.tools.check_services` below to confirm the bucket.
 

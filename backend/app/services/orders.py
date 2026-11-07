@@ -13,10 +13,16 @@ from app.core.auth import AuthUser
 from app.core.config import get_settings
 from app.core.storage import SupabaseStorage
 from app.models.catalog import ProductImage
-from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
+from app.models.enums import (
+    WINDOWED_PAYMENT_METHODS,
+    OrderStatus,
+    PaymentMethod,
+    PaymentStatus,
+)
 from app.models.orders import Order, Payment
 from app.schemas.checkout import Delivery, OrderItemRead, OrderRead
 from app.schemas.orders import AdminOrderRead, AdminOrderSummary, OrderSummary, PaymentRead
+from app.schemas.payments import PaymentAttemptRead
 from app.services import events
 
 # Normal lifecycle (business-rules §14). Cancellation is separate: it is a terminal state.
@@ -66,13 +72,15 @@ def refund_due(order: Order) -> int:
 
 def to_read(order: Order) -> OrderRead:
     payment = _current_payment(order)
+    open_attempt = payment.open_attempt
     return OrderRead(
         order_id=order.order_id,
         status=order.status,
         payment_method=payment.method,
         payment_status=payment.status,
         payment_deadline_at=order.payment_deadline_at,
-        proof_submitted_at=payment.proof_submitted_at,
+        proof_submitted_at=open_attempt.created_at if open_attempt else None,
+        payment_attempts=[PaymentAttemptRead.model_validate(a) for a in payment.attempts],
         customer_name=order.customer_name,
         customer_email=order.customer_email,
         customer_phone=order.customer_phone,
@@ -134,7 +142,10 @@ def to_admin_summary(order: Order) -> AdminOrderSummary:
 
 # ---- loading -------------------------------------------------------------------------------
 
-_LOAD = (selectinload(Order.items), selectinload(Order.payments))
+_LOAD = (
+    selectinload(Order.items),
+    selectinload(Order.payments).selectinload(Payment.attempts),
+)
 
 
 async def read_order(session: AsyncSession, order_id: uuid.UUID) -> OrderRead:
@@ -363,7 +374,7 @@ async def advance_status(session: AsyncSession, order_id: uuid.UUID, target: Ord
     payment = _current_payment(order)
     if (
         target == OrderStatus.CONFIRMED
-        and payment.method in (PaymentMethod.ONLINE, PaymentMethod.TRANSFER)
+        and payment.method in WINDOWED_PAYMENT_METHODS
         and payment.status != PaymentStatus.PAID
     ):
         # business-rules §13: an online or transfer order is never confirmed before its payment is

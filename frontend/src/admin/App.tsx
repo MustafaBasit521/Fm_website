@@ -13,6 +13,7 @@ import GalleryAdminPage from './GalleryAdminPage'
 import MessagesAdminPage from './MessagesAdminPage'
 import OrderAdminPage from './OrderAdminPage'
 import OrdersAdminPage from './OrdersAdminPage'
+import PaymentsAdminPage from './PaymentsAdminPage'
 import ProductFormPage from './ProductFormPage'
 import ProductsAdminPage from './ProductsAdminPage'
 import ReviewsAdminPage from './ReviewsAdminPage'
@@ -28,6 +29,7 @@ export default function AdminApp() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/orders" element={<OrdersAdminPage />} />
           <Route path="/orders/:id" element={<OrderAdminPage />} />
+          <Route path="/payments" element={<PaymentsAdminPage />} />
           <Route path="/products" element={<ProductsAdminPage />} />
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:id" element={<ProductFormPage />} />

@@ -30,7 +30,11 @@ describe.each(['shop', 'admin'])('%s deployment headers', (site) => {
   })
   it('only allows network calls to itself, the API and Supabase', () => {
     const connect = /connect-src ([^;]*)/.exec(csp)![1].split(' ')
-    expect(connect).toEqual(["'self'", 'https://API_DOMAIN', 'https://*.supabase.co'])
+    expect(connect).toEqual([
+      "'self'",
+      'https://bundle-of-loops-api.onrender.com',
+      'https://*.supabase.co',
+    ])
   })
   it('sets the standard protective headers', () => {
     expect(h['X-Content-Type-Options']).toBe('nosniff')

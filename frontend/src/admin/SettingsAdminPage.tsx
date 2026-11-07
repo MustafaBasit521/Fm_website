@@ -1,12 +1,20 @@
 import { useState, type FormEvent } from 'react'
-import { getAdminSettings, updateAdminSettings } from '../lib/adminApi'
+import { getAdminSettings, getPaymentQrUploadTarget, updateAdminSettings } from '../lib/adminApi'
 import { ApiError } from '../lib/api'
 import { paisaToRupeesInput, parseRupeesToPaisa } from '../lib/money'
-import { buttonClass, Field, FormError } from '../pages/ui'
+import { supabase } from '../lib/supabase'
+import { buttonClass, Field, FilePicker, FormError } from '../pages/ui'
 import { inputClass } from './styles'
 import { State, PageTitle, cardClass } from './ui'
 import { useToast } from '../toast/context'
 import { useLoad } from './useLoad'
+
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_BYTES = 5 * 1024 * 1024
+const WALLETS = [
+  { key: 'easypaisa', name: 'Easypaisa' },
+  { key: 'jazzcash', name: 'JazzCash' },
+] as const
 
 const SOCIAL: [string, string][] = [
   ['instagram', 'Instagram link'],
@@ -35,6 +43,25 @@ export default function SettingsAdminPage() {
     setBusy(true)
     setError(null)
     try {
+      // a new QR code is uploaded first (straight to storage); "remove" clears the wallet
+      const qr: Record<string, string | null> = {}
+      for (const { key, name } of WALLETS) {
+        const file = (e.currentTarget.elements.namedItem(`qr_${key}`) as HTMLInputElement | null)
+          ?.files?.[0]
+        if (file && file.size > 0) {
+          if (!IMAGE_TYPES.includes(file.type))
+            throw new Error(`${name}: use a JPG, PNG or WebP picture.`)
+          if (file.size > MAX_BYTES) throw new Error(`${name}: the picture must be under 5 MB.`)
+          const target = await getPaymentQrUploadTarget(file.type)
+          const { error: uploadError } = await supabase.storage
+            .from(target.bucket)
+            .uploadToSignedUrl(target.storage_path, target.token, file)
+          if (uploadError) throw new Error(`${name}: the upload failed. Please try again.`)
+          qr[`${key}_qr_path`] = target.storage_path
+        } else if (form.get(`remove_${key}`)) {
+          qr[`${key}_qr_path`] = null
+        }
+      }
       setSaved(
         await updateAdminSettings({
           business_name: optional('business_name'),
@@ -44,7 +71,9 @@ export default function SettingsAdminPage() {
           address: optional('address'),
           delivery_information: optional('delivery_information'),
           delivery_fee_paisa: fee,
-          transfer_instructions: optional('transfer_instructions'),
+          easypaisa_details: optional('easypaisa_details'),
+          jazzcash_details: optional('jazzcash_details'),
+          ...qr,
           social_links: links,
         }),
       )
@@ -53,7 +82,9 @@ export default function SettingsAdminPage() {
       setError(
         err instanceof ApiError && err.status === 422
           ? 'Please check the fields: links must start with https:// and the email, phone and fee must be valid.'
-          : 'Could not save the settings. Please try again.',
+          : err instanceof Error && !(err instanceof ApiError)
+            ? err.message
+            : 'Could not save the settings. Please try again.',
       )
     } finally {
       setBusy(false)
@@ -140,25 +171,63 @@ export default function SettingsAdminPage() {
                   </div>
                 </div>
               </section>
-              <section aria-label="Payment by transfer" className={`${cardClass} p-4 md:p-6`}>
-                <h2 className="font-serif text-2xl">Payment by transfer</h2>
-                <div className="mt-3 flex flex-col gap-1">
-                  <label htmlFor="transfer_instructions" className="text-sm font-medium text-bark">
-                    Where customers send the money
-                  </label>
-                  <textarea
-                    id="transfer_instructions"
-                    name="transfer_instructions"
-                    rows={4}
-                    maxLength={1000}
-                    className={inputClass}
-                    placeholder={'JazzCash: 0300 1234567 (account name)\nBank: IBAN ...'}
-                    defaultValue={settings.transfer_instructions ?? ''}
-                  />
-                  <p className="text-sm text-bark">
-                    Customers see this text when they pay by transfer. Leave it empty to switch
-                    transfer payments off (they can still pay cash on delivery).
-                  </p>
+              <section aria-label="Wallet payments" className={`${cardClass} p-4 md:p-6`}>
+                <h2 className="font-serif text-2xl">Easypaisa and JazzCash</h2>
+                <p className="mt-1 text-sm text-bark">
+                  Upload your merchant QR code for each wallet. A wallet is offered at checkout only
+                  while it has a QR code; remove the QR code to switch it off (cash on delivery
+                  always stays).
+                </p>
+                <div className="mt-4 grid gap-6 md:grid-cols-2">
+                  {WALLETS.map(({ key, name }) => {
+                    const url = settings[`${key}_qr_url`]
+                    return (
+                      <div key={key} className="flex flex-col gap-3">
+                        <h3 className="font-semibold">{name}</h3>
+                        {url ? (
+                          <img
+                            src={url}
+                            alt={`Current ${name} QR code`}
+                            className="h-40 w-40 rounded-[10px] border border-sand bg-white object-contain p-1"
+                          />
+                        ) : (
+                          <p className="text-sm text-bark">
+                            No QR code yet: {name} is switched off.
+                          </p>
+                        )}
+                        <FilePicker
+                          id={`qr_${key}`}
+                          name={`qr_${key}`}
+                          label={url ? `Replace the ${name} QR code` : `Upload the ${name} QR code`}
+                          accept={IMAGE_TYPES.join(',')}
+                          buttonText="Choose picture"
+                        />
+                        {url && (
+                          <label className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" name={`remove_${key}`} />
+                            Remove the QR code (switch {name} off)
+                          </label>
+                        )}
+                        <div className="flex flex-col gap-1">
+                          <label
+                            htmlFor={`${key}_details`}
+                            className="text-sm font-medium text-bark"
+                          >
+                            Account details shown next to the QR code (optional)
+                          </label>
+                          <textarea
+                            id={`${key}_details`}
+                            name={`${key}_details`}
+                            rows={2}
+                            maxLength={500}
+                            className={inputClass}
+                            placeholder="Account name and number"
+                            defaultValue={settings[`${key}_details`] ?? ''}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </section>
               <fieldset className={`${cardClass} p-4 md:p-6`}>

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -14,9 +14,6 @@ const api = {
   cancelAdminOrder: vi.fn(),
   refundOrder: vi.fn(),
   confirmCodPayment: vi.fn(),
-  confirmTransferPayment: vi.fn(),
-  rejectTransferProof: vi.fn(),
-  getPaymentProofImage: vi.fn(),
 }
 vi.mock('../lib/supabase', () => ({ supabase: {} }))
 vi.mock('../lib/adminApi', () => ({
@@ -26,9 +23,6 @@ vi.mock('../lib/adminApi', () => ({
   cancelAdminOrder: (...a: unknown[]) => api.cancelAdminOrder(...a),
   refundOrder: (...a: unknown[]) => api.refundOrder(...a),
   confirmCodPayment: (...a: unknown[]) => api.confirmCodPayment(...a),
-  confirmTransferPayment: (...a: unknown[]) => api.confirmTransferPayment(...a),
-  rejectTransferProof: (...a: unknown[]) => api.rejectTransferProof(...a),
-  getPaymentProofImage: (...a: unknown[]) => api.getPaymentProofImage(...a),
 }))
 
 const summary = (over: Partial<AdminOrderSummary> = {}): AdminOrderSummary => ({
@@ -360,80 +354,66 @@ it('shows an error when the order cannot be loaded', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load')
 })
 
-// ---- payment by transfer -------------------------------------------------------------------
+// ---- Easypaisa / JazzCash ------------------------------------------------------------------
 
-const transferOrder = (proof: boolean, over: Partial<AdminOrder> = {}) =>
+const attempt = (status: 'SUBMITTED' | 'PAID' | 'REJECTED', over = {}) => ({
+  attempt_id: 'a1',
+  status,
+  transaction_reference: 'TX-998877',
+  amount_paisa: 270100,
+  created_at: '2026-03-05T10:05:00Z',
+  rejection_reason: status === 'REJECTED' ? ('NOT_RECEIVED' as const) : null,
+  rejection_note: null,
+  reviewed_at: null,
+  ...over,
+})
+const walletOrder = (attempts: ReturnType<typeof attempt>[], over: Partial<AdminOrder> = {}) =>
   order({
-    payment_method: 'TRANSFER',
-    payment_deadline_at: proof ? null : '2026-03-05T10:30:00Z',
+    payment_method: 'EASYPAISA',
+    payment_deadline_at: attempts.some((a) => a.status === 'SUBMITTED')
+      ? null
+      : '2026-03-05T10:30:00Z',
     payments: [
       {
         payment_id: 'pay1',
-        method: 'TRANSFER',
+        method: 'EASYPAISA',
         status: 'PENDING',
         amount_paisa: 270100,
         refunded_amount_paisa: 0,
         provider_reference: null,
-        proof_reference: proof ? 'TX-998877' : null,
-        proof_submitted_at: proof ? '2026-03-05T10:05:00Z' : null,
         created_at: '2026-03-05T10:00:00Z',
+        attempts,
       },
     ],
     ...over,
   })
 
-it('shows the proof of a transfer with its screenshot and confirms the payment after a pop-up', async () => {
-  api.getAdminOrder.mockResolvedValue(transferOrder(true))
-  api.getPaymentProofImage.mockResolvedValue({ url: 'https://down.example/proof.png?sig=1' })
-  api.confirmTransferPayment.mockResolvedValue(
-    transferOrder(true, { status: 'CONFIRMED', payment_status: 'PAID' }),
-  )
+it('lists what the customer sent and points to the Payments page for the decision', async () => {
+  api.getAdminOrder.mockResolvedValue(walletOrder([attempt('SUBMITTED')]))
   renderDetail()
-  expect(await screen.findByText(/The customer says they paid/)).toBeInTheDocument()
-  expect(screen.getByText('TX-998877')).toBeInTheDocument()
-  expect(await screen.findByRole('img', { name: /Screenshot of the payment/ })).toHaveAttribute(
-    'src',
-    'https://down.example/proof.png?sig=1',
-  )
-  await userEvent.click(screen.getByRole('button', { name: 'Payment received' }))
-  const dialog = screen.getByRole('alertdialog', { name: 'Payment received?' })
-  expect(api.confirmTransferPayment).not.toHaveBeenCalled() // the pop-up asks first
-  await userEvent.click(within(dialog).getByRole('button', { name: 'Yes, confirm the order' }))
-  expect(api.confirmTransferPayment).toHaveBeenCalledWith('o1')
-  expect(screen.queryByText(/The customer says they paid/)).not.toBeInTheDocument()
+  expect(await screen.findByText('TX-998877')).toBeInTheDocument()
+  expect(screen.getByText(/waiting for your check/)).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Payments page' })).toHaveAttribute('href', '/payments')
+  // the decision is made on the Payments page, never from here
+  expect(screen.queryByRole('button', { name: /Payment received|Verify/ })).not.toBeInTheDocument()
 })
 
-it('asks the customer to send details again when the money was not found', async () => {
-  api.getAdminOrder.mockResolvedValue(transferOrder(true))
-  api.getPaymentProofImage.mockResolvedValue({ url: null })
-  api.rejectTransferProof.mockResolvedValue(transferOrder(false))
+it('keeps the history of a rejected attempt and says it is waiting for a new one', async () => {
+  api.getAdminOrder.mockResolvedValue(walletOrder([attempt('REJECTED')]))
   renderDetail()
-  await userEvent.click(await screen.findByRole('button', { name: 'Not received' }))
-  await userEvent.click(screen.getByRole('button', { name: 'Yes, ask them again' }))
-  expect(api.rejectTransferProof).toHaveBeenCalledWith('o1')
+  expect(await screen.findByText(/rejected \(Payment not received\)/)).toBeInTheDocument()
   expect(
-    await screen.findByText(/Waiting for the customer to send their payment details/),
+    screen.getByText(/Waiting for the customer to send the transaction number/),
   ).toBeInTheDocument()
 })
 
-it('lets the admin confirm a transfer without proof when the money is already there', async () => {
-  api.getAdminOrder.mockResolvedValue(transferOrder(false))
-  renderDetail()
-  expect(
-    await screen.findByText(/Waiting for the customer to send their payment details/),
-  ).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Not received' })).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Payment received' })).toBeInTheDocument()
-  expect(api.getPaymentProofImage).not.toHaveBeenCalled() // no proof: no link to ask for
-})
-
-it('shows no transfer actions for a payment that is already settled', async () => {
+it('shows a verified payment without any waiting message', async () => {
   api.getAdminOrder.mockResolvedValue(
-    transferOrder(true, { status: 'CONFIRMED', payment_status: 'PAID' }),
+    walletOrder([attempt('PAID')], { status: 'CONFIRMED', payment_status: 'PAID' }),
   )
   renderDetail()
-  await screen.findByText('2 × Sunflower')
-  expect(screen.queryByRole('button', { name: 'Payment received' })).not.toBeInTheDocument()
+  expect(await screen.findByText(/— verified —/)).toBeInTheDocument()
+  expect(screen.queryByText(/Waiting for the customer/)).not.toBeInTheDocument()
 })
 
 it('says "No actions left." for a delivered and paid order instead of an empty card', async () => {

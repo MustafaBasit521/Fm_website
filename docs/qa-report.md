@@ -40,7 +40,8 @@ Problems in the test rig itself (wrong selectors, duplicate test data, per-hour 
 2. **Real file uploads** to Supabase Storage (product, gallery, custom-order photo, payment screenshot) including the bucket limits.
 3. **Real email delivery** (Gmail SMTP or Resend) to an address that is not yours, and the Supabase sign-up emails.
 4. **A real phone** (touch, keyboard, camera upload) and a slow mobile connection.
-5. **The first deployment**: the content security policy against the live pages, CORS between the real addresses, the scheduled expiry call (`CRON_SECRET`), and `TRUST_PROXY_HEADERS`.
+5. **Easypaisa / JazzCash end to end** (added after the manual QR payment feature, which was tested with fakes only): upload a real QR code in Settings, scan it with a real wallet app on a phone, pay a small amount, send the real transaction number and receipt, verify it in the admin Payments page against the real merchant account, and try a rejection with each reason.
+6. **The first deployment**: the content security policy against the live pages, CORS between the real addresses, the scheduled expiry call (`CRON_SECRET`), and `TRUST_PROXY_HEADERS`.
 
 ## Recommendations (not blocking)
 

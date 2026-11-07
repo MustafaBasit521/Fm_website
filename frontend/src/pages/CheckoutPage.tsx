@@ -12,7 +12,7 @@ import {
   type PaymentMethod,
   type Quote,
 } from '../lib/api'
-import { paymentSummary } from '../lib/paymentText'
+import { isWalletMethod, methodName, paymentSummary } from '../lib/paymentText'
 import { formatPrice } from '../lib/money'
 import { saveLastOrder } from '../lib/lastOrder'
 import { buttonClass, Field, FormError, BackLink } from './ui'
@@ -308,15 +308,12 @@ export default function CheckoutPage() {
                     onChange={() => setMethod(m)}
                   />
                   <span>
-                    {m === 'COD'
-                      ? 'Cash on delivery'
-                      : m === 'TRANSFER'
-                        ? 'Bank or wallet transfer'
-                        : 'Pay online'}
-                    {m === 'TRANSFER' && (
+                    {methodName(m)}
+                    {isWalletMethod(m) && (
                       <span className="block text-sm text-bark">
-                        Send the money from JazzCash, Easypaisa or your bank to the shop&apos;s
-                        account and share the proof. We hold your order for 30 minutes.
+                        After you place the order you will see the shop&apos;s {methodName(m)} QR
+                        code. Pay, then send us the transaction number and a screenshot of the
+                        receipt. We hold your order for 30 minutes.
                       </span>
                     )}
                   </span>

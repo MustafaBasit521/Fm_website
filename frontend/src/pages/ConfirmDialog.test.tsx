@@ -66,3 +66,25 @@ it('keeps Tab inside the dialog', async () => {
   await userEvent.tab()
   expect(screen.getByRole('button', { name: 'Keep it' })).toHaveFocus()
 })
+
+it('keeps the focus in a field inside the dialog while the page re-renders on every keystroke', async () => {
+  function WithField() {
+    const [note, setNote] = useState('')
+    return (
+      <ConfirmDialog
+        open
+        title="Why?"
+        confirmLabel="Save"
+        onCancel={() => {}} // a new function on every render
+        onConfirm={() => {}}
+      >
+        <label htmlFor="n">Note</label>
+        <textarea id="n" value={note} onChange={(e) => setNote(e.target.value)} />
+      </ConfirmDialog>
+    )
+  }
+  render(<WithField />)
+  await userEvent.type(screen.getByLabelText('Note'), 'abc')
+  expect(screen.getByLabelText('Note')).toHaveValue('abc')
+  expect(screen.getByLabelText('Note')).toHaveFocus()
+})

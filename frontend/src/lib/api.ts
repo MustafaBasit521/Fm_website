@@ -159,7 +159,27 @@ export const removeFromWishlist = (productId: string) =>
 
 // ---- cart, checkout, orders ---------------------------------------------------------------
 
-export type PaymentMethod = 'COD' | 'ONLINE' | 'TRANSFER'
+export type PaymentMethod = 'COD' | 'ONLINE' | 'TRANSFER' | 'EASYPAISA' | 'JAZZCASH'
+export type PaymentAttemptStatus = 'SUBMITTED' | 'PAID' | 'REJECTED'
+export type RejectionReason =
+  | 'INCORRECT_REFERENCE'
+  | 'AMOUNT_MISMATCH'
+  | 'NOT_RECEIVED'
+  | 'UNCLEAR_RECEIPT'
+  | 'DUPLICATE_REFERENCE'
+  | 'OTHER'
+
+/** One time the customer sent a transaction number and a receipt. */
+export interface PaymentAttempt {
+  attempt_id: string
+  status: PaymentAttemptStatus
+  transaction_reference: string
+  amount_paisa: number
+  created_at: string
+  rejection_reason: RejectionReason | null
+  rejection_note: string | null
+  reviewed_at: string | null
+}
 export type LineIssue = 'NOT_FOUND' | 'UNAVAILABLE' | 'EXCEEDS_AVAILABLE'
 
 export interface CartLine {
@@ -218,8 +238,10 @@ export interface Order {
   payment_method: PaymentMethod
   payment_status: string
   payment_deadline_at: string | null
-  /** Transfer orders: when the customer sent proof (the shop is checking it). */
+  /** Easypaisa / JazzCash orders: when the customer sent a receipt the shop is still checking. */
   proof_submitted_at?: string | null
+  /** Every submission so far, oldest first (a rejected one keeps its reason). */
+  payment_attempts?: PaymentAttempt[]
   customer_name: string
   customer_email: string
   customer_phone: string | null
@@ -271,7 +293,7 @@ export const getProofUploadTarget = (orderId: string, contentType: string) =>
   })
 export const sendPaymentProof = (
   orderId: string,
-  proof: { reference?: string | null; image_path?: string | null },
+  proof: { reference: string; image_path: string },
 ) => apiPost<Order>(`/orders/${encodeURIComponent(orderId)}/payment-proof`, proof)
 export const cancelOrder = (id: string) =>
   apiPost<Order>(`/orders/${encodeURIComponent(id)}/cancel`, {})
@@ -492,8 +514,11 @@ export interface BusinessSettings {
   delivery_information: string | null
   delivery_fee_paisa: number
   social_links: Record<string, string>
-  /** Where customers send money for the transfer method (empty: not offered). */
-  transfer_instructions?: string | null
+  /** The shop's wallet QR codes (a wallet without a QR code is not offered at checkout). */
+  easypaisa_qr_url?: string | null
+  easypaisa_details?: string | null
+  jazzcash_qr_url?: string | null
+  jazzcash_details?: string | null
 }
 
 // The shop details rarely change and are needed by the header, footer and several pages: fetch

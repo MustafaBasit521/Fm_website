@@ -319,23 +319,28 @@ If the 30-minute window expires without a successful payment:
 
 Expired unpaid online orders must be cleaned up automatically.
 
-**The customer is told (decided by the owner, UI polish phase):** when an unpaid online or transfer order expires, the customer gets an in-app notification (registered customers) and an email ("Order X was cancelled: payment not received", with how to order again and what to do if they already paid), and the shop gets an alert email in case the customer did pay and forgot to send the details. Each expired order is announced exactly once, by a scheduled call to the backend (`POST /api/internal/expire-orders`, protected by a secret) that also runs the expiry function itself.
+**The customer is told (decided by the owner, UI polish phase):** when an unpaid online, Easypaisa or JazzCash order expires, the customer gets an in-app notification (registered customers) and an email ("Order X was cancelled: payment not received", with how to order again and what to do if they already paid), and the shop gets an alert email in case the customer did pay and forgot to send the details. Each expired order is announced exactly once, by a scheduled call to the backend (`POST /api/internal/expire-orders`, protected by a secret) that also runs the expiry function itself.
 
 Expiry mechanism (decided): the database function `expire_unpaid_online_orders()` cancels expired unpaid online orders and returns their stock; it is scheduled every minute with Supabase pg_cron. The API also runs the same function just before reserving stock for a new order, so correctness does not depend on the schedule. Online payment stays disabled (`ONLINE_PAYMENTS_ENABLED=false`) until a payment gateway is integrated, so no customer places an order they cannot pay for.
 
 Late payment (decided): if a verified payment arrives after the window has closed — whether the expiry job has already cancelled the order or has not run yet — the order stays Cancelled and is never reopened. The payment is recorded as Paid and the full amount is refundable (no cancellation charge).
 
-## Transfer orders (decided by the owner, UI polish phase)
+## Easypaisa and JazzCash orders (decided by the owner, manual QR payment phase)
 
-The shop has no payment-gateway account (an Instagram business without NTN or business bank account), so customers may also **pay by transfer** to the shop's own account (JazzCash, Easypaisa or bank). The method is offered only while the admin has written payment instructions in the settings (account names and numbers); clearing the text switches it off.
+The shop has no payment-gateway account (an Instagram business without NTN or business bank account), so customers may **pay in advance with Easypaisa or JazzCash** by scanning the shop's own merchant QR code. There is no gateway, no webhook and no automatic check: **only an admin can mark such a payment as paid**, after looking at the shop's own wallet account. A customer's screenshot never marks anything as paid. This replaces the earlier generic "bank or wallet transfer" method (its enum value stays for old rows but is no longer offered).
 
-* A transfer order is created like an online order: Pending, payment Pending, stock or capacity reserved, and the same **30-minute window** (`payment_deadline_at`).
-* The customer sees the instructions and the amount, sends the money, and then tells the shop with a **transaction number, a screenshot, or both** (the screenshot goes straight to the private `payment-proofs` bucket). This works for guests as well (the unguessable order id is the capability; rate limited).
-* **Sending the details stops the clock** (`payment_deadline_at` becomes empty): the shop needs time to look, and the order does not expire meanwhile. The payment stays Pending. The shop gets an alert email and the customer a confirmation.
-* The **admin** checks the shop's account and chooses: **"Payment received"** (payment Paid and order Confirmed, the customer is told; the admin may also do this without any proof when the money is already there) or **"Not received"** (the proof is cleared, the customer is told and gets a **fresh 30 minutes** to send correct details).
-* If no details arrive within the window, the order expires like any unpaid online order: Cancelled and the stock returned (the same database function). If someone pays after that, it must be sorted out with the shop directly; nothing is reopened.
-* The order cannot be confirmed by a plain status change before its payment is received.
+* **Offering:** each wallet is offered at checkout only while the admin has uploaded its QR code (Settings -> Easypaisa and JazzCash). The admin may also write account details to show next to the QR code. Removing the QR code switches that wallet off. Cash on Delivery is always offered.
+* **Placing:** the order is created like an online order: Pending, payment Pending, stock or capacity reserved, and the same **30-minute window** (`payment_deadline_at`). The confirmation page and the order page show the QR code, the amount to pay, the order number, instructions and the form.
+* **Submitting:** the customer must send **both** the wallet's transaction number (6 to 40 letters, digits or dashes) **and** a screenshot of the receipt (JPG, PNG or WebP, up to 5 MB, into the private `payment-proofs` bucket). Guests can do this too (the unguessable order id is the capability); for a registered customer's order only that customer can submit or read the history. The expected amount is always the order total held by the server.
+* **Duplicate numbers:** a transaction number that backs another submission which was not rejected (on this or any other order, case-insensitive) is refused with a clear message. The number of a rejected submission can be sent again.
+* **One at a time:** while a submission is waiting for the admin the customer cannot send another. **Submitting stops the clock** (`payment_deadline_at` becomes empty): the shop needs time to look, and the order does not expire meanwhile. The payment stays Pending. The shop gets an alert email and the customer a confirmation.
+* **Verifying (admin):** the admin opens the **Payments** page, looks at the transaction number and receipt, **checks the real merchant account**, then chooses "Verify payment": the submission becomes Paid, the payment Paid and the order Confirmed, the customer is told, and the admin id and time are stored. It works once only (a second try, or two admins at the same moment, gets a clear "already reviewed" answer). It is refused if the order was cancelled meanwhile or its total changed.
+* **Rejecting (admin):** a **reason is mandatory**: incorrect transaction number, amount mismatch, payment not received, invalid or unclear receipt, duplicate transaction number, or other (then the admin must write the reason; a note may be added to any reason). The submission becomes Rejected with the admin id and time, the order stays Pending and out of preparation, the customer is told the reason (notification and email) and gets a **fresh 30 minutes** to send corrected details.
+* **History:** every submission is kept. A corrected submission is a new record; rejected ones stay visible to the admin and, with their reason, to the customer. Customers never see admin ids.
+* If no valid details arrive within the window, the order expires like any unpaid online order: Cancelled and the stock returned (the same database function). If someone pays after that, it must be sorted out with the shop directly; nothing is reopened.
+* The order cannot be confirmed by a plain status change before its payment is verified. The admin can no longer confirm a wallet payment without a submission (to be able to verify, the customer must have sent a transaction number and receipt).
 * **Refunds**: the shop returns the money itself from its own account and the admin only records it (same limits as §22: never more than paid minus any cancellation charge minus what was already refunded; partial refunds allowed). No provider is called.
+* The payment status of the order stays separate from the submission status (Submitted, Paid, Rejected).
 
 ## COD orders
 
@@ -489,7 +494,7 @@ Payment methods:
 
 * COD
 * ONLINE
-* TRANSFER (money sent to the shop's own account, checked by the admin: see §13)
+* EASYPAISA and JAZZCASH (money sent to the shop's own wallet, checked by the admin: see §13). `TRANSFER` is the retired first version of this.
 
 Payment status:
 

@@ -39,7 +39,36 @@ class PaymentMethod(enum.StrEnum):
     COD = "COD"
     ONLINE = "ONLINE"
     # The customer sends money to the shop's own account and shows proof; the admin checks it.
+    # TRANSFER is the first, generic version of this (before the two wallets had their own QR
+    # codes). It is no longer offered but old orders keep it.
     TRANSFER = "TRANSFER"
+    EASYPAISA = "EASYPAISA"
+    JAZZCASH = "JAZZCASH"
+
+
+# Methods where the customer pays the shop directly and the admin checks the shop's account.
+MANUAL_PAYMENT_METHODS = (PaymentMethod.TRANSFER, PaymentMethod.EASYPAISA, PaymentMethod.JAZZCASH)
+# Methods with the 30-minute payment window (business-rules §13).
+WINDOWED_PAYMENT_METHODS = (PaymentMethod.ONLINE, *MANUAL_PAYMENT_METHODS)
+
+
+class PaymentAttemptStatus(enum.StrEnum):
+    """PostgreSQL enum `payment_attempt_status`: one customer submission, checked by the admin."""
+
+    SUBMITTED = "SUBMITTED"
+    PAID = "PAID"
+    REJECTED = "REJECTED"
+
+
+class PaymentRejectionReason(enum.StrEnum):
+    """PostgreSQL enum `payment_rejection_reason`."""
+
+    INCORRECT_REFERENCE = "INCORRECT_REFERENCE"
+    AMOUNT_MISMATCH = "AMOUNT_MISMATCH"
+    NOT_RECEIVED = "NOT_RECEIVED"
+    UNCLEAR_RECEIPT = "UNCLEAR_RECEIPT"
+    DUPLICATE_REFERENCE = "DUPLICATE_REFERENCE"
+    OTHER = "OTHER"
 
 
 class GalleryImageType(enum.StrEnum):

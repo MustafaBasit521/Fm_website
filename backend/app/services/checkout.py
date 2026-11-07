@@ -19,6 +19,7 @@ from app.models.catalog import Product
 from app.models.customer_data import Address
 from app.models.enums import (
     ACTIVE_ORDER_STATUSES,
+    WINDOWED_PAYMENT_METHODS,
     OrderStatus,
     PaymentMethod,
     PaymentStatus,
@@ -48,23 +49,30 @@ def _problem(status_code: int, code: str, message: str, **extra: Any) -> HTTPExc
     return HTTPException(status_code, {"code": code, "message": message, **extra})
 
 
-def payment_methods(settings: Settings, *, transfer: bool = False) -> list[PaymentMethod]:
-    """`transfer`: the shop has written payment instructions, so it accepts money transfers."""
+def payment_methods(
+    settings: Settings, *, easypaisa: bool = False, jazzcash: bool = False
+) -> list[PaymentMethod]:
+    """`easypaisa` / `jazzcash`: the shop has uploaded that wallet's QR code, so it accepts it."""
     methods = [PaymentMethod.COD]
     if settings.online_payments_enabled:
         methods.append(PaymentMethod.ONLINE)
-    if transfer:
-        methods.append(PaymentMethod.TRANSFER)
+    if easypaisa:
+        methods.append(PaymentMethod.EASYPAISA)
+    if jazzcash:
+        methods.append(PaymentMethod.JAZZCASH)
     return methods
 
 
-async def transfer_enabled(session: AsyncSession) -> bool:
-    instructions = await session.scalar(
-        select(BusinessSettings.transfer_instructions)
-        .order_by(BusinessSettings.updated_at.desc())
-        .limit(1)
-    )
-    return bool(instructions and instructions.strip())
+async def wallet_flags(session: AsyncSession) -> dict[str, bool]:
+    """Which wallets are switched on (a QR code exists), as keyword arguments."""
+    row = (
+        await session.execute(
+            select(BusinessSettings.easypaisa_qr_path, BusinessSettings.jazzcash_qr_path)
+            .order_by(BusinessSettings.updated_at.desc())
+            .limit(1)
+        )
+    ).one_or_none()
+    return {"easypaisa": bool(row and row[0]), "jazzcash": bool(row and row[1])}
 
 
 def merge_lines(items: list[CartLine]) -> dict[uuid.UUID, int]:
@@ -192,7 +200,7 @@ async def quote(session: AsyncSession, items: list[CartLine], settings: Settings
         subtotal_paisa=subtotal,
         delivery_fee_paisa=fee,
         total_paisa=total,
-        payment_methods=payment_methods(settings, transfer=await transfer_enabled(session)),
+        payment_methods=payment_methods(settings, **await wallet_flags(session)),
         can_checkout=ok and bool(lines),
     )
 
@@ -277,9 +285,7 @@ async def expire_unpaid_orders(session: AsyncSession) -> int:
 async def create_order(
     session: AsyncSession, user: AuthUser | None, data: OrderCreate, settings: Settings
 ) -> OrderRead:
-    if data.payment_method not in payment_methods(
-        settings, transfer=await transfer_enabled(session)
-    ):
+    if data.payment_method not in payment_methods(settings, **await wallet_flags(session)):
         raise _problem(
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "PAYMENT_METHOD_UNAVAILABLE",
@@ -335,8 +341,8 @@ async def create_order(
             if line.product.availability_type == ProductAvailability.READY_TO_SHIP:
                 line.product.stock_quantity -= line.quantity
 
-        # Online and transfer orders have the 30-minute window (business-rules §13); COD has none.
-        windowed = data.payment_method in (PaymentMethod.ONLINE, PaymentMethod.TRANSFER)
+        # Online and wallet orders have the 30-minute window (business-rules §13); COD has none.
+        windowed = data.payment_method in WINDOWED_PAYMENT_METHODS
         order = Order(
             customer_id=user.id if user else None,
             customer_name=data.contact.name,

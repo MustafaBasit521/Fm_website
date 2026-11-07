@@ -3,8 +3,9 @@ import { useParams } from 'react-router-dom'
 import { ApiError, cancelOrder, changeOrderAddress, getOrder, type Order } from '../lib/api'
 import { formatPrice } from '../lib/money'
 import { formatDate, paymentStatusLabel } from '../lib/orderStatus'
+import { isWalletMethod, methodName } from '../lib/paymentText'
 import { PayNowButton } from './PayNowButton'
-import { TransferPayment } from './TransferPayment'
+import { WalletPayment } from './WalletPayment'
 import { buttonClass, Field, FormError, BackLink } from './ui'
 import { OrderBreakdown } from './OrderBreakdown'
 import { StatusBadge } from './StatusBadge'
@@ -127,7 +128,9 @@ export default function OrderDetailPage() {
         <StatusBadge status={order.status} /> · placed {formatDate(order.created_at)} ·{' '}
         {order.payment_method === 'COD'
           ? 'Cash on delivery'
-          : paymentStatusLabel(order.payment_status)}
+          : isWalletMethod(order.payment_method)
+            ? `${methodName(order.payment_method)} · ${paymentStatusLabel(order.payment_status)}`
+            : paymentStatusLabel(order.payment_status)}
       </p>
 
       {order.payment_method === 'ONLINE' &&
@@ -145,7 +148,7 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-      <TransferPayment order={order} onUpdated={setOverride} />
+      <WalletPayment order={order} onUpdated={setOverride} />
 
       {order.status === 'CANCELLED' && (
         <div role="status" className="mt-4 rounded-[18px] border border-sand bg-paper p-4">

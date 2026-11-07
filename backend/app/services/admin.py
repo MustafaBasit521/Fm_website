@@ -16,10 +16,11 @@ from app.models.enums import (
     CustomOrderStatus,
     MessageStatus,
     OrderStatus,
+    PaymentAttemptStatus,
     PaymentMethod,
     ProductAvailability,
 )
-from app.models.orders import Order, Payment
+from app.models.orders import Order, Payment, PaymentAttempt
 from app.schemas.admin import (
     AdminCategory,
     AdminCustomer,
@@ -56,6 +57,11 @@ async def dashboard(session: AsyncSession) -> DashboardSummary:
         OrderStatus.CONFIRMED.value
     ]
 
+    payments_to_check = await session.scalar(
+        select(func.count())
+        .select_from(PaymentAttempt)
+        .where(PaymentAttempt.status == PaymentAttemptStatus.SUBMITTED)
+    )
     new_messages = await session.scalar(
         select(func.count()).select_from(Message).where(Message.status == MessageStatus.NEW)
     )
@@ -83,6 +89,7 @@ async def dashboard(session: AsyncSession) -> DashboardSummary:
     return DashboardSummary(
         orders_by_status=by_status,
         orders_needing_action=needing_action,
+        payments_to_check=payments_to_check or 0,
         new_messages=new_messages or 0,
         new_custom_orders=new_custom or 0,
         low_stock_threshold=LOW_STOCK_THRESHOLD,

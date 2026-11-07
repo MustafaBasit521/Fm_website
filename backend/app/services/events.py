@@ -28,9 +28,10 @@ from app.models.enums import (
     NotificationType,
     OrderStatus,
     PaymentMethod,
+    PaymentRejectionReason,
 )
 from app.models.newsletter import NewsletterSubscriber
-from app.models.orders import Order
+from app.models.orders import Order, PaymentAttempt
 
 DEFAULT_SHOP_NAME = "Bundle of Loops"  # used until the owner sets a name in the settings
 
@@ -230,11 +231,30 @@ async def payment_failed(session: AsyncSession, order: Order) -> None:
     )
 
 
-async def transfer_proof_received(session: AsyncSession, order: Order) -> None:
+REJECTION_TEXT = {
+    PaymentRejectionReason.INCORRECT_REFERENCE: "the transaction number is incorrect",
+    PaymentRejectionReason.AMOUNT_MISMATCH: "the amount does not match the order total",
+    PaymentRejectionReason.NOT_RECEIVED: "we could not find the payment in the shop's account",
+    PaymentRejectionReason.UNCLEAR_RECEIPT: "the receipt is invalid or unclear",
+    PaymentRejectionReason.DUPLICATE_REFERENCE: "this transaction number was already used",
+}
+
+
+def rejection_text(attempt: PaymentAttempt) -> str:
+    """The reason in plain words, for the customer."""
+    if attempt.rejection_reason == PaymentRejectionReason.OTHER or (
+        attempt.rejection_reason not in REJECTION_TEXT
+    ):
+        return attempt.rejection_note or "the payment could not be confirmed"
+    text = REJECTION_TEXT[attempt.rejection_reason]
+    return f"{text} ({attempt.rejection_note})" if attempt.rejection_note else text
+
+
+async def payment_proof_received(
+    session: AsyncSession, order: Order, attempt: PaymentAttempt
+) -> None:
     shop = await _shop_name(session)
     ref = short_ref(order)
-    payment = next((p for p in order.payments if p.method == PaymentMethod.TRANSFER), None)
-    detail = (payment.proof_reference if payment else None) or "a screenshot"
     text = (
         f"We received your payment details for order {ref}. The shop will check the payment and "
         "confirm your order soon."
@@ -258,24 +278,27 @@ async def transfer_proof_received(session: AsyncSession, order: Order) -> None:
         session,
         f"Payment to check - order {ref}",
         f"{order.customer_name} says they paid {format_price(order.total_amount_paisa)} for order "
-        f"{ref} (proof: {detail}). Open the order in the admin to check your account and mark the "
-        "payment as received.",
+        f"{ref} (transaction number: {attempt.transaction_reference}). Open the payments page in "
+        "the admin, check your Easypaisa or JazzCash account, then verify or reject the payment.",
     )
 
 
-async def transfer_proof_rejected(session: AsyncSession, order: Order) -> None:
+async def payment_attempt_rejected(
+    session: AsyncSession, order: Order, attempt: PaymentAttempt
+) -> None:
     shop = await _shop_name(session)
     ref = short_ref(order)
     text = (
-        f"We could not find your payment for order {ref}. Please check the details and send them "
-        "again within 30 minutes; after that the order is cancelled."
+        f"We could not accept your payment for order {ref}: {rejection_text(attempt)}. Please "
+        "check and send the correct transaction number and receipt within 30 minutes; after that "
+        "the order is cancelled."
     )
-    _notify(session, order.customer_id, NotificationType.PAYMENT_FAILURE, "Payment not found", text)
+    _notify(session, order.customer_id, NotificationType.PAYMENT_FAILURE, "Payment rejected", text)
     queue_email(
         session,
         EmailMessage(
             to=order.customer_email,
-            subject=f"We could not find your payment - order {ref}",
+            subject=f"Your payment was not accepted - order {ref}",
             body=f"Hi {order.customer_name},\n\n{text}\n\n- {shop}",
         ),
     )

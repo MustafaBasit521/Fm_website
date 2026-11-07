@@ -434,6 +434,7 @@ Relationship:
 
 ```text
 orders 1 ──── N payments
+payments 1 ──── N payment_attempts   (Easypaisa / JazzCash submissions, see §30)
 ```
 
 The implementation should decide whether multiple payment attempts are represented as multiple payment records or payment-attempt records. This should be finalized before provider-specific implementation.
@@ -950,12 +951,17 @@ Visitors (with or without an account) who asked to hear about new pieces (`busin
 
 ---
 
-# 30. Payment by transfer
+# 30. Payment by transfer, then Easypaisa / JazzCash
 
-* `payment_method` has the extra value `TRANSFER` (migration `payment by transfer`, revision `b061159f49d0`; PostgreSQL cannot remove enum values, so a downgrade leaves it).
-* `payments` gets `proof_reference TEXT NULL` (the transaction number the customer typed), `proof_image_path TEXT NULL` (path `payment-proofs/{uuid}.{jpg|png|webp}` in the **private** `payment-proofs` bucket; the admin sees it through a short-lived signed link) and `proof_submitted_at TIMESTAMPTZ NULL`.
-* `business_settings` gets `transfer_instructions TEXT NULL`: where customers send the money; empty means the method is not offered.
-* The database function `expire_unpaid_online_orders()` now treats `TRANSFER` like `ONLINE` (unpaid, window passed, nothing paid). Sending proof sets `orders.payment_deadline_at` to NULL, so such an order is not picked up while the shop is checking; rejecting the proof sets a new deadline.
+* `payment_method` got the value `TRANSFER` (revision `b061159f49d0`) and then `EASYPAISA` and `JAZZCASH` (revision `5d3b8f1c2a47`; PostgreSQL cannot remove enum values, so a downgrade leaves them). `TRANSFER` is no longer offered.
+* New enums `payment_attempt_status` (`SUBMITTED`, `PAID`, `REJECTED`) and `payment_rejection_reason` (`INCORRECT_REFERENCE`, `AMOUNT_MISMATCH`, `NOT_RECEIVED`, `UNCLEAR_RECEIPT`, `DUPLICATE_REFERENCE`, `OTHER`).
+* New table **`payment_attempts`** (§11a): one row per submission by the customer. Columns: `attempt_id` (PK), `payment_id` (FK `payments`, RESTRICT), `order_id` (FK `orders`, RESTRICT), `amount_paisa` (BIGINT, the server's order total when submitted), `transaction_reference`, `receipt_path` (`payment-proofs/{uuid}.{jpg|png|webp}` in the **private** `payment-proofs` bucket; the admin sees it through a short-lived signed link), `status`, `rejection_reason`, `rejection_note`, `reviewed_by` (the admin's Supabase user id, taken from the verified token), `reviewed_at`, `created_at`, `updated_at`.
+  * CHECKs: amount not negative; a non-empty transaction number; `SUBMITTED` rows have no reviewer and `PAID`/`REJECTED` rows have both reviewer and time; a reason exists exactly when the row is `REJECTED`; the reason `OTHER` needs a non-empty note.
+  * Indexes: `order_id`; `(status, created_at)` for the admin queue; **unique partial** `payment_id WHERE status = 'SUBMITTED'` (one undecided submission per payment); **unique partial** `lower(transaction_reference) WHERE status <> 'REJECTED'` (a number can back only one live submission, even under concurrent requests); unique `receipt_path`.
+  * Rejected rows are never overwritten: a corrected submission is a new row.
+* `payments` lost `proof_reference`, `proof_image_path` and `proof_submitted_at` (moved into attempts; the migration copied waiting details that had both a number and a screenshot).
+* `business_settings` lost `transfer_instructions` and gained `easypaisa_qr_path`, `easypaisa_details`, `jazzcash_qr_path`, `jazzcash_details`. The QR codes are meant for customers, so they live in the public gallery bucket under `payment-qr/`. A wallet is offered only while its QR path is set.
+* The database function `expire_unpaid_online_orders()` treats `TRANSFER`, `EASYPAISA` and `JAZZCASH` like `ONLINE` (unpaid, window passed, nothing paid). Sending details sets `orders.payment_deadline_at` to NULL, so such an order is not picked up while the shop is checking; rejecting sets a new deadline.
 
 ---
 

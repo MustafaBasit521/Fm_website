@@ -8,6 +8,7 @@ from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.schemas.address import AddressCreate
 from app.schemas.catalog import ProductImageRead
 from app.schemas.customer import CustomerUpdate
+from app.schemas.payments import PaymentAttemptRead
 
 MAX_LINE_QUANTITY = 99
 MAX_LINES = 50
@@ -122,8 +123,10 @@ class OrderRead(BaseModel):
     payment_method: PaymentMethod
     payment_status: PaymentStatus
     payment_deadline_at: datetime | None
-    # TRANSFER orders: when the customer sent proof (the shop is checking it), else None.
+    # Easypaisa / JazzCash orders: when the customer sent a receipt that the shop is still
+    # checking, else None; and every submission so far (rejected ones keep their reason).
     proof_submitted_at: datetime | None = None
+    payment_attempts: list[PaymentAttemptRead] = []
     customer_name: str
     customer_email: str
     customer_phone: str | None

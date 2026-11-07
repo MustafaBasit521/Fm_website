@@ -9,6 +9,7 @@ import {
   ArrowUpRightIcon,
   BagIcon,
   BoxIcon,
+  CardIcon,
   ChatIcon,
   HomeIcon,
   ImageIcon,
@@ -22,7 +23,7 @@ import {
 
 const SHOP_URL = (import.meta.env.VITE_SHOP_URL as string | undefined) ?? 'http://localhost:5173'
 
-type Badge = 'orders' | 'messages' | 'custom'
+type Badge = 'orders' | 'payments' | 'messages' | 'custom'
 type Item = {
   to: string
   label: string
@@ -35,6 +36,7 @@ const GROUPS: { title: string | null; items: Item[] }[] = [
     title: 'Shop',
     items: [
       { to: '/orders', label: 'Orders', Icon: BoxIcon, badge: 'orders' },
+      { to: '/payments', label: 'Payments', Icon: CardIcon, badge: 'payments' },
       { to: '/products', label: 'Products', Icon: BagIcon },
       { to: '/categories', label: 'Categories', Icon: TagIcon },
     ],
@@ -117,7 +119,7 @@ function NavGroups({ counts }: { counts: Record<Badge, number> }) {
                 {count > 0 && (
                   <span
                     aria-label={`${count} new`}
-                    className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold text-white ${badge === 'orders' ? 'bg-terracotta' : 'bg-ink'}`}
+                    className={`ml-auto rounded-full px-2 py-0.5 text-xs font-semibold text-white ${badge === 'orders' || badge === 'payments' ? 'bg-terracotta' : 'bg-ink'}`}
                   >
                     {count}
                   </span>
@@ -165,7 +167,7 @@ function MobileHeader({
   signOut: () => Promise<void>
 }) {
   const [open, setOpen] = useState(false)
-  const waiting = counts.orders + counts.messages + counts.custom
+  const waiting = counts.orders + counts.payments + counts.messages + counts.custom
   return (
     <header className="flex items-center justify-between border-b border-sand bg-cream-200 px-4 py-3 md:hidden">
       <Logo name={name} />
@@ -198,7 +200,12 @@ export default function AdminLayout() {
   const { signOut } = useAuth()
   const { pathname } = useLocation()
   const [name, setName] = useState('Bundle of Loops')
-  const [counts, setCounts] = useState<Record<Badge, number>>({ orders: 0, messages: 0, custom: 0 })
+  const [counts, setCounts] = useState<Record<Badge, number>>({
+    orders: 0,
+    payments: 0,
+    messages: 0,
+    custom: 0,
+  })
 
   useEffect(() => {
     getPublicSettings()
@@ -213,6 +220,7 @@ export default function AdminLayout() {
       .then((d) =>
         setCounts({
           orders: d.orders_needing_action,
+          payments: d.payments_to_check ?? 0,
           messages: d.new_messages,
           custom: d.new_custom_orders,
         }),

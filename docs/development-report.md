@@ -515,3 +515,25 @@ Following CLAUDE.md §24, `business-rules.md` and `database.md` were brought in 
 
 The owner supplied the shop's Instagram logo (a 201 x 190 screenshot of a round logo on a dark background). It was cut out with a circular mask (the screenshot's dark corners made transparent) and saved as `public/logo.png` (192 px) and `public/favicon.png` (64 px). Used on the admin login and two-factor pages, the admin sidebar and phone header, and as the favicon of both sites. The source is low resolution, so it is shown at 112 px or smaller; a larger original from the owner would look sharper on high-density screens.
 
+
+## Deployment (Vercel projects)
+
+**Request (owner):** deploy to Render and Vercel with the access granted.
+
+**Done:** after the owner approved the Vercel CLI login, two Vercel projects were created in the owner's team (`bundle-of-loops-shop` with root `deploy/shop`, `bundle-of-loops-admin` with root `deploy/admin`), linked to the GitHub repository (production branch `main`), with "include source files outside the root directory" on and the public variables set (`VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, plus `VITE_SHOP_URL` for the admin). The `API_DOMAIN` placeholder in both `vercel.json` files and in `frontend/src/deploy.test.ts` was replaced with `bundle-of-loops-api.onrender.com` (the Render service name is fixed to `bundle-of-loops-api`).
+
+**Limits:** no tool gives access to Render, so the API is created by hand in the Render dashboard (`docs/deployment.md`). The Vercel builds start when the changes are pushed.
+
+## Manual Easypaisa / JazzCash payment
+
+**Request (owner):** a manual QR-based advance payment system: Easypaisa and JazzCash with the shop's own merchant QR codes, a transaction number and receipt from the customer, and an admin who verifies or rejects (with a mandatory reason) after checking the real merchant account. Phases as asked: inspection, backend, frontend, tests.
+
+**Inspection findings:** the earlier "bank or wallet transfer" method already had most of the flow (private proof bucket, 30-minute clock that stops on submission, admin confirm/reject, refunds recorded by the admin) but kept one proof per payment (a rejection erased it), took either a number or a screenshot, had no reason for a rejection, no admin id, no duplicate check and no queue page.
+
+**Decisions (owner):** both number and receipt required; a reused transaction number is blocked; the old transfer method is replaced by the two wallets; payment feature before deployment.
+
+**Done:** migration `5d3b8f1c2a47` (enum values, `payment_attempts` with CHECKs and unique partial indexes, QR columns, expiry function for the new methods); `app/services/payments.py` (submit, verify, reject, queue, receipt link; the order row is locked first so two admins cannot both verify); `app/api/admin_payments.py`; ownership check for registered customers' orders; QR upload and public settings; frontend `WalletPayment`, checkout copy, admin Payments page, settings QR upload, order page history. Tests: `tests/test_wallet_payments.py` (50 cases, including 4 concurrent verifies giving exactly one success and the database refusing inconsistent rows) and `Payments.test.tsx`, `WalletPayment.test.tsx`.
+
+**Found on the way:** the new CHECK "reason OTHER needs a note" let a missing note through (NULL passes a CHECK) until a test caught it; `ConfirmDialog` restarted its focus handling on every render, so typing in a field inside it lost focus after each letter.
+
+**Limits:** the admin can no longer mark a wallet order paid without a submission. Nothing is checked automatically against Easypaisa/JazzCash: the provider-specific part is isolated so an API check could be added later.

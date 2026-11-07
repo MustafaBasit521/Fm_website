@@ -13,11 +13,18 @@ from sqlalchemy import (
     Text,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
-from app.models.enums import OrderStatus, PaymentMethod, PaymentStatus
+from app.models.enums import (
+    OrderStatus,
+    PaymentAttemptStatus,
+    PaymentMethod,
+    PaymentRejectionReason,
+    PaymentStatus,
+)
 
 
 class Order(Base):
@@ -128,14 +135,93 @@ class Payment(Base):
     amount_paisa: Mapped[int] = mapped_column(BigInteger)
     refunded_amount_paisa: Mapped[int] = mapped_column(BigInteger, server_default="0")
     provider_reference: Mapped[str | None] = mapped_column(Text, unique=True)
-    # TRANSFER payments: what the customer sent as proof (a transaction number, a screenshot in
-    # the private payment-proofs bucket, or both). The admin checks it and marks the payment Paid.
-    proof_reference: Mapped[str | None] = mapped_column(Text)
-    proof_image_path: Mapped[str | None] = mapped_column(Text)
-    proof_submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
     order: Mapped[Order] = relationship(back_populates="payments")
+    # Easypaisa / JazzCash: every time the customer sent a transaction number and a receipt.
+    attempts: Mapped[list["PaymentAttempt"]] = relationship(
+        back_populates="payment", order_by="PaymentAttempt.created_at"
+    )
+
+    @property
+    def open_attempt(self) -> "PaymentAttempt | None":
+        """The submission the admin has not decided yet."""
+        return next((a for a in self.attempts if a.status == PaymentAttemptStatus.SUBMITTED), None)
+
+
+class PaymentAttempt(Base):
+    """database.md §11a. One submission by the customer for a manual (Easypaisa / JazzCash)
+    payment: a transaction number and a receipt screenshot. A rejected attempt is kept as history;
+    a corrected submission is a new row. Only an admin moves an attempt to PAID or REJECTED."""
+
+    __tablename__ = "payment_attempts"
+    __table_args__ = (
+        CheckConstraint("amount_paisa >= 0", name="ck_payment_attempts_amount_nonneg"),
+        CheckConstraint(
+            "(status = 'SUBMITTED' AND reviewed_by IS NULL AND reviewed_at IS NULL) OR "
+            "(status IN ('PAID', 'REJECTED') AND reviewed_by IS NOT NULL "
+            "AND reviewed_at IS NOT NULL)",
+            name="ck_payment_attempts_review",
+        ),
+        CheckConstraint(
+            "(status = 'REJECTED') = (rejection_reason IS NOT NULL)",
+            name="ck_payment_attempts_reason",
+        ),
+        CheckConstraint(
+            "rejection_reason IS DISTINCT FROM 'OTHER' "
+            "OR coalesce(length(btrim(rejection_note)), 0) > 0",
+            name="ck_payment_attempts_other_note",
+        ),
+        CheckConstraint(
+            "length(btrim(transaction_reference)) > 0", name="ck_payment_attempts_reference"
+        ),
+        Index("ix_payment_attempts_order_id", "order_id"),
+        Index("ix_payment_attempts_status_created", "status", "created_at"),
+        # One undecided submission per payment.
+        Index(
+            "uq_payment_attempts_open",
+            "payment_id",
+            unique=True,
+            postgresql_where=text("status = 'SUBMITTED'"),
+        ),
+        # A transaction number can back only one live (not rejected) attempt.
+        Index(
+            "uq_payment_attempts_reference",
+            text("lower(transaction_reference)"),
+            unique=True,
+            postgresql_where=text("status <> 'REJECTED'"),
+        ),
+        Index("uq_payment_attempts_receipt", "receipt_path", unique=True),
+    )
+
+    attempt_id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    payment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("payments.payment_id", ondelete="RESTRICT")
+    )
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.order_id", ondelete="RESTRICT"))
+    # What was due when the customer submitted (the server's order total, never the browser's).
+    amount_paisa: Mapped[int] = mapped_column(BigInteger)
+    transaction_reference: Mapped[str] = mapped_column(Text)
+    # In the PRIVATE payment-proofs bucket.
+    receipt_path: Mapped[str] = mapped_column(Text)
+    status: Mapped[PaymentAttemptStatus] = mapped_column(
+        Enum(PaymentAttemptStatus, name="payment_attempt_status"),
+        server_default=PaymentAttemptStatus.SUBMITTED.value,
+    )
+    rejection_reason: Mapped[PaymentRejectionReason | None] = mapped_column(
+        Enum(PaymentRejectionReason, name="payment_rejection_reason")
+    )
+    rejection_note: Mapped[str | None] = mapped_column(Text)
+    # The admin (Supabase Auth user id, from the verified token) who decided.
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column()
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    payment: Mapped[Payment] = relationship(back_populates="attempts")
+    order: Mapped[Order] = relationship()

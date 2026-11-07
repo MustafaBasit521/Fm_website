@@ -78,7 +78,7 @@ Environment variables (Production), the same for both projects:
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | the Supabase **publishable** key (public by design) |
 | `VITE_SHOP_URL` | the shop's Vercel address (used by the admin's "View shop" button; set it on the admin project) |
 
-**Before the first build**, replace the word `API_DOMAIN` in `deploy/shop/vercel.json` and `deploy/admin/vercel.json` with the Render host name (for example `bundle-of-loops-api.onrender.com`, without `https://`). It is the only address the sites may call besides Supabase. (Tell Claude the address and it will make the change and update the test that guards it.)
+**The `vercel.json` files already point at `bundle-of-loops-api.onrender.com`.** This is why the Render service must be named exactly `bundle-of-loops-api`. If you choose another name or a custom domain, change that host in `deploy/shop/vercel.json`, `deploy/admin/vercel.json`, `frontend/src/deploy.test.ts` and the Vercel variable `VITE_API_BASE_URL` (tell Claude and it will do it).
 
 After the first build, note the two Vercel addresses.
 
@@ -122,7 +122,7 @@ Every 5 minutes it cancels expired unpaid orders, tells the customers once, and 
 2. The shop opens, shows products, and a **Cash on Delivery** test order can be placed; the shop owner's email receives the alert.
 3. The admin opens at its own address, log in, set up the authenticator code (QR code) the first time, and see the dashboard.
 4. Upload one product picture, one gallery picture, and send one custom-order request with a photo (needs the buckets in the README).
-5. Place a transfer order, send a transaction number, confirm it in the admin.
+5. Upload an Easypaisa QR code in Settings, place an Easypaisa order, send a transaction number and a receipt, and verify it on the admin's Payments page.
 6. Run `python -m app.tools.check_services` locally with the production values if you want one more summary.
 7. Check the browser console of both sites: there must be no blocked-by-CSP errors (if there are, the address in `vercel.json` or `CORS_ORIGINS` is wrong).
 

@@ -22,11 +22,14 @@ def cron_on(client):
 async def transfer_on(db_engine):
     async with db_engine.begin() as conn:
         await conn.execute(
-            text("UPDATE business_settings SET transfer_instructions = 'JazzCash 0300'")
+            text(
+                "UPDATE business_settings SET easypaisa_qr_path = 'payment-qr/' || repeat('1', 32) "
+                "|| '.png'"
+            )
         )
 
 
-async def make_expired_order(client, make_product, db_engine, *, method="TRANSFER", qty=2):
+async def make_expired_order(client, make_product, db_engine, *, method="EASYPAISA", qty=2):
     p = await make_product(stock_quantity=5)
     r = await place(client, [(p["product_id"], qty)], payment_method=method)
     assert r.status_code == 201, r.text
@@ -117,7 +120,7 @@ async def test_a_registered_customer_also_gets_an_in_app_notification(
     uid = uuid.uuid4()
     headers = auth(make_token(sub=uid, email="reg@example.com", name="Reg"))
     p = await make_product(stock_quantity=5)
-    r = await place(client, [(p["product_id"], 1)], headers=headers, payment_method="TRANSFER")
+    r = await place(client, [(p["product_id"], 1)], headers=headers, payment_method="EASYPAISA")
     assert r.status_code == 201, r.text
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -134,13 +137,14 @@ async def test_orders_that_are_not_expired_unpaid_orders_are_left_alone(
     p = await make_product(stock_quantity=9)
     # still inside its window, a COD order, a transfer order whose proof is being checked, and a
     # customer-cancelled order
-    inside = (await place(client, [(p["product_id"], 1)], payment_method="TRANSFER")).json()
+    inside = (await place(client, [(p["product_id"], 1)], payment_method="EASYPAISA")).json()
     cod = (await place(client, [(p["product_id"], 1)])).json()
-    checking = (await place(client, [(p["product_id"], 1)], payment_method="TRANSFER")).json()
+    checking = (await place(client, [(p["product_id"], 1)], payment_method="EASYPAISA")).json()
     await client.post(
-        f"/api/orders/{checking['order_id']}/payment-proof", json={"reference": "TX1"}
+        f"/api/orders/{checking['order_id']}/payment-proof",
+        json={"reference": "TX1234567", "image_path": f"payment-proofs/{'c' * 32}.png"},
     )
-    mine = (await place(client, [(p["product_id"], 1)], payment_method="TRANSFER")).json()
+    mine = (await place(client, [(p["product_id"], 1)], payment_method="EASYPAISA")).json()
     await client.post(f"/api/admin/orders/{mine['order_id']}/cancel", headers=admin_h, json={})
     emails.sent.clear()
     assert (await call(client)).json() == {"expired": 0, "notified": 0}

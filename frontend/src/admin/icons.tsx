@@ -27,6 +27,12 @@ export const BoxIcon = (p: P) => (
     <path d="M4 8l8 4 8-4M12 12v8" />
   </svg>
 )
+export const CardIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="6" width="18" height="13" rx="2" />
+    <path d="M3 10h18M7 15h4" />
+  </svg>
+)
 export const BagIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M5 8h14l-1 12H6L5 8Z" />
