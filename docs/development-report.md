@@ -573,3 +573,11 @@ The owner supplied the shop's Instagram logo (a 201 x 190 screenshot of a round 
 * `deploy/shop/vercel.json`, `deploy/admin/vercel.json` (CSP `connect-src`) and `frontend/src/deploy.test.ts` now use the Railway address; the deploy test passes. `backend/railway.json` added. `docs/deployment.md` has a "Current host: Railway" section; the Render steps stay as an alternative.
 
 **Still open:** `VITE_API_BASE_URL` on both Vercel projects, Supabase login URLs, the expiry cron call, a push, and the live checks.
+
+## SQA pass 2 and hand-over to the SQA phase (8 Nov 2026)
+
+**Request (owner):** confirm that everything works and move the whole system to the SQA phase.
+
+**Done:** ran every automated check (backend 587, frontend 445, ruff, ESLint, TypeScript, Prettier, dependency audits: all clean) and probed the live API and both sites with read-only requests (auth refused without a token, cron secret, docs off, gateway routes 403, CORS, security headers, sites load). Added a "Second pass" section to `docs/qa-report.md` and moved `docs/progress.md` to the SQA / launch-readiness phase with a new "Current Next Step".
+
+**Not claimed:** real-money wallet payments, customer emails, phone camera uploads and load were not tested; they are listed in the QA report and progress file as the remaining manual checks.

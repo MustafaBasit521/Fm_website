@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-**Phases 1 to 10 are implemented and tested, the UI polish and the quality-assurance phase are done (see `docs/qa-report.md`). The project is in the first deployment (Supabase + Render + Vercel, see `docs/deployment.md`).**
+**Phases 1 to 10 are implemented and tested, the UI polish and the quality-assurance phase are done (see `docs/qa-report.md`). The system is deployed (API on Railway, sites on Vercel, database on Supabase) and has passed its second QA pass (8 November 2026, see `docs/qa-report.md`). It is now in the SQA / launch-readiness phase: manual checks with real money and real customers, then the first real orders.**
 
 Phase 0 (architecture and requirements) was completed first; everything it decided is recorded under "Finalized Decisions" below.
 
@@ -471,10 +471,11 @@ Implementation notes (admin security):
 
 # Current Next Step
 
-0. **Apply migration `8e2a6c4b91d0` to Supabase** (after `5d3b8f1c2a47`, which is already there): `make migrate`. It only adds columns and the `payment_refunds` table. Then, in the admin settings, fill in the WhatsApp number and the Easypaisa/JazzCash QR code or account number. The private `payment-proofs` bucket is needed only if the receipt flow is switched on.
-1. **Deploy**: the two Vercel projects exist (`bundle-of-loops-shop`, `bundle-of-loops-admin`, linked to GitHub, root directories set, public variables set). Still to do: create the API on Render named exactly `bundle-of-loops-api` (it asks for a card to verify the account even for the free instance), set `CORS_ORIGINS` and `FRONTEND_URL`, the Supabase login URLs, and schedule the expiry call (`docs/deployment.md`).
-2. **Check the real services by hand** (list in `docs/qa-report.md`): real sign-up, login and authenticator codes, uploads to the four Storage buckets (including `payment-proofs`), emails to someone else's address, a real phone.
-3. **Before real customers**: a domain (owner's name) with Resend for customer emails, a backend plan that does not sleep, backups.
+Done: migration `8e2a6c4b91d0` applied; API deployed on Railway (`https://bundle-of-loops-api-production.up.railway.app`); both Vercel sites point at it; Supabase login addresses set; admin and shop checked by hand on the live system (see `docs/qa-report.md`, second pass).
+
+1. **SQA / launch readiness, by hand with the owner:** one real small Easypaisa and one JazzCash payment, then "Mark as paid" and a refund; a real phone (camera uploads, slow connection); emails to a non-owner address.
+2. **Before real customers:** a domain in the owner's name verified in Resend (so customers get emails); a card on Railway before the 30-day trial ends (or move the API); Supabase Pro (backups, no pausing); a commercial Vercel plan.
+3. **Then:** the open audit items (P4, G-items, see the private audit report), CI and a backup routine, the payment gateway (Safepay/PayFast) once there are customers, and the scheduled expiry call only when the gateway is switched on.
 
 ---
 

@@ -1,6 +1,36 @@
 # Quality assurance report
 
-Date: 19 October 2026. Scope: the whole shop (customer site, admin site, API) before the first deployment.
+Date: 19 October 2026 (first pass). Scope: the whole shop (customer site, admin site, API) before the first deployment. The second pass (8 November 2026) is the first section below.
+
+## Second pass: launch payments and the live deployment (8 November 2026)
+
+Scope: the simplified launch payments (business-rules §13) and the first live deployment (API on Railway, sites on Vercel, database on Supabase).
+
+**Automated, all green:** 587 backend tests (including 25 launch-payment tests and the old receipt tests run with the flag on), 445 frontend tests, ruff (lint and format), ESLint, TypeScript, Prettier, `npm audit --omit=dev` (0 vulnerabilities) and `pip-audit` (no known vulnerabilities).
+
+**Live checks against the deployed API (read-only, nothing created):**
+
+| Check | Result |
+|---|---|
+| `/api/health`, `/api/settings`, `/api/categories`, `/api/products` | 200, database reachable |
+| `/api/admin/orders`, `/api/admin/settings`, `/api/admin/payments`, `/api/orders` without a token; admin route with a forged token | 401 |
+| Cron route without the secret | 401 "Invalid secret" |
+| `/docs`, `/openapi.json` | 404 (API documentation is off in production) |
+| Gateway routes (`/orders/{id}/pay`, `/payments/webhook/{provider}`) | 403 `FEATURE_DISABLED` |
+| CORS: shop and admin addresses allowed, unknown origin gets no allow header and its preflight is refused | as designed |
+| Headers: HSTS, `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, strict content security policy on API and both sites | present |
+| Both Vercel sites | 200; single-page routes load; the shop shows real products from the live API |
+
+**Checked by the owner by hand on the live system:** admin login with the authenticator code, Settings (WhatsApp and wallet details), a cash-on-delivery order, a wallet order with "Mark as paid", and the Supabase login addresses. All worked.
+
+**Found during deployment (not product bugs):** the hosting build failed twice (Python install attestation check; a pre-filled `pip` build command) and a typo in the production `EMAIL_FROM` value. All fixed; see `docs/deployment.md`.
+
+**Observations (not blocking):**
+- The API runs in Singapore and the database in Tokyo, so each query costs a few dozen milliseconds more; the product list took 0.5 to 1.1 s in the owner's browser. Acceptable for launch; the hosts can be moved closer together later.
+- Railway's trial lasts 30 days. A card must be added before it ends or the API stops.
+- Customer emails: Resend with the test sender delivers only to the account owner until a domain is verified.
+
+**Still not verified (needs real money, a real phone or a domain):** a real Easypaisa/JazzCash payment end to end and the refund by hand in the wallet app, email delivery to a customer address, real uploads on a phone camera, behaviour under real traffic, and the open audit items (P4, the G-items) listed in the private audit report.
 
 ## How it was tested
 
