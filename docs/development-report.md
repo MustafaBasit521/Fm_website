@@ -560,3 +560,16 @@ The owner supplied the shop's Instagram logo (a 201 x 190 screenshot of a round 
 * Tests: `tests/test_wallet_simple.py` (25 cases: COD unchanged, no deadline/expiry, mark-as-paid success, 5 concurrent clicks give one success, no token / customer / admin without the second factor refused, wrong amount refused, plain confirm refused, cancel releases stock, late money, refund trace, awaiting filter, flag-off routes refuse, settings alert). The old receipt tests run with the flag switched on (fixture `receipts_on`).
 
 **Audit items:** resolved P5 (typed amount), P6 (refund reference), P12 (alert); P1 (money after cancellation) now has a path; the receipt-flow items (P2, P3, P8-P11, P13) are dormant while the flag is off. P4 (a wrong amount leaves no record) and the G-items are unchanged. Anyone can place wallet orders that hold stock until the admin cancels them (same as COD).
+
+## Backend hosting moved to Railway (Nov 2026)
+
+**Request (owner):** deploy the API on Railway instead of Render. The owner created the account and the service `bundle-of-loops-api` in the Railway dashboard (the Railway CLI could not be installed here).
+
+**Done:**
+* Service from GitHub `Fm_website` (main), Root Directory `/backend`, start command and health check `/api/health` set in the dashboard; production variables entered through the Raw Editor from a temporary file that was deleted afterwards (no secret was printed or committed).
+* Two build failures fixed: Python 3.12.8 could not be installed (fixed with the variable `MISE_PYTHON_GITHUB_ATTESTATIONS=false`) and the pre-filled Custom Build Command `pip install -r requirements.txt` failed with `pip: not found` (cleared; Railpack installs the requirements itself).
+* Found and fixed a typo in the production `EMAIL_FROM` copy (`onboarding@resend.dev123456789`); the local `backend/.env` still has it.
+* Address `https://bundle-of-loops-api-production.up.railway.app`: `/api/health` 200, `/api/settings` and `/api/products` 200 (database reachable), CORS answers for the shop address.
+* `deploy/shop/vercel.json`, `deploy/admin/vercel.json` (CSP `connect-src`) and `frontend/src/deploy.test.ts` now use the Railway address; the deploy test passes. `backend/railway.json` added. `docs/deployment.md` has a "Current host: Railway" section; the Render steps stay as an alternative.
+
+**Still open:** `VITE_API_BASE_URL` on both Vercel projects, Supabase login URLs, the expiry cron call, a push, and the live checks.

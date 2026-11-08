@@ -8,9 +8,21 @@ The system has three parts. Do them **in this order**, because each step needs a
 | API (FastAPI) | **Render** (free plan to start) | an always-on process: it sends emails after saving an order and keeps request limits in memory, which a serverless host would break |
 | Shop website and admin website | **Vercel** (two projects) | they are static files |
 
-Never paste a secret key into chat, into GitHub or into a file in this repository. Secrets are typed only into the Render or Vercel dashboards.
+Never paste a secret key into chat, into GitHub or into a file in this repository. Secrets are typed only into the Railway, Render or Vercel dashboards.
 
-## Step 1: the API on Render (by hand, no Blueprint needed)
+## Current host: the API on Railway (Nov 2026)
+
+The live API runs on **Railway** (30-day trial credit, then the Hobby plan, about $5 a month plus usage, which needs a card). Its address is `https://bundle-of-loops-api-production.up.railway.app`, and the two `vercel.json` files, `frontend/src/deploy.test.ts` and the Vercel variable `VITE_API_BASE_URL` point at it. Settings used, all in the Railway dashboard:
+
+- Source: the GitHub repo `Fm_website`, branch `main`, **Root Directory `/backend`** (Settings -> Source -> Add Root Directory).
+- Build: Railpack (default). **Leave Custom Build Command empty**; Railpack installs `requirements.txt` itself, and a custom `pip install` fails with `pip: not found`.
+- Deploy: Custom Start Command `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'`, Healthcheck Path `/api/health`, region Southeast Asia.
+- Variables: `APP_ENV=production`, `TRUST_PROXY_HEADERS=true`, `LOG_LEVEL`, `CORS_ORIGINS`, `FRONTEND_URL`, `CRON_SECRET`, `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM`, and **`MISE_PYTHON_GITHUB_ATTESTATIONS=false`**. Without the last one the Python 3.12.8 install fails with "No GitHub artifact attestations found".
+- `backend/railway.json` repeats the start command and health check, but Railway does not read it from inside the root directory unless its config path is set to `/backend/railway.json`. The dashboard values are the ones in use.
+
+Steps 2 to 6 below apply unchanged; read "the Render address" as the Railway address. Step 1 describes Render, the earlier host, and is kept as an alternative (`render.yaml`).
+
+## Step 1 (alternative host): the API on Render (by hand, no Blueprint needed)
 
 Render's "Blueprint" feature asks for a payment method, so create the service by hand instead (the free web service does not need one; if Render asks for a card anyway, stop and tell the developer).
 
@@ -78,7 +90,7 @@ Environment variables (Production), the same for both projects:
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | the Supabase **publishable** key (public by design) |
 | `VITE_SHOP_URL` | the shop's Vercel address (used by the admin's "View shop" button; set it on the admin project) |
 
-**The `vercel.json` files already point at `bundle-of-loops-api.onrender.com`.** This is why the Render service must be named exactly `bundle-of-loops-api`. If you choose another name or a custom domain, change that host in `deploy/shop/vercel.json`, `deploy/admin/vercel.json`, `frontend/src/deploy.test.ts` and the Vercel variable `VITE_API_BASE_URL` (tell Claude and it will do it).
+**The `vercel.json` files already point at the Railway address `bundle-of-loops-api-production.up.railway.app`.** (With Render, the service had to be named exactly `bundle-of-loops-api`.) If you choose another name or a custom domain, change that host in `deploy/shop/vercel.json`, `deploy/admin/vercel.json`, `frontend/src/deploy.test.ts` and the Vercel variable `VITE_API_BASE_URL` (tell Claude and it will do it).
 
 After the first build, note the two Vercel addresses.
 
