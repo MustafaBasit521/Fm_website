@@ -32,7 +32,7 @@ describe.each(['shop', 'admin'])('%s deployment headers', (site) => {
     const connect = /connect-src ([^;]*)/.exec(csp)![1].split(' ')
     expect(connect).toEqual([
       "'self'",
-      'https://bundle-of-loops-api.onrender.com',
+      'https://bundle-of-loops-api-production.up.railway.app',
       'https://*.supabase.co',
     ])
   })
